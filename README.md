@@ -1,10 +1,10 @@
 # Matrix Rust SDK Log Visualiser
 
-A web-app viewer for [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) logs. This tool helps visualize and logs. First victim: `/sync` requests.
+A web-app viewer for [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) logs. This tool helps visualize and logs, starting with /sync requests.”
 
-## Local use
+Available at https://manuroe.github.io/matrix-rust-sdk-log-visualiser/.
 
-To launch the web app locally, use Python's built-in HTTP server:
+Or locally:
 
 ```bash
 python3 -m http.server 8000
