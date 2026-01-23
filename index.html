@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Sync Requests Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="drop-zone" class="drop-zone">
+        <div class="drop-zone-content">
+            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <h2>Drop Matrix SDK Log File Here</h2>
+            <p>or click to browse</p>
+            <input type="file" id="file-input" accept=".log,.txt" />
+        </div>
+    </div>
+
+    <div id="app" class="app hidden">
+        <div class="header">
+            <h1>Matrix Rust SDK Log Visualiser: <code class="inline-code">/sync</code> requests</h1>
+            <div class="controls">
+                <button id="load-new-file" class="btn-secondary">Load New File</button>
+                <select id="conn-filter"></select>
+                <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555;">
+                    <input type="checkbox" id="hide-pending" checked />
+                    Hide pending
+                </label>
+                <div class="stats">
+                    <span id="shown-count">0</span> / <span id="total-count">0</span> requests
+                </div>
+                <button id="export-csv" class="btn-primary push-right">Export CSV</button>
+            </div>
+        </div>
+
+        <div class="timeline-container">
+            <div class="timeline-header">
+                <div>Request</div>
+                <div>Timeline</div>
+                <div>Status</div>
+                <div>↑ Size</div>
+                <div>↓ Size</div>
+                <div>Duration</div>
+            </div>
+            <div id="timeline-content"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

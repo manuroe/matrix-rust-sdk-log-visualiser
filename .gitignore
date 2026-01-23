@@ -1,0 +1,18 @@
+# Log files
+*.log
+*.txt
+
+# CSV exports
+*.csv
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
