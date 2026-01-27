@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SyncRequest, ParsedLogLine } from '../types/log.types';
+import { isInTimeRange, calculateTimeRange, timeToMs } from '../utils/timeUtils';
 
 interface LogStore {
   allRequests: SyncRequest[];
@@ -7,6 +8,8 @@ interface LogStore {
   connectionIds: string[];
   selectedConnId: string;
   hidePending: boolean;
+  startTime: string | null;
+  endTime: string | null;
   expandedRows: Set<string>;
   
   // Log display state
@@ -16,6 +19,7 @@ interface LogStore {
   setRequests: (requests: SyncRequest[], connIds: string[], rawLines: ParsedLogLine[]) => void;
   setSelectedConnId: (connId: string) => void;
   setHidePending: (hide: boolean) => void;
+  setTimeFilter: (startTime: string | null, endTime: string | null) => void;
   toggleRowExpansion: (requestId: string) => void;
   filterRequests: () => void;
   clearData: () => void;
@@ -31,6 +35,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
   connectionIds: [],
   selectedConnId: '',
   hidePending: true,
+  startTime: null,
+  endTime: null,
   expandedRows: new Set(),
   
   rawLogLines: [],
@@ -57,6 +63,11 @@ export const useLogStore = create<LogStore>((set, get) => ({
     get().filterRequests();
   },
 
+  setTimeFilter: (startTime, endTime) => {
+    set({ startTime, endTime });
+    get().filterRequests();
+  },
+
   toggleRowExpansion: (requestId) => {
     const expandedRows = new Set(get().expandedRows);
     if (expandedRows.has(requestId)) {
@@ -68,12 +79,38 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   filterRequests: () => {
-    const { allRequests, selectedConnId, hidePending } = get();
-    const filtered = allRequests.filter(
-      (r) =>
-        (!selectedConnId || r.conn_id === selectedConnId) &&
-        (!hidePending || r.status)
-    );
+    const { allRequests, selectedConnId, hidePending, startTime, endTime } = get();
+    
+    // Calculate time range if filters are set
+    let timeRangeMs: { startMs: number; endMs: number } | null = null;
+    if (startTime || endTime) {
+      // Find max time from all requests to use as reference (end of log)
+      const times = allRequests
+        .map((r) => r.response_time)
+        .filter((t) => t)
+        .map(timeToMs);
+      const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
+      
+      // Calculate time range relative to the log's maximum time
+      timeRangeMs = calculateTimeRange(startTime, endTime, maxLogTimeMs);
+    }
+    
+    const filtered = allRequests.filter((r) => {
+      // Connection filter
+      if (selectedConnId && r.conn_id !== selectedConnId) return false;
+      
+      // Pending filter
+      if (hidePending && !r.status) return false;
+      
+      // Time filter
+      if (timeRangeMs && r.response_time) {
+        if (!isInTimeRange(r.response_time, timeRangeMs.startMs, timeRangeMs.endMs)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
     set({ filteredRequests: filtered });
   },
 
@@ -83,6 +120,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
       filteredRequests: [],
       connectionIds: [],
       selectedConnId: '',
+      startTime: null,
+      endTime: null,
       expandedRows: new Set(),
       rawLogLines: [],
       openLogViewerIds: new Set(),

@@ -172,6 +172,444 @@ body {
     background: #f5f5f5;
 }
 
+/* Time Filter Styles */
+.app-header {
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.time-filter {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.time-filter-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.time-filter-display label {
+    font-weight: 500;
+    color: #555;
+}
+
+.time-filter-text {
+    color: #0066cc;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+}
+
+.time-filter-shortcuts {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.btn-shortcut {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.btn-shortcut:hover {
+    border-color: #0066cc;
+    color: #0066cc;
+}
+
+.btn-shortcut.active {
+    background: #0066cc;
+    color: white;
+    border-color: #0066cc;
+}
+
+.btn-clear {
+    background: #f5f5f5;
+    border-color: #ccc;
+    color: #666;
+}
+
+.btn-clear:hover {
+    background: #e8e8e8;
+    border-color: #999;
+    color: #333;
+}
+
+.time-filter-custom {
+    padding: 10px 0;
+    background: #f9f9f9;
+    border-top: 1px solid #eee;
+}
+
+.custom-inputs {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    padding: 8px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.input-group label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #555;
+}
+
+.input-group input {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    width: 150px;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.time-filter-error {
+    padding: 8px 8px;
+    background: #fee;
+    color: #c00;
+    font-size: 12px;
+    border-radius: 4px;
+    margin: 0 8px;
+}
+
+.custom-help {
+    padding: 6px 8px;
+    font-size: 11px;
+    color: #888;
+    background: #fafafa;
+    border-radius: 4px;
+    margin: 0 8px;
+}
+
+.custom-help code {
+    padding: 2px 4px;
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* Compact Header Styles */
+.header-compact {
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 8px 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: space-between;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.header-center {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.select-compact {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+}
+
+.checkbox-compact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #555;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.stats-compact {
+    font-size: 12px;
+    color: #888;
+    white-space: nowrap;
+}
+
+.btn-compact {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+/* Burger Menu Styles */
+.burger-menu {
+    position: relative;
+}
+
+.burger-button {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.burger-button:hover {
+    background: #f5f5f5;
+    border-color: #999;
+}
+
+.burger-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 200px;
+    z-index: 1000;
+    padding: 4px 0;
+}
+
+.burger-item {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.burger-item:hover {
+    background: #f5f5f5;
+}
+
+.burger-item.active {
+    background: #e8f4ff;
+    color: #0066cc;
+    font-weight: 500;
+}
+
+.burger-divider {
+    height: 1px;
+    background: #eee;
+    margin: 4px 0;
+}
+
+.burger-section-title {
+    padding: 8px 16px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Time Range Selector Styles */
+.time-range-selector {
+    position: relative;
+}
+
+.time-range-button {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.time-range-button:hover {
+    background: #f5f5f5;
+    border-color: #999;
+}
+
+.time-range-icon {
+    font-size: 14px;
+}
+
+.time-range-text {
+    color: #333;
+    font-weight: 500;
+}
+
+.time-range-arrow {
+    font-size: 10px;
+    color: #888;
+}
+
+.time-range-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 200px;
+    z-index: 1000;
+    padding: 4px 0;
+}
+
+.time-range-shortcuts {
+    padding: 4px;
+}
+
+.time-range-item {
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 3px;
+}
+
+.time-range-item:hover {
+    background: #f5f5f5;
+}
+
+.time-range-item.active {
+    background: #e8f4ff;
+    color: #0066cc;
+    font-weight: 500;
+}
+
+.time-range-item.time-range-clear {
+    color: #c00;
+}
+
+.time-range-item.time-range-clear:hover {
+    background: #fee;
+}
+
+.time-range-divider {
+    height: 1px;
+    background: #eee;
+    margin: 4px 0;
+}
+
+.time-range-custom {
+    padding: 12px;
+}
+
+.custom-input-group {
+    margin-bottom: 10px;
+}
+
+.custom-input-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.custom-input-group input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.custom-input-group input:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.time-range-error {
+    padding: 6px 8px;
+    background: #fee;
+    color: #c00;
+    font-size: 11px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+}
+
+.custom-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.btn-secondary:hover {
+    background: #f5f5f5;
+}
+
 .stats {
     font-size: 12px;
     color: #888;

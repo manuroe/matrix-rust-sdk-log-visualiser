@@ -1,39 +1,37 @@
-import { useNavigate } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
 import { exportToCSV } from '../utils/logParser';
-import { timeToMs } from '../utils/timeUtils';
+import { timeToMs, applyTimeRangeFilter } from '../utils/timeUtils';
 import { LogDisplayView } from './LogDisplayView';
+import { BurgerMenu } from '../components/BurgerMenu';
+import { TimeRangeSelector } from '../components/TimeRangeSelector';
 
 export function SyncView() {
-  const navigate = useNavigate();
   const {
     allRequests,
     filteredRequests,
     connectionIds,
     selectedConnId,
     hidePending,
+    startTime,
+    endTime,
     expandedRows,
     openLogViewerIds,
     setSelectedConnId,
     setHidePending,
     toggleRowExpansion,
-    clearData,
     openLogViewer,
     closeLogViewer,
   } = useLogStore();
-
-  const handleLoadNewFile = () => {
-    clearData();
-    navigate('/');
-  };
 
   const handleExportCSV = () => {
     exportToCSV(allRequests);
   };
 
-  const totalForConn = allRequests.filter(
+  // Calculate total for selected connection, considering time range filter
+  const connFilteredRequests = allRequests.filter(
     (r) => !selectedConnId || r.conn_id === selectedConnId
-  ).length;
+  );
+  const totalForConn = applyTimeRangeFilter(connFilteredRequests, startTime, endTime).length;
 
   // Calculate timeline scale
   const times = filteredRequests
@@ -46,18 +44,20 @@ export function SyncView() {
 
   return (
     <div className="app">
-      <div className="header">
-        <h1>
-          Matrix Rust SDK Log Visualiser: <code className="inline-code">/http_requests/sync</code> requests
-        </h1>
-        <div className="controls">
-          <button onClick={handleLoadNewFile} className="btn-secondary">
-            Load New File
-          </button>
+      <div className="header-compact">
+        <div className="header-left">
+          <BurgerMenu />
+          <h1 className="header-title">
+            /sync requests
+          </h1>
+        </div>
+        
+        <div className="header-center">
           <select
             id="conn-filter"
             value={selectedConnId}
             onChange={(e) => setSelectedConnId(e.target.value)}
+            className="select-compact"
           >
             {connectionIds.map((connId) => (
               <option key={connId} value={connId}>
@@ -65,7 +65,8 @@ export function SyncView() {
               </option>
             ))}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#555' }}>
+          
+          <label className="checkbox-compact">
             <input
               type="checkbox"
               id="hide-pending"
@@ -74,11 +75,15 @@ export function SyncView() {
             />
             Hide pending
           </label>
-          <div className="stats">
-            <span id="shown-count">{filteredRequests.length}</span> /{' '}
-            <span id="total-count">{totalForConn}</span> requests
+          
+          <div className="stats-compact">
+            <span id="shown-count">{filteredRequests.length}</span> / <span id="total-count">{totalForConn}</span>
           </div>
-          <button onClick={handleExportCSV} className="btn-primary push-right">
+        </div>
+        
+        <div className="header-right">
+          <TimeRangeSelector />
+          <button onClick={handleExportCSV} className="btn-primary btn-compact">
             Export CSV
           </button>
         </div>
