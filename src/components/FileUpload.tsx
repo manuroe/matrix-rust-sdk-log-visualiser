@@ -14,8 +14,8 @@ export function FileUpload() {
       reader.onload = (e) => {
         try {
           const logContent = e.target?.result as string;
-          const { requests, connectionIds } = parseLogFile(logContent);
-          setRequests(requests, connectionIds);
+          const { requests, connectionIds, rawLogLines } = parseLogFile(logContent);
+          setRequests(requests, connectionIds, rawLogLines);
           navigate('/http_requests/sync');
         } catch (error) {
           console.error('Error parsing log file:', error);

@@ -1,14 +1,43 @@
-import type { SyncRequest, LogParserResult } from '../types/log.types';
+import type { SyncRequest, LogParserResult, ParsedLogLine, LogLevel } from '../types/log.types';
 
 // Regex patterns for parsing log lines (ported from vanilla JS)
 const RESP_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+\/sync[^"]*)"\s+request_size="(?<req_size>[^"]+)"\s+status=(?<status>\S+)\s+response_size="(?<resp_size>[^"]+)"\s+request_duration=(?<duration_val>[0-9.]+)(?<duration_unit>ms|s)/;
 const SEND_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+\/sync[^"]*)"\s+request_size="(?<req_size>[^"]+)"(?![^}]*(?:status=|response_size=|request_duration=))/;
 
+// Pattern for extracting log level - matches common Rust log formats
+const LOG_LEVEL_RE = /\s(TRACE|DEBUG|INFO|WARN|ERROR)\s/;
+
+function extractLogLevel(line: string): LogLevel {
+  const match = line.match(LOG_LEVEL_RE);
+  return match ? (match[1] as LogLevel) : 'UNKNOWN';
+}
+
+function extractTimestamp(line: string): string {
+  // Extract timestamp from position 11+, format: HH:MM:SS.microseconds
+  const timeMatch = line.slice(11).match(/(\d{2}:\d{2}:\d{2}\.\d+)Z?/);
+  return timeMatch ? timeMatch[1] : '';
+}
+
 export function parseLogFile(logContent: string): LogParserResult {
   const lines = logContent.split('\n');
   const records = new Map<string, Partial<SyncRequest>>();
+  const rawLogLines: ParsedLogLine[] = [];
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Parse every line for the raw log view
+    if (line.trim()) {
+      const timestamp = extractTimestamp(line);
+      const level = extractLogLevel(line);
+      rawLogLines.push({
+        lineNumber: i + 1,
+        rawText: line,
+        timestamp,
+        level,
+        message: line,
+      });
+    }
     // Early filter for performance
     if (!line.includes('/sync') || !line.includes('request_id=')) {
       continue;
@@ -97,6 +126,7 @@ export function parseLogFile(logContent: string): LogParserResult {
   return {
     requests: allRequests,
     connectionIds,
+    rawLogLines,
   };
 }
 

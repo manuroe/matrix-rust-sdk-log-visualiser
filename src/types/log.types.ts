@@ -16,4 +16,15 @@ export interface SyncRequest {
 export interface LogParserResult {
   requests: SyncRequest[];
   connectionIds: string[];
+  rawLogLines: ParsedLogLine[];
 }
+
+export interface ParsedLogLine {
+  lineNumber: number;
+  rawText: string;
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+}
+
+export type LogLevel = 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'UNKNOWN';
