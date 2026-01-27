@@ -8,8 +8,28 @@ A web application for visualizing and analyzing Matrix Rust SDK logs.
 - **React 18+** - UI framework
 - **TypeScript** - Type safety
 - **React Router** - Hash-based navigation for static hosting
-- **Zustand** - State management (TBD)
+- **Zustand** - State management
 - **@tanstack/react-virtual** - Virtual scrolling for large log files
+
+## State Management Architecture
+
+**State Library**: Zustand (simple, lightweight state management)
+
+**Global Filters**: 
+- `startTime` and `endTime` - time range filters shared across all views
+- Synced with URL query parameters (`?start=...&end=...`)
+- Managed centrally in Zustand store
+- Applied consistently to HTTP Requests view and Sync Requests view
+
+**Data Separation**:
+- **Sync-specific state**: `allRequests`, `filteredRequests`, `connectionIds`, `selectedConnId`, `hidePending`
+- **HTTP requests state**: `allHttpRequests`, `filteredHttpRequests`, `hidePendingHttp`
+- **Shared state**: `startTime`, `endTime`, `rawLogLines`, `expandedRows`, `openLogViewerIds`
+
+**Filtering Strategy**:
+- Each view has its own filter function (`filterRequests()`, `filterHttpRequests()`)
+- Global time filters trigger re-filtering of both views
+- View-specific filters (e.g., connection ID for sync) only affect that view
 
 ## UX/UI Design
 
@@ -42,3 +62,4 @@ npm run preview
 npm test            # Unit tests (Vitest)
 npm run test:e2e    # End-to-end tests (Playwright)
 ```
+

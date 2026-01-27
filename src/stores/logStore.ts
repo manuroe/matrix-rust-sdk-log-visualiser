@@ -1,27 +1,45 @@
 import { create } from 'zustand';
-import type { SyncRequest, ParsedLogLine } from '../types/log.types';
+import type { HttpRequest, SyncRequest, ParsedLogLine } from '../types/log.types';
 import { isInTimeRange, calculateTimeRange, timeToMs } from '../utils/timeUtils';
 
 interface LogStore {
+  // Sync-specific state
   allRequests: SyncRequest[];
   filteredRequests: SyncRequest[];
   connectionIds: string[];
   selectedConnId: string;
   hidePending: boolean;
+  
+  // HTTP requests state (all requests, not just sync)
+  allHttpRequests: HttpRequest[];
+  filteredHttpRequests: HttpRequest[];
+  hidePendingHttp: boolean;
+  
+  // Global filters (shared across all views)
   startTime: string | null;
   endTime: string | null;
+  
+  // UI state
   expandedRows: Set<string>;
   
   // Log display state
   rawLogLines: ParsedLogLine[];
   openLogViewerIds: Set<string>;
   
+  // Sync-specific actions
   setRequests: (requests: SyncRequest[], connIds: string[], rawLines: ParsedLogLine[]) => void;
   setSelectedConnId: (connId: string) => void;
   setHidePending: (hide: boolean) => void;
+  filterRequests: () => void;
+  
+  // HTTP requests actions
+  setHttpRequests: (requests: HttpRequest[], rawLines: ParsedLogLine[]) => void;
+  setHidePendingHttp: (hide: boolean) => void;
+  filterHttpRequests: () => void;
+  
+  // Global actions
   setTimeFilter: (startTime: string | null, endTime: string | null) => void;
   toggleRowExpansion: (requestId: string) => void;
-  filterRequests: () => void;
   clearData: () => void;
   
   // Log viewer actions
@@ -30,13 +48,23 @@ interface LogStore {
 }
 
 export const useLogStore = create<LogStore>((set, get) => ({
+  // Sync-specific state
   allRequests: [],
   filteredRequests: [],
   connectionIds: [],
   selectedConnId: '',
   hidePending: true,
+  
+  // HTTP requests state
+  allHttpRequests: [],
+  filteredHttpRequests: [],
+  hidePendingHttp: true,
+  
+  // Global filters
   startTime: null,
   endTime: null,
+  
+  // UI state
   expandedRows: new Set(),
   
   rawLogLines: [],
@@ -62,10 +90,25 @@ export const useLogStore = create<LogStore>((set, get) => ({
     set({ hidePending: hide });
     get().filterRequests();
   },
+  
+  setHttpRequests: (requests, rawLines) => {
+    set({ 
+      allHttpRequests: requests,
+      rawLogLines: rawLines
+    });
+    get().filterHttpRequests();
+  },
+  
+  setHidePendingHttp: (hide) => {
+    set({ hidePendingHttp: hide });
+    get().filterHttpRequests();
+  },
 
   setTimeFilter: (startTime, endTime) => {
     set({ startTime, endTime });
+    // Re-filter both sync and HTTP requests when time filter changes
     get().filterRequests();
+    get().filterHttpRequests();
   },
 
   toggleRowExpansion: (requestId) => {
@@ -113,6 +156,39 @@ export const useLogStore = create<LogStore>((set, get) => ({
     });
     set({ filteredRequests: filtered });
   },
+  
+  filterHttpRequests: () => {
+    const { allHttpRequests, hidePendingHttp, startTime, endTime } = get();
+    
+    // Calculate time range if filters are set
+    let timeRangeMs: { startMs: number; endMs: number } | null = null;
+    if (startTime || endTime) {
+      // Find max time from all HTTP requests to use as reference (end of log)
+      const times = allHttpRequests
+        .map((r) => r.response_time)
+        .filter((t) => t)
+        .map(timeToMs);
+      const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
+      
+      // Calculate time range relative to the log's maximum time
+      timeRangeMs = calculateTimeRange(startTime, endTime, maxLogTimeMs);
+    }
+    
+    const filtered = allHttpRequests.filter((r) => {
+      // Pending filter
+      if (hidePendingHttp && !r.status) return false;
+      
+      // Time filter
+      if (timeRangeMs && r.response_time) {
+        if (!isInTimeRange(r.response_time, timeRangeMs.startMs, timeRangeMs.endMs)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    set({ filteredHttpRequests: filtered });
+  },
 
   clearData: () => {
     set({
@@ -120,6 +196,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
       filteredRequests: [],
       connectionIds: [],
       selectedConnId: '',
+      allHttpRequests: [],
+      filteredHttpRequests: [],
       startTime: null,
       endTime: null,
       expandedRows: new Set(),

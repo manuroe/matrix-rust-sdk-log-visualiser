@@ -195,11 +195,11 @@ export function isInTimeRange(
  * Apply time range filter to a list of requests
  * Returns requests that fall within the time range (by response_time)
  */
-export function applyTimeRangeFilter(
-  requests: SyncRequest[],
+export function applyTimeRangeFilter<T extends { response_time: string }>(
+  requests: T[],
   startTime: string | null,
   endTime: string | null
-): SyncRequest[] {
+): T[] {
   if (!startTime && !endTime) return requests;
 
   // Find max time from requests to use as reference
@@ -214,6 +214,3 @@ export function applyTimeRangeFilter(
 
   return requests.filter((r) => r.response_time && isInTimeRange(r.response_time, startMs, endMs));
 }
-
-// Import type for JSDoc
-import type { SyncRequest } from '../types/log.types';

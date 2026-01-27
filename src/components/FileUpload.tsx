@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { parseLogFile } from '../utils/logParser';
+import { parseLogFile, parseAllHttpRequests } from '../utils/logParser';
 import { useLogStore } from '../stores/logStore';
 
 export function FileUpload() {
   const navigate = useNavigate();
   const setRequests = useLogStore((state) => state.setRequests);
+  const setHttpRequests = useLogStore((state) => state.setHttpRequests);
 
   const handleFile = useCallback(
     (file: File) => {
@@ -14,8 +15,13 @@ export function FileUpload() {
       reader.onload = (e) => {
         try {
           const logContent = e.target?.result as string;
+          
+          // Parse both sync-specific and all HTTP requests
           const { requests, connectionIds, rawLogLines } = parseLogFile(logContent);
+          const { httpRequests } = parseAllHttpRequests(logContent);
+          
           setRequests(requests, connectionIds, rawLogLines);
+          setHttpRequests(httpRequests, rawLogLines);
           navigate('/http_requests/sync');
         } catch (error) {
           console.error('Error parsing log file:', error);
@@ -29,7 +35,7 @@ export function FileUpload() {
 
       reader.readAsText(file, 'UTF-8');
     },
-    [setRequests, navigate]
+    [setRequests, setHttpRequests, navigate]
   );
 
   const handleDrop = useCallback(
