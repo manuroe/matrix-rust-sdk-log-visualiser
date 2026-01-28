@@ -54,6 +54,12 @@ export function BurgerMenu() {
           <div className="burger-divider" />
           <div className="burger-section-title">Views</div>
           <button 
+            className={`burger-item ${isActive('/logs') ? 'active' : ''}`}
+            onClick={() => handleNavigate('/logs')}
+          >
+            All Logs
+          </button>
+          <button 
             className={`burger-item ${isActive('/http_requests') ? 'active' : ''}`}
             onClick={() => handleNavigate('/http_requests')}
           >

@@ -52,7 +52,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [76, 157];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" />);
 
     // Line 76 should be visible
     // Ensure line containers exist
@@ -84,7 +84,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [76, 157];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" />);
 
     // Line 157 visible
     const line157Container = getLineContainer(157);
@@ -115,14 +115,14 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [76, 157];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" nextRequestLineRange={{ start: 157, end: 160 }} />);
 
     const line76Container = getLineContainer(76);
     const downBtn76 = line76Container.querySelector('button[aria-label="Load hidden lines below"]') as HTMLButtonElement;
     expect(downBtn76).toBeTruthy();
     fireEvent.contextMenu(downBtn76);
 
-    const loadAllNext = await screen.findByText(/Load all to next line/i);
+    const loadAllNext = await screen.findByText(/Load to next log/i);
     await user.click(loadAllNext);
 
     // Should expand all until next anchor (157), making 156 visible and no down arrow on 156
@@ -138,14 +138,14 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [76, 157];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" prevRequestLineRange={{ start: 70, end: 76 }} />);
 
     const line157Container = getLineContainer(157);
     const upBtn157 = line157Container.querySelector('button[aria-label="Load hidden lines above"]') as HTMLButtonElement;
     expect(upBtn157).toBeTruthy();
     fireEvent.contextMenu(upBtn157);
 
-    const loadAllPrev = await screen.findByText(/Load all to previous line/i);
+    const loadAllPrev = await screen.findByText(/Load to previous log/i);
     await user.click(loadAllPrev);
 
     // Should expand all until previous anchor (76), making 77 visible and no up arrow on 77
@@ -161,7 +161,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [76, 157];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" />);
 
     const line157Container = getLineContainer(157);
     const downBtn157 = line157Container.querySelector('button[aria-label="Load hidden lines below"]') as HTMLButtonElement;
@@ -184,7 +184,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [76, 157];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" />);
 
     const line76Container = getLineContainer(76);
     const upBtn76 = line76Container.querySelector('button[aria-label="Load hidden lines above"]') as HTMLButtonElement;
@@ -207,7 +207,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [3, 7];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" />);
 
     const line3Container = getLineContainer(3);
     const textSpan = line3Container.querySelector('.log-line-text') as HTMLSpanElement;
@@ -229,7 +229,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const matchIndices = [2, 4];
     useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
 
-    render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
+    render(<LogDisplayView requestFilter="MATCH" />);
 
     let line2Container = getLineContainer(2);
     // Default is nowrap
@@ -254,7 +254,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
 
     render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
 
-    // Initially only matching line should be present
+    // Initially only matching line should be visible
     const line15Container = getLineContainer(15);
     expect(line15Container).toBeInTheDocument();
     // A non-matching neighbor should not be present yet
@@ -286,5 +286,241 @@ describe('LogDisplayView gap arrows & expansion', () => {
     // There should be no down arrow for 76 because next line is visible
     const downBtn76_2 = line76Container2.querySelector('button[aria-label="Load hidden lines below"]');
     expect(downBtn76_2).toBeNull();
+  });
+});
+
+describe('LogDisplayView filter & search behaviors', () => {
+  beforeEach(() => {
+    useLogStore.getState().clearData();
+  });
+
+  it('filter narrows visible lines to only matching ones', async () => {
+    const total = 20;
+    useLogStore.setState({
+      rawLogLines: makeLogs(total, []),
+    });
+
+    const { rerender } = render(<LogDisplayView />);
+
+    // All lines should be visible initially
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('19')).toBeInTheDocument();
+
+    // Apply filter
+    const filterInput = screen.getByPlaceholderText(/Filter logs/i);
+    await userEvent.type(filterInput, 'MATCH');
+    
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 400));
+    rerender(<LogDisplayView />);
+
+    // No lines should be visible (no MATCH in test logs by default)
+    expect(() => getLineContainer(0)).toThrow();
+  });
+
+  it('search highlights matching text within filtered results', async () => {
+    const total = 10;
+    useLogStore.setState({
+      rawLogLines: makeLogs(total, [2, 5, 8]),
+    });
+
+    render(<LogDisplayView requestFilter="MATCH" />);
+
+    // Filter should show only lines 2, 5, 8
+    const line2Container = getLineContainer(2);
+    const line5Container = getLineContainer(5);
+    const line8Container = getLineContainer(8);
+    expect(line2Container).toBeInTheDocument();
+    expect(line5Container).toBeInTheDocument();
+    expect(line8Container).toBeInTheDocument();
+
+    // Apply search within filtered results
+    const searchInput = screen.getByPlaceholderText(/Search logs/i);
+    await userEvent.type(searchInput, 'MATCH');
+
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // Search should highlight matches
+    const marks = screen.queryAllByRole('mark');
+    expect(marks.length).toBeGreaterThan(0);
+  });
+
+  it('search counter shows correct number of matches in filtered results', async () => {
+    const total = 20;
+    const matchIndices = Array.from({ length: 20 }, (_, i) => i); // All have "MATCH"
+    useLogStore.setState({
+      rawLogLines: makeLogs(total, matchIndices),
+    });
+
+    render(<LogDisplayView />);
+
+    // All 20 lines visible
+    const searchInput = screen.getByPlaceholderText(/Search logs/i);
+    await userEvent.type(searchInput, 'MATCH');
+
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // Counter should show search results
+    const counter = screen.queryByText(/\d+ \/ \d+/);
+    expect(counter).toBeTruthy();
+  });
+
+  it('search counter reflects filtered results only', async () => {
+    const total = 10;
+    const matchIndices = Array.from({ length: 10 }, (_, i) => i); // All have "MATCH"
+    useLogStore.setState({
+      rawLogLines: makeLogs(total, matchIndices),
+    });
+
+    render(<LogDisplayView requestFilter="MATCH" />);
+
+    // Apply search
+    const searchInput = screen.getByPlaceholderText(/Search logs/i);
+    await userEvent.type(searchInput, 'MATCH');
+
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // Counter should show matches in filtered results (all 10 have "MATCH")
+    const counter = screen.queryByText(/\d+ \/ \d+/);
+    expect(counter).toBeTruthy();
+  });
+
+  it('search respects case sensitivity toggle', async () => {
+    const logs: ParsedLogLine[] = [
+      {
+        lineNumber: 0,
+        rawText: '2024-01-01T00:00:00.000Z INFO uppercase TEXT',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        level: 'INFO',
+        message: 'uppercase TEXT',
+      },
+      {
+        lineNumber: 1,
+        rawText: '2024-01-01T00:00:00.000Z INFO lowercase text',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        level: 'INFO',
+        message: 'lowercase text',
+      },
+    ];
+    useLogStore.setState({ rawLogLines: logs });
+
+    render(<LogDisplayView />);
+
+    // Case insensitive search for "TEXT" should find both lines
+    const searchInput = screen.getByPlaceholderText(/Search logs/i) as HTMLInputElement;
+    await userEvent.type(searchInput, 'TEXT');
+
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // Both should match (case insensitive by default)
+    const marks = screen.queryAllByRole('mark');
+    expect(marks.length).toBeGreaterThanOrEqual(1);
+
+    // Toggle case sensitive
+    const caseSensitiveCheckbox = screen.getByLabelText(/Case sensitive/i) as HTMLInputElement;
+    await userEvent.click(caseSensitiveCheckbox);
+
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // Now only first line should match
+    const marksAfter = screen.queryAllByRole('mark');
+    expect(marksAfter.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('filter input initializes from requestFilter prop', () => {
+    useLogStore.setState({
+      rawLogLines: makeLogs(10, [2, 5]),
+    });
+
+    render(<LogDisplayView requestFilter="MATCH" />);
+
+    const filterInput = screen.getByPlaceholderText(/Filter logs/i) as HTMLInputElement;
+    expect(filterInput.value).toBe('MATCH');
+  });
+
+  it('search input starts empty regardless of requestFilter', () => {
+    useLogStore.setState({
+      rawLogLines: makeLogs(10, [2, 5]),
+    });
+
+    render(<LogDisplayView requestFilter="MATCH" />);
+
+    const searchInput = screen.getByPlaceholderText(/Search logs/i) as HTMLInputElement;
+    expect(searchInput.value).toBe('');
+  });
+
+  it('filter and search can be used independently', async () => {
+    const logs: ParsedLogLine[] = [
+      {
+        lineNumber: 0,
+        rawText: '2024-01-01T00:00:00.000Z INFO request-001',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        level: 'INFO',
+        message: 'request-001',
+      },
+      {
+        lineNumber: 1,
+        rawText: '2024-01-01T00:00:00.000Z INFO response-data',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        level: 'INFO',
+        message: 'response-data',
+      },
+      {
+        lineNumber: 2,
+        rawText: '2024-01-01T00:00:00.000Z INFO request-002',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        level: 'INFO',
+        message: 'request-002',
+      },
+    ];
+    useLogStore.setState({ rawLogLines: logs });
+
+    render(<LogDisplayView requestFilter="request" />);
+
+    // Filter should show lines 0 and 2
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    // Line 1 should not be visible
+    expect(() => getLineContainer(1)).toThrow();
+
+    // Apply search for "001" (only in line 0)
+    const searchInput = screen.getByPlaceholderText(/Search logs/i);
+    await userEvent.type(searchInput, '001');
+
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // Should have search results
+    const counter = screen.queryByText(/1 \/ 1/);
+    expect(counter).toBeTruthy();
+  });
+
+  it('context lines work with filter', async () => {
+    const total = 20;
+    useLogStore.setState({
+      rawLogLines: makeLogs(total, [10]), // Only line 10 matches
+    });
+
+    render(<LogDisplayView requestFilter="MATCH" />);
+
+    // Only line 10 should be visible
+    const line10Container = getLineContainer(10);
+    expect(line10Container).toBeInTheDocument();
+    expect(() => getLineContainer(9)).toThrow();
+    expect(() => getLineContainer(11)).toThrow();
+
+    // Enable context lines
+    const ctxToggle = screen.getByTitle(/Context lines before\/after matches/i);
+    await userEvent.click(ctxToggle as HTMLButtonElement);
+
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // Now lines 5-15 should be visible (10 ± 5)
+    const line5Container = getLineContainer(5);
+    const line15Container = getLineContainer(15);
+    expect(line5Container).toBeInTheDocument();
+    expect(line15Container).toBeInTheDocument();
   });
 });

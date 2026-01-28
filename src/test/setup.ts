@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 
 // Optional: mock matchMedia if used
 Object.defineProperty(window, 'matchMedia', {
@@ -14,3 +15,7 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 });
+
+// Mock scrollIntoView for tests
+Element.prototype.scrollIntoView = vi.fn();
+HTMLElement.prototype.scrollIntoView = vi.fn();

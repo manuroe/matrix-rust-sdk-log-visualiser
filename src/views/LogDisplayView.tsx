@@ -11,17 +11,24 @@ interface LogDisplayViewProps {
   onClose?: () => void;
   prevRequestLineRange?: { start: number; end: number };
   nextRequestLineRange?: { start: number; end: number };
+  logLines?: ParsedLogLine[];
 }
 
-export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = false, onClose, prevRequestLineRange, nextRequestLineRange }: LogDisplayViewProps) {
+export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = false, onClose, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
   const { rawLogLines } = useLogStore();
+  
+  // Use passed logLines if provided, otherwise use all raw log lines from store
+  const displayLogLines = logLines || rawLogLines;
 
-  const [searchQuery, setSearchQuery] = useState(requestFilter);
-  const [showOnlyMatching, setShowOnlyMatching] = useState(defaultShowOnlyMatching || Boolean(requestFilter));
+  const [searchQueryInput, setSearchQueryInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterQueryInput, setFilterQueryInput] = useState(requestFilter);
+  const [filterQuery, setFilterQuery] = useState(requestFilter);
   const [contextLines, setContextLines] = useState(0);
   const [lineWrap, setLineWrap] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [stripPrefix, setStripPrefix] = useState(true);
+  const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
   const [expandedGaps, setExpandedGaps] = useState<Map<string, number>>(new Map());
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -33,12 +40,29 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
   } | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
-  const matchingLineIndices = useMemo(() => {
-    if (!searchQuery.trim()) return new Set<number>();
-    const query = caseSensitive ? searchQuery : searchQuery.toLowerCase();
+  // Debounce search input to avoid recalculating on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchQueryInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQueryInput]);
+
+  // Debounce filter input to avoid recalculating on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilterQuery(filterQueryInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterQueryInput]);
+
+  // Filter determines which lines to show/hide (like old showOnlyMatching behavior)
+  const filterMatchingLineIndices = useMemo(() => {
+    if (!filterQuery.trim()) return new Set<number>();
+    const query = caseSensitive ? filterQuery : filterQuery.toLowerCase();
     const indices = new Set<number>();
 
-    rawLogLines.forEach((line, index) => {
+    displayLogLines.forEach((line, index) => {
       const haystack = caseSensitive ? line.rawText : line.rawText.toLowerCase();
       if (haystack.includes(query)) {
         indices.add(index);
@@ -46,29 +70,73 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
     });
 
     return indices;
-  }, [rawLogLines, searchQuery, caseSensitive]);
+  }, [displayLogLines, filterQuery, caseSensitive]);
 
+  // Build the filtered lines based on filter query and context
   const filteredLines = useMemo(() => {
-    const allLines = rawLogLines.map((line, index) => ({ line, index }));
+    const allLines = displayLogLines.map((line, index) => ({ line, index }));
 
-    if (!showOnlyMatching || matchingLineIndices.size === 0) return allLines;
+    // If no filter, show all lines
+    if (!filterQuery.trim()) return allLines;
 
-    if (contextLines === 0) return allLines.filter(({ index }) => matchingLineIndices.has(index));
+    // If filter is set but no matches, show empty
+    if (filterMatchingLineIndices.size === 0) return [];
+
+    if (contextLines === 0) return allLines.filter(({ index }) => filterMatchingLineIndices.has(index));
 
     const linesToShow = new Set<number>();
-    matchingLineIndices.forEach((matchIndex) => {
-      for (let i = Math.max(0, matchIndex - contextLines); i <= Math.min(rawLogLines.length - 1, matchIndex + contextLines); i++) {
+    filterMatchingLineIndices.forEach((matchIndex) => {
+      for (let i = Math.max(0, matchIndex - contextLines); i <= Math.min(displayLogLines.length - 1, matchIndex + contextLines); i++) {
         linesToShow.add(i);
       }
     });
 
     return allLines.filter(({ index }) => linesToShow.has(index));
-  }, [rawLogLines, showOnlyMatching, contextLines, matchingLineIndices]);
+  }, [displayLogLines, filterQuery, contextLines, filterMatchingLineIndices]);
 
-  // Build display items with gap indicators attached to lines
+  // Search determines highlighting within visible lines
+  const searchMatchingLineIndices = useMemo(() => {
+    if (!searchQuery.trim()) return new Set<number>();
+    const query = caseSensitive ? searchQuery : searchQuery.toLowerCase();
+    const indices = new Set<number>();
+
+    // Search only within filtered lines (respects active filter)
+    filteredLines.forEach(({ line, index }) => {
+      const haystack = caseSensitive ? line.rawText : line.rawText.toLowerCase();
+      if (haystack.includes(query)) {
+        indices.add(index);
+      }
+    });
+
+    return indices;
+  }, [filteredLines, searchQuery, caseSensitive]);
+
+  // Convert search matches to sorted array for navigation
+  const searchMatchesArray = useMemo(() => {
+    return Array.from(searchMatchingLineIndices).sort((a, b) => a - b);
+  }, [searchMatchingLineIndices]);
+
+  // Reset current match index when search changes
+  useEffect(() => {
+    setCurrentSearchMatchIndex(0);
+  }, [searchQuery, caseSensitive]);
+
+  // Navigate to previous search match
+  const goToPreviousMatch = () => {
+    if (searchMatchesArray.length === 0) return;
+    setCurrentSearchMatchIndex((prev) => (prev - 1 + searchMatchesArray.length) % searchMatchesArray.length);
+  };
+
+  // Navigate to next search match
+  const goToNextMatch = () => {
+    if (searchMatchesArray.length === 0) return;
+    setCurrentSearchMatchIndex((prev) => (prev + 1) % searchMatchesArray.length);
+  };
+
+  // Build display items with gap indicators
   const displayItems = useMemo(() => {
-    return buildDisplayItems(filteredLines, rawLogLines, expandedGaps);
-  }, [filteredLines, expandedGaps, rawLogLines]);
+    return buildDisplayItems(filteredLines, displayLogLines, expandedGaps);
+  }, [filteredLines, displayLogLines, expandedGaps]);
 
   const rowVirtualizer = useVirtualizer({
     count: displayItems.length,
@@ -83,10 +151,28 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
     // Reset all measurements and force remeasure when wrap state or filters change
     rowVirtualizer.measurementsCache = [];
     rowVirtualizer.measure();
-  }, [rowVirtualizer, lineWrap, showOnlyMatching, contextLines, searchQuery, displayItems.length, expandedGaps]);
+  }, [rowVirtualizer, lineWrap, contextLines, searchQuery, displayItems.length, expandedGaps, filterQuery]);
+
+  // Auto-scroll to current search match
+  useEffect(() => {
+    if (searchMatchesArray.length === 0) return;
+    
+    const currentMatchLineNumber = searchMatchesArray[currentSearchMatchIndex];
+    const displayItemIndex = displayItems.findIndex(item => item.data.index === currentMatchLineNumber);
+    
+    if (displayItemIndex !== -1) {
+      // Find the actual DOM element and scroll it into view
+      setTimeout(() => {
+        const matchElement = document.querySelector(`.log-line[data-index="${displayItemIndex}"]`);
+        if (matchElement) {
+          matchElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50); // Small delay to ensure element is rendered
+    }
+  }, [currentSearchMatchIndex, searchMatchesArray, displayItems]);
 
   const highlightText = (line: ParsedLogLine, originalIndex: number) => {
-    const isMatch = matchingLineIndices.has(originalIndex);
+    const isMatch = searchMatchingLineIndices.has(originalIndex);
     if (!searchQuery || !isMatch) {
       return getDisplayText(line);
     }
@@ -143,9 +229,9 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
       gapId,
       count,
       filteredLines,
-      rawLogLines.length,
+      displayLogLines.length,
       expandedGaps,
-      matchingLineIndices,
+      filterMatchingLineIndices,
       prevRequestLineRange,
       nextRequestLineRange
     );
@@ -194,8 +280,19 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
             type="text"
             className="log-search-input"
             placeholder="Search logs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchQueryInput}
+            onChange={(e) => setSearchQueryInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                  goToPreviousMatch();
+                } else {
+                  goToNextMatch();
+                }
+              }
+            }}
+            title="Search and highlight in filtered results"
           />
           <label className="log-toolbar-option">
             <input
@@ -205,10 +302,30 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
             />
             Case sensitive
           </label>
-          {matchingLineIndices.size > 0 && (
-            <span className="search-results-count">
-              {matchingLineIndices.size} match{matchingLineIndices.size !== 1 ? 'es' : ''}
-            </span>
+          {searchMatchesArray.length > 0 && (
+            <>
+              <div className="search-navigation">
+                <button
+                  className="btn-toolbar btn-icon"
+                  onClick={goToPreviousMatch}
+                  title="Previous match (Shift+Enter)"
+                  disabled={searchMatchesArray.length === 0}
+                >
+                  ↑
+                </button>
+                <span className="search-results-count">
+                  {currentSearchMatchIndex + 1} / {searchMatchesArray.length}
+                </span>
+                <button
+                  className="btn-toolbar btn-icon"
+                  onClick={goToNextMatch}
+                  title="Next match (Enter)"
+                  disabled={searchMatchesArray.length === 0}
+                >
+                  ↓
+                </button>
+              </div>
+            </>
           )}
         </div>
         <div className="log-toolbar-right">
@@ -228,57 +345,43 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
             />
             Strip prefix
           </label>
-          {searchQuery && (
-            <>
-              <button
-                className={`btn-toolbar ${!showOnlyMatching ? 'active' : ''}`}
-                onClick={() => setShowOnlyMatching(false)}
-              >
-                All lines
-              </button>
-              <button
-                className={`btn-toolbar ${showOnlyMatching && contextLines === 0 ? 'active' : ''}`}
-                onClick={() => {
-                  setShowOnlyMatching(true);
+          <input
+            type="text"
+            className="log-search-input"
+            placeholder="Filter logs..."
+            value={filterQueryInput}
+            onChange={(e) => setFilterQueryInput(e.target.value)}
+            title="Filter to show only matching lines"
+          />
+          <div className="log-toolbar-context-group">
+            <button
+              className={`btn-toolbar btn-context-toggle ${contextLines > 0 ? 'active' : ''}`}
+              onClick={() => {
+                if (contextLines > 0) {
                   setContextLines(0);
-                }}
-              >
-                Matching only
-              </button>
-              <div className="log-toolbar-context-group">
-                <button
-                  className={`btn-toolbar btn-context-toggle ${showOnlyMatching && contextLines > 0 ? 'active' : ''}`}
-                  onClick={() => {
-                    if (contextLines > 0) {
-                      setContextLines(0);
-                    } else {
-                      setShowOnlyMatching(true);
-                      setContextLines(5);
-                    }
-                  }}
-                  title="Context lines before/after matches"
-                >
-                  ≡
-                </button>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={contextLines}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setContextLines(val);
-                    if (val > 0 && !showOnlyMatching) {
-                      setShowOnlyMatching(true);
-                    }
-                  }}
-                  className="log-context-input"
-                  title="Context lines (0 = disabled)"
-                  disabled={!showOnlyMatching}
-                />
-              </div>
-            </>
-          )}
+                } else {
+                  setContextLines(5);
+                }
+              }}
+              title="Context lines before/after matches"
+              disabled={!filterQuery.trim()}
+            >
+              ≡
+            </button>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={contextLines}
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 0;
+                setContextLines(val);
+              }}
+              className="log-context-input"
+              title="Context lines (0 = disabled)"
+              disabled={!filterQuery.trim()}
+            />
+          </div>
           {onClose && (
             <button
               className="btn-toolbar btn-icon close-icon"
@@ -303,7 +406,8 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const item = displayItems[virtualRow.index];
             const { line, index } = item?.data;
-            const isMatch = matchingLineIndices.has(index);
+            const isMatch = searchMatchingLineIndices.has(index);
+            const isCurrentSearchMatch = searchMatchesArray.length > 0 && index === searchMatchesArray[currentSearchMatchIndex];
             const gapAbove = item?.gapAbove;
             const gapBelow = item?.gapBelow;
 
@@ -314,7 +418,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
                 ref={(el) => {
                   if (el) rowVirtualizer.measureElement(el);
                 }}
-                className={`log-line ${getLogLevelClass(line.level)} ${isMatch && showOnlyMatching ? 'match-line' : ''} ${lineWrap ? 'wrap' : 'nowrap'}`}
+                className={`log-line ${getLogLevelClass(line.level)} ${isMatch ? 'match-line' : ''} ${isCurrentSearchMatch ? 'current-match' : ''} ${lineWrap ? 'wrap' : 'nowrap'}`}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -367,13 +471,19 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = f
         </div>
       </div>
 
-      {displayItems.length === 0 && rawLogLines.length > 0 && (
+      {displayItems.length === 0 && filteredLines.length > 0 && (
         <div className="log-empty-state">
           No matching lines found for "{searchQuery}"
         </div>
       )}
 
-      {rawLogLines.length === 0 && (
+      {filteredLines.length === 0 && filterQuery && (
+        <div className="log-empty-state">
+          No lines match filter "{filterQuery}"
+        </div>
+      )}
+
+      {displayLogLines.length === 0 && (
         <div className="log-empty-state">
           No log data available. Please upload a log file.
         </div>
