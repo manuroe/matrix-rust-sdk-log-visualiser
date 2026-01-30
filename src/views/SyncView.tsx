@@ -1,6 +1,7 @@
 import { useLogStore } from '../stores/logStore';
 import { exportToCSV } from '../utils/logParser';
 import { timeToMs, applyTimeRangeFilter } from '../utils/timeUtils';
+import { isoToTime } from '../utils/timeUtils';
 import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
@@ -172,7 +173,7 @@ export function SyncView() {
                     >
                       {req.request_id}
                     </div>
-                    <div className="time sticky-col" style={{ left: '90px' }}>{req.request_time}</div>
+                    <div className="time sticky-col" style={{ left: '90px' }}>{isoToTime(req.request_time)}</div>
                     <div className={`status ${statusClass} sticky-col`} style={{ left: '220px' }}>{status}</div>
                     <div className="size sticky-col" style={{ left: '285px' }}>{req.request_size || '-'}</div>
                     <div className="size sticky-col" style={{ left: '360px' }}>{req.response_size || '-'}</div>

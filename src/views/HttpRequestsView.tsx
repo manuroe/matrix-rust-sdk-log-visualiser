@@ -4,6 +4,8 @@ import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import type { HttpRequest } from '../types/log.types';
+import { useEffect } from 'react';
+import { isoToTime } from '../utils/timeUtils';
 
 export function HttpRequestsView() {
   const {
@@ -38,6 +40,67 @@ export function HttpRequestsView() {
 
   // Find common URI prefix to strip from display
   const commonUriPrefix = findCommonUriPrefix(filteredHttpRequests.map(r => r.uri));
+
+  useEffect(() => {
+    // Check for id param in hash
+    const hash = window.location.hash;
+    const match = hash.match(/id=([^&]+)/);
+    if (match) {
+      const reqId = decodeURIComponent(match[1]);
+      // Open the log viewer for this request
+      openLogViewer(reqId);
+      setTimeout(() => {
+        const allRows = Array.from(document.querySelectorAll('.request-row .request-id.clickable.sticky-col'));
+        const target = allRows.find(el => el.textContent === reqId);
+        if (target) {
+          // Expand if not already
+          if (!target.classList.contains('expanded')) {
+            console.log('Clicking to expand target:', target.textContent);
+            (target as HTMLElement).click();
+          }
+          // Scroll the nearest scrollable parent of the expanded row to the top
+          setTimeout(() => {
+            const expandedRow = target.closest('.request-row.expanded');
+            console.log('Target:', target, 'Expanded row:', expandedRow);
+            if (expandedRow) {
+              // Find nearest scrollable parent
+              function getScrollableParent(node: HTMLElement | null): HTMLElement | Window {
+                while (node && node !== document.body) {
+                  const style = window.getComputedStyle(node);
+                  const overflowY = style.overflowY;
+                  if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+                    return node;
+                  }
+                  node = node.parentElement;
+                }
+                return window;
+              }
+              const scrollParent = getScrollableParent(expandedRow as HTMLElement);
+              const header = document.querySelector('.header-compact');
+              const headerHeight = header ? (header as HTMLElement).offsetHeight : 0;
+              const rowRect = (expandedRow as HTMLElement).getBoundingClientRect();
+              if (scrollParent instanceof HTMLElement) {
+                const parentRect = scrollParent.getBoundingClientRect();
+                const scrollTop = scrollParent.scrollTop + (rowRect.top - parentRect.top) - headerHeight;
+                scrollParent.scrollTo({ top: scrollTop, behavior: 'smooth' });
+                // ...removed debug log...
+              } else {
+                (expandedRow as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setTimeout(() => {
+                  window.scrollBy({ top: -headerHeight, behavior: 'smooth' });
+                  // ...removed debug log...
+                }, 200);
+              }
+            } else {
+              console.log('No expanded row found for target');
+            }
+          }, 100);
+        } else {
+          console.log('No target found for reqId', reqId);
+        }
+      }, 300);
+    }
+  }, [filteredHttpRequests, openLogViewer]);
 
   return (
     <div className="app">
@@ -159,7 +222,7 @@ export function HttpRequestsView() {
                       {req.request_id}
                     </div>
                     <div className="uri sticky-col" style={{ left: '90px' }} title={req.uri}>{stripCommonPrefix(extractRelativeUri(req.uri), commonUriPrefix)}</div>
-                    <div className="time sticky-col" style={{ left: '390px' }}>{req.request_time}</div>
+                    <div className="time sticky-col" style={{ left: '390px' }}>{isoToTime(req.request_time)}</div>
                     <div className="method">{req.method}</div>
                     <div className={`status ${statusClass}`}>{status}</div>
                     <div className="size">{req.request_size || '-'}</div>

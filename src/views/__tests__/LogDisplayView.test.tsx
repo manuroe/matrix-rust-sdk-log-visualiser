@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { useLogStore } from '../../stores/logStore';
 import { LogDisplayView } from '../LogDisplayView';
@@ -35,7 +36,7 @@ function makeLogs(total: number, matchIndices: number[]): ParsedLogLine[] {
 
 function getLineContainer(lineNumber: number): HTMLElement {
   const candidates = screen.getAllByText(String(lineNumber));
-  const lineNumSpan = candidates.find((el) => el.classList.contains('log-line-number')) as HTMLElement;
+  const lineNumSpan = candidates.find((el: Element) => el.classList.contains('log-line-number')) as HTMLElement;
   if (!lineNumSpan) throw new Error(`Line number span not found for ${lineNumber}`);
   return lineNumSpan.closest('.log-line') as HTMLElement;
 }

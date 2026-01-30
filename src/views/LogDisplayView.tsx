@@ -14,7 +14,7 @@ interface LogDisplayViewProps {
   logLines?: ParsedLogLine[];
 }
 
-export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching = false, onClose, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
+export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _defaultShowOnlyMatching = false, onClose, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
   const { rawLogLines } = useLogStore();
   
   // Use passed logLines if provided, otherwise use all raw log lines from store

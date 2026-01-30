@@ -13,7 +13,13 @@ function extractLogLevel(line: string): LogLevel {
 }
 
 function extractTimestamp(line: string): string {
-  // Extract timestamp from position 11+, format: HH:MM:SS.microseconds
+  // Prefer full ISO timestamp if present
+  const isoMatch = line.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/);
+  if (isoMatch) {
+    return isoMatch[0];
+  }
+
+  // Fallback to time-only (HH:MM:SS.microseconds)
   const timeMatch = line.slice(11).match(/(\d{2}:\d{2}:\d{2}\.\d+)Z?/);
   return timeMatch ? timeMatch[1] : '';
 }

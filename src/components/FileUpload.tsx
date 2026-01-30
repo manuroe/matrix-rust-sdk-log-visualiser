@@ -22,7 +22,7 @@ export function FileUpload() {
           
           setRequests(requests, connectionIds, rawLogLines);
           setHttpRequests(httpRequests, rawLogLines);
-          navigate('/http_requests/sync');
+          navigate('/summary');
         } catch (error) {
           console.error('Error parsing log file:', error);
           alert('Error parsing log file. Please make sure it\'s a valid Matrix SDK log file.');

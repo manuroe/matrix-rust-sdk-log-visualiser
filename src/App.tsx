@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, useSearchParams } from 'react-router-dom';
 import { LandingPage } from './views/LandingPage';
+import { SummaryView } from './views/SummaryView';
 import { SyncView } from './views/SyncView';
 import { HttpRequestsView } from './views/HttpRequestsView';
 import { LogsView } from './views/LogsView';
@@ -53,6 +54,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/summary" element={<SummaryView />} />
       <Route path="/logs" element={<LogsView />} />
       <Route path="/http_requests" element={<HttpRequestsView />} />
       <Route path="/http_requests/sync" element={<SyncView />} />

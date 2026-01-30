@@ -1,5 +1,33 @@
+function normalizeIsoTimestamp(iso: string): string {
+  const match = iso.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z)?$/);
+  if (!match) return iso;
+
+  const base = match[1];
+  const fraction = match[2];
+  const hasZ = Boolean(match[3]);
+
+  if (fraction) {
+    const ms = fraction.slice(0, 3).padEnd(3, '0');
+    return `${base}.${ms}${hasZ ? 'Z' : 'Z'}`;
+  }
+
+  return `${base}${hasZ ? 'Z' : 'Z'}`;
+}
+
 export function timeToMs(timeStr: string): number {
   if (!timeStr) return 0;
+
+  if (timeStr.includes('T')) {
+    const normalized = normalizeIsoTimestamp(timeStr);
+    const parsed = Date.parse(normalized);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  const timeMatch = timeStr.match(/^(\d{2}):(\d{2}):(\d{2})(\.\d+)?$/);
+  if (!timeMatch) return 0;
+
   const [h, m, s] = timeStr.split(':').map(parseFloat);
   return h * 3600000 + m * 60000 + s * 1000;
 }
@@ -17,6 +45,13 @@ export function timeToISO(timeStr: string): string {
   if (!timeStr || !timeStr.match(/^\d{2}:\d{2}:\d{2}/)) return timeStr;
   // Use epoch date as placeholder since logs only contain time
   return `1970-01-01T${timeStr}Z`;
+}
+
+/**
+ * Convert a millisecond timestamp to ISO string
+ */
+export function msToISO(timestampMs: number): string {
+  return new Date(timestampMs).toISOString();
 }
 
 /**
@@ -100,7 +135,7 @@ export function parseTimeInput(input: string): string | null {
 
     // Validate ranges and extract just the time portion
     if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59) {
-      return isoToTime(trimmed);
+      return trimmed;
     }
   }
 
@@ -155,7 +190,7 @@ export function calculateTimeRange(
   if (endTime) {
     if (endTime === 'end') {
       endMs = maxLogTimeMs;
-    } else if (/^\d{2}:\d{2}:\d{2}/.test(endTime)) {
+    } else {
       endMs = timeToMs(endTime);
     }
   }
@@ -170,8 +205,7 @@ export function calculateTimeRange(
       // Shortcut: calculate offset from endTime
       const offsetMs = shortcutToMs(startTime);
       startMs = Math.max(0, endMs - offsetMs);
-    } else if (/^\d{2}:\d{2}:\d{2}/.test(startTime)) {
-      // ISO time
+    } else {
       startMs = timeToMs(startTime);
     }
   }

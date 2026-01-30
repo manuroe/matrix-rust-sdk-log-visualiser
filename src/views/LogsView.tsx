@@ -1,14 +1,19 @@
 import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
 import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import { calculateTimeRange, timeToMs } from '../utils/timeUtils';
+import { calculateTimeRange, timeToMs, isoToTime } from '../utils/timeUtils';
 
 export function LogsView() {
+  const [searchParams] = useSearchParams();
   const { rawLogLines, startTime, endTime } = useLogStore();
+  
+  // Get filter from URL param to prefill the input (not for automatic filtering)
+  const filterPrefill = searchParams.get('filter') || '';
 
-  // Filter log lines by time range
+  // Filter log lines by time range only
   const filteredLines = useMemo(() => {
     if (rawLogLines.length === 0) return [];
 
@@ -22,6 +27,7 @@ export function LogsView() {
     const { startMs, endMs } = calculateTimeRange(startTime, endTime, maxLogTimeMs);
 
     return rawLogLines.filter((line) => {
+      // Time range filter only
       const lineTimeMs = timeToMs(line.timestamp);
       return lineTimeMs >= startMs && lineTimeMs <= endMs;
     });
@@ -52,7 +58,13 @@ export function LogsView() {
       </div>
 
       <div className="logs-view-container">
-        <LogDisplayView logLines={filteredLines} />
+        <LogDisplayView 
+          logLines={filteredLines.map(line => ({
+            ...line,
+            timestamp: isoToTime(line.timestamp)
+          }))}
+          requestFilter={filterPrefill}
+        />
       </div>
     </div>
   );
