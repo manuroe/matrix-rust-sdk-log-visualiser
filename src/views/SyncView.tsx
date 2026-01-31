@@ -1,5 +1,4 @@
 import { useLogStore } from '../stores/logStore';
-import { exportToCSV } from '../utils/logParser';
 import { timeToMs, applyTimeRangeFilter } from '../utils/timeUtils';
 import { isoToTime } from '../utils/timeUtils';
 import { LogDisplayView } from './LogDisplayView';
@@ -23,10 +22,6 @@ export function SyncView() {
     openLogViewer,
     closeLogViewer,
   } = useLogStore();
-
-  const handleExportCSV = () => {
-    exportToCSV(allRequests);
-  };
 
   // Calculate total for selected connection, considering time range filter
   const connFilteredRequests = allRequests.filter(
@@ -84,9 +79,6 @@ export function SyncView() {
         
         <div className="header-right">
           <TimeRangeSelector />
-          <button onClick={handleExportCSV} className="btn-primary btn-compact">
-            Export CSV
-          </button>
         </div>
       </div>
 
@@ -101,8 +93,9 @@ export function SyncView() {
           <div className="sticky-col" style={{ left: '360px' }}>↓ Size</div>
           <div>Duration</div>
         </div>
-        <div id="timeline-content">
-          {filteredRequests.length === 0 ? (
+        <div className="scroll-content">
+          <div id="timeline-content">
+            {filteredRequests.length === 0 ? (
             <div className="no-data">No sync requests found in log file</div>
           ) : (
             filteredRequests.map((req, reqIndex) => {
@@ -229,6 +222,7 @@ export function SyncView() {
               );
             })
           )}
+          </div>
         </div>
       </div>
     </div>

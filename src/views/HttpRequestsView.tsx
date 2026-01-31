@@ -3,7 +3,6 @@ import { timeToMs, applyTimeRangeFilter } from '../utils/timeUtils';
 import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import type { HttpRequest } from '../types/log.types';
 import { useEffect } from 'react';
 import { isoToTime } from '../utils/timeUtils';
 
@@ -21,10 +20,6 @@ export function HttpRequestsView() {
     openLogViewer,
     closeLogViewer,
   } = useLogStore();
-
-  const handleExportCSV = () => {
-    exportHttpRequestsToCSV(allHttpRequests);
-  };
 
   // Calculate total considering time range filter
   const totalCount = applyTimeRangeFilter(allHttpRequests, startTime, endTime).length;
@@ -130,9 +125,6 @@ export function HttpRequestsView() {
         
         <div className="header-right">
           <TimeRangeSelector />
-          <button onClick={handleExportCSV} className="btn-primary btn-compact">
-            Export CSV
-          </button>
         </div>
       </div>
 
@@ -149,8 +141,9 @@ export function HttpRequestsView() {
           <div>↓ Size</div>
           <div>Duration</div>
         </div>
-        <div id="timeline-content">
-          {filteredHttpRequests.length === 0 ? (
+        <div className="scroll-content">
+          <div id="timeline-content">
+            {filteredHttpRequests.length === 0 ? (
             <div className="no-data">No HTTP requests found in log file</div>
           ) : (
             filteredHttpRequests.map((req, reqIndex) => {
@@ -279,6 +272,7 @@ export function HttpRequestsView() {
               );
             })
           )}
+          </div>
         </div>
       </div>
     </div>
@@ -295,55 +289,6 @@ function extractRelativeUri(uri: string): string {
     const match = uri.match(/^https?:\/\/[^\/]+(.*)$/);
     return match ? match[1] || '/' : uri;
   }
-}
-
-function exportHttpRequestsToCSV(requests: HttpRequest[]): void {
-  if (requests.length === 0) {
-    alert('No data to export');
-    return;
-  }
-
-  // CSV headers
-  const headers = [
-    'request_id',
-    'request_time',
-    'response_time',
-    'method',
-    'uri',
-    'status',
-    'request_size',
-    'response_size',
-    'request_duration_ms',
-    'send_line',
-    'response_line',
-  ];
-
-  // Build CSV content
-  let csv = headers.join(',') + '\n';
-
-  requests.forEach((req) => {
-    const row = headers.map((h) => {
-      const value = String(req[h as keyof HttpRequest] || '');
-      // Escape quotes and wrap in quotes if contains comma or newline
-      if (value.includes(',') || value.includes('\n') || value.includes('"')) {
-        return '"' + value.replace(/"/g, '""') + '"';
-      }
-      return value;
-    });
-    csv += row.join(',') + '\n';
-  });
-
-  // Create download
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-
-  link.setAttribute('href', url);
-  link.setAttribute('download', 'http_requests.csv');
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 }
 
 function findCommonUriPrefix(uris: string[]): string {
