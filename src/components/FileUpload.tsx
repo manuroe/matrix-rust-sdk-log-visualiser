@@ -1,41 +1,82 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { decompressSync } from 'fflate';
 import { parseLogFile, parseAllHttpRequests } from '../utils/logParser';
 import { useLogStore } from '../stores/logStore';
+import {
+  validateTextFile,
+  validateGzipFile,
+  decodeTextBytes,
+} from '../utils/fileValidator';
 
 export function FileUpload() {
   const navigate = useNavigate();
   const setRequests = useLogStore((state) => state.setRequests);
   const setHttpRequests = useLogStore((state) => state.setHttpRequests);
   const lastRoute = useLogStore((state) => state.lastRoute);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+
+  const isGzipFile = (file: File): boolean => {
+    // Check by MIME type only (no extension check)
+    return file.type === 'application/gzip' || file.type === 'application/x-gzip';
+  };
 
   const handleFile = useCallback(
-    (file: File) => {
-      const reader = new FileReader();
+    async (file: File) => {
+      setValidationError(null);
+      setValidationWarnings([]);
 
-      reader.onload = (e) => {
-        try {
-          const logContent = e.target?.result as string;
-          
-          // Parse both sync-specific and all HTTP requests
-          const { requests, connectionIds, rawLogLines } = parseLogFile(logContent);
-          const { httpRequests } = parseAllHttpRequests(logContent);
-          
-          setRequests(requests, connectionIds, rawLogLines);
-          setHttpRequests(httpRequests, rawLogLines);
-          const targetRoute = lastRoute && lastRoute !== '/' ? lastRoute : '/summary';
-          navigate(targetRoute);
-        } catch (error) {
-          console.error('Error parsing log file:', error);
-          alert('Error parsing log file. Please make sure it\'s a valid Matrix SDK log file.');
+      try {
+        let logContent: string;
+        let warnings: string[] = [];
+
+        if (isGzipFile(file)) {
+          // Validate gzip file
+          const gzipValidation = await validateGzipFile(file, decompressSync);
+          if (!gzipValidation.isValid) {
+            setValidationError(gzipValidation.error || 'Invalid gzip file');
+            return;
+          }
+          warnings = gzipValidation.warnings;
+
+          // Decompress
+          const fileBuffer = await readFileAsArrayBuffer(file);
+          const compressedUint8 = new Uint8Array(fileBuffer);
+          const decompressedUint8 = decompressSync(compressedUint8);
+          logContent = decodeTextBytes(decompressedUint8, gzipValidation.encoding);
+        } else {
+          // Validate plain text file
+          const textValidation = await validateTextFile(file);
+          if (!textValidation.isValid) {
+            setValidationError(textValidation.error || 'Invalid text file');
+            return;
+          }
+          warnings = textValidation.warnings;
+
+          // Read as text
+          logContent = await readFileAsText(file);
         }
-      };
 
-      reader.onerror = () => {
-        alert('Error reading file. Please try again.');
-      };
+        // Show warnings if any
+        if (warnings.length > 0) {
+          setValidationWarnings(warnings);
+        }
 
-      reader.readAsText(file, 'UTF-8');
+        // Parse both sync-specific and all HTTP requests
+        const { requests, connectionIds, rawLogLines } = parseLogFile(logContent);
+        const { httpRequests } = parseAllHttpRequests(logContent);
+
+        setRequests(requests, connectionIds, rawLogLines);
+        setHttpRequests(httpRequests, rawLogLines);
+        const targetRoute = lastRoute && lastRoute !== '/' ? lastRoute : '/summary';
+        navigate(targetRoute);
+      } catch (error) {
+        console.error('Error processing file:', error);
+        setValidationError(
+          error instanceof Error ? error.message : 'Error processing file. Please try again.'
+        );
+      }
     },
     [setRequests, setHttpRequests, navigate, lastRoute]
   );
@@ -75,6 +116,38 @@ export function FileUpload() {
     document.getElementById('file-input')?.click();
   }, []);
 
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (typeof result === 'string') {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to read file as text'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file, 'UTF-8');
+    });
+  };
+
+  const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (result instanceof ArrayBuffer) {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to read file as ArrayBuffer'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
   return (
     <div
       id="drop-zone"
@@ -92,10 +165,25 @@ export function FileUpload() {
         </svg>
         <h2>Drop Matrix SDK Log File Here</h2>
         <p>or click to browse</p>
+        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+          Supports .log or .log.gz files
+        </p>
+        {validationError && (
+          <div style={{ color: '#ef4444', marginTop: '10px', fontSize: '14px' }}>
+            ❌ {validationError}
+          </div>
+        )}
+        {validationWarnings.length > 0 && !validationError && (
+          <div style={{ color: '#f59e0b', marginTop: '10px', fontSize: '14px' }}>
+            {validationWarnings.map((warning, idx) => (
+              <div key={idx}>⚠️ {warning}</div>
+            ))}
+          </div>
+        )}
         <input
           type="file"
           id="file-input"
-          accept=".log,.txt"
+          accept=".log,.txt,.log.gz,.gz"
           onChange={handleFileInput}
           style={{ display: 'none' }}
         />

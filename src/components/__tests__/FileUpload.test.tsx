@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
+import { compressSync } from 'fflate';
 import { FileUpload } from '../FileUpload';
 import { useLogStore } from '../../stores/logStore';
 
@@ -18,30 +19,13 @@ vi.mock('../../utils/logParser', () => ({
   parseAllHttpRequests: (content: string) => mockParseAllHttpRequests(content),
 }));
 
-class MockFileReader {
-  public result: string | null = null;
-  public onload: ((event: ProgressEvent<FileReader>) => void) | null = null;
-  public onerror: (() => void) | null = null;
-
-  readAsText() {
-    this.result = 'mock log content';
-    if (this.onload) {
-      this.onload({ target: this } as unknown as ProgressEvent<FileReader>);
-    }
-  }
-}
-
 describe('FileUpload navigation', () => {
-  const originalFileReader = globalThis.FileReader;
-
   beforeEach(() => {
     useLogStore.getState().clearData();
     useLogStore.getState().clearLastRoute();
     mockNavigate.mockReset();
     mockParseLogFile.mockReset();
     mockParseAllHttpRequests.mockReset();
-
-    vi.stubGlobal('FileReader', MockFileReader as unknown as typeof FileReader);
 
     mockParseLogFile.mockReturnValue({
       requests: [],
@@ -60,11 +44,10 @@ describe('FileUpload navigation', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
-    globalThis.FileReader = originalFileReader;
+    vi.clearAllMocks();
   });
 
-  it('navigates to last route after upload when available', () => {
+  it('navigates to last route after upload when available', async () => {
     useLogStore.setState({ lastRoute: '/http_requests?id=REQ-1' });
 
     const { container } = render(<FileUpload />);
@@ -73,10 +56,15 @@ describe('FileUpload navigation', () => {
 
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/http_requests?id=REQ-1');
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/http_requests?id=REQ-1');
+        resolve();
+      }, 100);
+    });
   });
 
-  it('falls back to /summary when last route is empty', () => {
+  it('falls back to /summary when last route is empty', async () => {
     useLogStore.setState({ lastRoute: null });
 
     const { container } = render(<FileUpload />);
@@ -85,6 +73,112 @@ describe('FileUpload navigation', () => {
 
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/summary');
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/summary');
+        resolve();
+      }, 100);
+    });
+  });
+
+  it('decompresses .log.gz files and parses content', async () => {
+    useLogStore.setState({ lastRoute: '/summary' });
+
+    const logContent = 'test log line 1\ntest log line 2';
+    const compressedData = compressSync(new TextEncoder().encode(logContent));
+
+    const { container } = render(<FileUpload />);
+    const input = container.querySelector('#file-input') as HTMLInputElement;
+    const file = new File([compressedData as BlobPart], 'test.log.gz', { type: 'application/gzip' });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        expect(mockParseLogFile).toHaveBeenCalledWith(logContent);
+        expect(mockParseAllHttpRequests).toHaveBeenCalledWith(logContent);
+        expect(mockNavigate).toHaveBeenCalledWith('/summary');
+        resolve();
+      }, 100);
+    });
+  });
+
+  it('accepts .gz files by MIME type', async () => {
+    useLogStore.setState({ lastRoute: null });
+
+    const logContent = 'test log content';
+    const compressedData = compressSync(new TextEncoder().encode(logContent));
+
+    const { container } = render(<FileUpload />);
+    const input = container.querySelector('#file-input') as HTMLInputElement;
+    const file = new File([compressedData as BlobPart], 'archive.gz', { type: 'application/gzip' });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        expect(mockParseLogFile).toHaveBeenCalledWith(logContent);
+        expect(mockNavigate).toHaveBeenCalledWith('/summary');
+        resolve();
+      }, 100);
+    });
+  });
+
+  it('rejects gzip files with binary content', async () => {
+    const { container, rerender } = render(<FileUpload />);
+    const input = container.querySelector('#file-input') as HTMLInputElement;
+
+    // Create gzip with binary content (null bytes)
+    const binaryContent = new Uint8Array([0x74, 0x65, 0x73, 0x74, 0x00, 0x64]); // "test\0d"
+    const compressedData = compressSync(binaryContent);
+    const file = new File([compressedData as BlobPart], 'test.log.gz', { type: 'application/gzip' });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        rerender(<FileUpload />);
+        expect(mockNavigate).not.toHaveBeenCalled();
+        resolve();
+      }, 150);
+    });
+  });
+
+  it('rejects plain text files with binary content', async () => {
+    const { container, rerender } = render(<FileUpload />);
+    const input = container.querySelector('#file-input') as HTMLInputElement;
+
+    // Binary content with null bytes
+    const binaryContent = new Uint8Array([0x74, 0x65, 0x73, 0x74, 0x00, 0x64]); // "test\0d"
+    const file = new File([binaryContent], 'test.log', { type: 'text/plain' });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        rerender(<FileUpload />);
+        expect(mockNavigate).not.toHaveBeenCalled();
+        resolve();
+      }, 150);
+    });
+  });
+
+  it('rejects invalid gzip files', async () => {
+    const { container, rerender } = render(<FileUpload />);
+    const input = container.querySelector('#file-input') as HTMLInputElement;
+
+    // ZIP file header (not gzip)
+    const invalidGzip = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+    const file = new File([invalidGzip], 'test.log.gz', { type: 'application/gzip' });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        rerender(<FileUpload />);
+        expect(mockNavigate).not.toHaveBeenCalled();
+        resolve();
+      }, 150);
+    });
   });
 });
