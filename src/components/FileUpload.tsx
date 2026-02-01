@@ -7,6 +7,7 @@ export function FileUpload() {
   const navigate = useNavigate();
   const setRequests = useLogStore((state) => state.setRequests);
   const setHttpRequests = useLogStore((state) => state.setHttpRequests);
+  const lastRoute = useLogStore((state) => state.lastRoute);
 
   const handleFile = useCallback(
     (file: File) => {
@@ -22,7 +23,8 @@ export function FileUpload() {
           
           setRequests(requests, connectionIds, rawLogLines);
           setHttpRequests(httpRequests, rawLogLines);
-          navigate('/summary');
+          const targetRoute = lastRoute && lastRoute !== '/' ? lastRoute : '/summary';
+          navigate(targetRoute);
         } catch (error) {
           console.error('Error parsing log file:', error);
           alert('Error parsing log file. Please make sure it\'s a valid Matrix SDK log file.');
@@ -35,7 +37,7 @@ export function FileUpload() {
 
       reader.readAsText(file, 'UTF-8');
     },
-    [setRequests, setHttpRequests, navigate]
+    [setRequests, setHttpRequests, navigate, lastRoute]
   );
 
   const handleDrop = useCallback(

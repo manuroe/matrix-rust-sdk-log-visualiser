@@ -1,5 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { HashRouter as Router, Routes, Route, useSearchParams } from 'react-router-dom';
+import {
+  HashRouter as Router,
+  Routes,
+  Route,
+  useSearchParams,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { LandingPage } from './views/LandingPage';
 import { SummaryView } from './views/SummaryView';
 import { SyncView } from './views/SyncView';
@@ -10,7 +17,9 @@ import { urlToTimeFormat, timeToURLFormat } from './utils/timeUtils';
 
 function AppContent() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { setTimeFilter, startTime, endTime } = useLogStore();
+  const { setTimeFilter, startTime, endTime, rawLogLines, setLastRoute } = useLogStore();
+  const location = useLocation();
+  const navigate = useNavigate();
   const prevTimeFilterRef = useRef<{ startTime: string | null; endTime: string | null }>({
     startTime: null,
     endTime: null,
@@ -50,6 +59,20 @@ function AppContent() {
       setSearchParams(newParams);
     }
   }, [startTime, endTime, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const fullPath = `${location.pathname}${location.search}${location.hash}`;
+    if (location.pathname !== '/') {
+      setLastRoute(fullPath);
+    }
+  }, [location.pathname, location.search, location.hash, setLastRoute]);
+
+  useEffect(() => {
+    const hasData = rawLogLines.length > 0;
+    if (!hasData && location.pathname !== '/') {
+      navigate('/', { replace: true });
+    }
+  }, [rawLogLines.length, location.pathname, navigate]);
 
   return (
     <Routes>

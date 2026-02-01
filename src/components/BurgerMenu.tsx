@@ -7,7 +7,7 @@ export function BurgerMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { clearData } = useLogStore();
+  const { clearData, clearLastRoute } = useLogStore();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -25,6 +25,7 @@ export function BurgerMenu() {
 
   const handleNewSession = () => {
     clearData();
+    clearLastRoute();
     navigate('/');
     setIsOpen(false);
   };

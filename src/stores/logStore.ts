@@ -25,6 +25,7 @@ interface LogStore {
   // Log display state
   rawLogLines: ParsedLogLine[];
   openLogViewerIds: Set<string>;
+  lastRoute: string | null;
   
   // Sync-specific actions
   setRequests: (requests: SyncRequest[], connIds: string[], rawLines: ParsedLogLine[]) => void;
@@ -46,6 +47,10 @@ interface LogStore {
   // Log viewer actions
   openLogViewer: (requestId: string) => void;
   closeLogViewer: (requestId: string) => void;
+
+  // Navigation memory
+  setLastRoute: (route: string) => void;
+  clearLastRoute: () => void;
 }
 
 export const useLogStore = create<LogStore>((set, get) => ({
@@ -70,6 +75,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   
   rawLogLines: [],
   openLogViewerIds: new Set(),
+  lastRoute: null,
 
   setRequests: (requests, connIds, rawLines) => {
     const defaultConn = connIds.includes('room-list') ? 'room-list' : connIds[0] || '';
@@ -224,5 +230,13 @@ export const useLogStore = create<LogStore>((set, get) => ({
     const current = new Set(get().openLogViewerIds);
     current.delete(requestId);
     set({ openLogViewerIds: current });
+  },
+
+  setLastRoute: (route) => {
+    set({ lastRoute: route });
+  },
+
+  clearLastRoute: () => {
+    set({ lastRoute: null });
   },
 }));
