@@ -1,8 +1,42 @@
 .scroll-content {
+    display: flex;
     flex: 1;
+    overflow: hidden;
+}
+
+#timeline-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-content-wrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.timeline-rows-left {
+    flex-shrink: 0;
     overflow-y: auto;
-    min-height: 0;
-    padding: 0 16px 16px 16px;
+    overflow-x: hidden;
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-rows-right {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: scroll;
+    position: relative;
+    scrollbar-width: none;
+}
+
+.timeline-rows-right::-webkit-scrollbar {
+    display: none;
 }
 
 * {
@@ -639,55 +673,64 @@ body {
 }
 
 .sticky-col {
-    position: sticky;
-    background-color: #f9f9f9;
-    z-index: 5;
-    padding: 10px 8px;
-    margin: -10px -8px;
+    padding: 2px 6px;
+    margin: 0;
     display: flex;
     align-items: center;
 }
 
 .timeline-header .sticky-col {
     background-color: white;
-    padding: 6px 8px;
+    padding: 2px 6px;
     margin: 0;
+    /* Use flexbox for alignment */
     display: flex;
     align-items: center;
+    justify-content: flex-start;
+    /* Force width to respect grid columns */
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .request-row .sticky-col {
-    background-color: #f9f9f9;
+    background-color: var(--row-bg, transparent);
+    /* Override flex for grid items */
+    min-width: 0;
 }
 
-.request-row:hover .sticky-col {
-    background-color: #f9f9f9;
-}
-
-.request-row.expanded .sticky-col {
-    background-color: #fafafa;
-}
-
+/* Two-column layout: sticky columns (left) + waterfall (right) */
 .timeline-header {
-    display: grid;
-    grid-template-columns:
-        minmax(90px, 1fr)
-        minmax(120px, 1fr)
-        minmax(80px, 1fr)
-        minmax(80px, 1fr)
-        minmax(80px, 1fr)
-        minmax(0, 15fr);
-    gap: 12px;
+    display: flex;
+    gap: 0;
     background: white;
-    padding: 6px 16px;
+    padding: 0;
     border-radius: 0;
     margin: 0;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: #555;
     flex-shrink: 0;
+    border-bottom: 2px solid #ddd;
+}
+
+.timeline-header-sticky {
+    display: grid;
+    grid-template-columns: 90px 130px 75px 75px;
+    gap: 8px;
+    padding: 4px 16px;
+    background: white;
+    flex-shrink: 0;
     align-items: center;
-    border-bottom: 1px solid #e5e5e5;
+    border-right: 1px solid #ddd;
+}
+
+.timeline-header-waterfall {
+    flex: 1;
+    padding: 4px 16px;
+    overflow: hidden;
 }
 
 .timeline-header > div {
@@ -699,29 +742,88 @@ body {
 }
 
 .request-row {
-    display: grid;
-    grid-template-columns:
-        minmax(90px, 1fr)
-        minmax(120px, 1fr)
-        minmax(80px, 1fr)
-        minmax(80px, 1fr)
-        minmax(80px, 1fr)
-        minmax(0, 15fr);
-    gap: 12px;
-    padding: 10px 8px;
-    border-bottom: 1px solid #e5e5e5;
-    align-items: center;
-    font-size: 13px;
+    display: flex;
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
+    font-size: 12px;
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: background-color 0.1s;
+    min-height: 28px;
+    --row-bg: #ffffff;
+    background-color: var(--row-bg);
+}
+
+.request-row-sticky {
+    display: grid;
+    grid-template-columns: 70px 400px 115px 45px 45px 45px;
+    gap: 8px;
+    padding: 4px 16px;
+    background-color: var(--row-bg);
+    flex-shrink: 0;
+    align-items: center;
+    border-right: 1px solid #ddd;
+    border-bottom: 1px solid #eee;
+}
+
+/* SyncView has different columns: Request, Time, Size, Size */
+.sync-view .request-row-sticky {
+    grid-template-columns: 70px 115px 45px 45px;
+    gap: 6px;
+    padding: 3px 12px;
+}
+
+.timeline-header-sticky {
+    display: grid;
+    grid-template-columns: 70px 400px 115px 45px 45px 45px;
+    gap: 8px;
+    padding: 4px 16px;
+    background: white;
+    flex-shrink: 0;
+    align-items: center;
+    border-right: 1px solid #ddd;
+}
+
+/* SyncView has different columns */
+.sync-view .timeline-header-sticky {
+    grid-template-columns: 70px 115px 45px 45px;
+    gap: 6px;
+    padding: 3px 12px;
+}
+
+.request-row-waterfall {
+    flex-shrink: 0;
+    padding: 4px 8px;
+    overflow: visible;
+    position: relative;
+}
+
+.request-row-waterfall-scroll {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+}
+
+/* Zebra striping for better visual distinction */
+.request-row:nth-child(odd) {
+    --row-bg: #fafafa;
+}
+
+.request-row:nth-child(even) {
+    --row-bg: #ffffff;
 }
 
 .request-row:hover {
-    background: #f9f9f9;
+    --row-bg: #e8f4fd;
+}
+
+.request-row.row-hovered {
+    --row-bg: #e8f4fd;
 }
 
 .request-row.expanded {
-    background: #fafafa;
+    --row-bg: #d4e8f7;
 }
 
 .request-row.pending {
@@ -732,6 +834,7 @@ body {
     font-weight: 500;
     color: #0066cc;
     font-family: monospace;
+    font-size: 11px;
 }
 
 .clickable {
@@ -740,15 +843,15 @@ body {
 
 .time {
     font-family: monospace;
-    font-size: 12px;
+    font-size: 11px;
     color: #666;
 }
 
 .status {
     font-weight: 600;
-    padding: 2px 6px;
+    padding: 2px 4px;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 11px;
     text-align: center;
 }
 
@@ -788,104 +891,94 @@ body {
 
 .size {
     font-family: monospace;
-    font-size: 12px;
+    font-size: 11px;
     text-align: left;
     color: #666;
 }
 
 .duration {
     font-family: monospace;
-    font-size: 12px;
+    font-size: 11px;
     text-align: left;
     color: #666;
+}
+
+.method {
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: #555;
+}
+
+.uri {
+    font-family: monospace;
+    font-size: 11px;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .waterfall {
     position: relative;
     height: 20px;
-    background: #f5f5f5;
-    border-radius: 2px;
-    overflow: visible;
+    background: transparent;
+    border-radius: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    min-width: 400px;
+}
+
+.waterfall::-webkit-scrollbar {
+    height: 6px;
+}
+
+.waterfall::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.waterfall::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.waterfall::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .waterfall-item {
     position: absolute;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     height: 100%;
 }
 
 .waterfall-bar {
-    height: 16px;
+    height: 14px;
     background: #0066cc;
     border-radius: 2px;
     position: relative;
+}
+
+.waterfall-bar.success {
+    background: #28a745;
 }
 
 .waterfall-bar.pending {
     background: #ff9800;
 }
 
+.waterfall-bar.error {
+    background: #dc3545;
+}
+
 .waterfall-duration {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
     color: #333;
     white-space: nowrap;
     font-family: monospace;
-}
-
-.details-row {
-    display: block;
-    grid-column: 1 / -1;
-    padding: 12px;
-    background: #fafafa;
-    border-top: 1px solid #e5e5e5;
-}
-
-.details-content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    font-size: 12px;
-}
-
-.details-content.single {
-    grid-template-columns: 1fr;
-}
-
-.detail-section {
-    background: white;
-    padding: 8px;
-    border-radius: 3px;
-    border: 1px solid #e5e5e5;
-}
-
-.detail-section h4 {
-    font-size: 11px;
-    font-weight: 600;
-    color: #555;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-}
-
-.detail-actions {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-}
-
-.detail-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 4px 0;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.detail-item:last-child {
-    border-bottom: none;
 }
 
 .detail-label {
@@ -1270,33 +1363,13 @@ body {
     background: #4e4e4e;
 }
 
-/* Inline Log Viewer */
-.inline-log-viewer {
-    margin: 8px 0 16px;
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    background: #fff;
-    overflow: hidden;
-}
-
-.inline-log-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
+/* Expanded Log Viewer - Full Width */
+.expanded-log-viewer {
+    border-top: 1px solid #ddd;
     background: #fafafa;
-    border-bottom: 1px solid #e5e5e5;
-}
-
-.inline-log-subtitle {
-    display: inline-block;
-    margin-left: 8px;
-    color: #666;
-    font-size: 12px;
-}
-
-.inline-log-body {
-    height: 420px;
+    padding: 16px;
+    height: 500px;
+    overflow: hidden;
 }
 
 /* Log Gap Controls */
@@ -1642,9 +1715,7 @@ body {
     font-size: 14px;
 }
 
-.chart-legend {
-    /* Styles are applied inline in LogActivityChart component */
-}
+/* Styles applied inline in LogActivityChart component */
 
 .legend-item {
     display: flex;

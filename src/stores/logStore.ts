@@ -40,6 +40,7 @@ interface LogStore {
   // Global actions
   setTimeFilter: (startTime: string | null, endTime: string | null) => void;
   toggleRowExpansion: (requestId: string) => void;
+  setActiveRequest: (requestId: string) => void; // Opens one request, closes all others
   clearData: () => void;
   
   // Log viewer actions
@@ -119,6 +120,13 @@ export const useLogStore = create<LogStore>((set, get) => ({
       expandedRows.add(requestId);
     }
     set({ expandedRows });
+  },
+
+  setActiveRequest: (requestId) => {
+    // Atomically close all rows and open the new one
+    const expandedRows = new Set([requestId]);
+    const openLogViewerIds = new Set([requestId]);
+    set({ expandedRows, openLogViewerIds });
   },
 
   filterRequests: () => {

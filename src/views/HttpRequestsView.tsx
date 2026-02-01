@@ -1,10 +1,11 @@
 import { useLogStore } from '../stores/logStore';
-import { timeToMs, applyTimeRangeFilter } from '../utils/timeUtils';
-import { LogDisplayView } from './LogDisplayView';
+import { timeToMs, applyTimeRangeFilter, isoToTime } from '../utils/timeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import { useEffect } from 'react';
-import { isoToTime } from '../utils/timeUtils';
+import { useEffect, useState, useRef } from 'react';
+import { WaterfallTimeline, getWaterfallPosition, getWaterfallBarWidth } from '../components/WaterfallTimeline';
+import { calculateTimelineWidth } from '../utils/timelineUtils';
+import { LogDisplayView } from './LogDisplayView';
 
 export function HttpRequestsView() {
   const {
@@ -15,11 +16,63 @@ export function HttpRequestsView() {
     endTime,
     expandedRows,
     openLogViewerIds,
+    rawLogLines,
     setHidePendingHttp,
     toggleRowExpansion,
     openLogViewer,
     closeLogViewer,
+    setActiveRequest,
   } = useLogStore();
+
+  const waterfallContainerRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [columnWidths, setColumnWidths] = useState<number[]>([]);
+  const syncingRef = useRef(false);
+  const scrolledIdRef = useRef<string | null>(null);  // Track which ID we've scrolled to
+
+  // Sync vertical scroll between left and right panels
+  useEffect(() => {
+    const rightPanel = waterfallContainerRef.current;
+    const leftPanel = leftPanelRef.current;
+    if (!rightPanel || !leftPanel) return;
+
+    const handleLeftScroll = () => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      rightPanel.scrollTop = leftPanel.scrollTop;
+      syncingRef.current = false;
+    };
+
+    const handleRightScroll = () => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      leftPanel.scrollTop = rightPanel.scrollTop;
+      syncingRef.current = false;
+    };
+
+    leftPanel.addEventListener('scroll', handleLeftScroll);
+    rightPanel.addEventListener('scroll', handleRightScroll);
+
+    return () => {
+      leftPanel.removeEventListener('scroll', handleLeftScroll);
+      rightPanel.removeEventListener('scroll', handleRightScroll);
+    };
+  }, []);
+
+  // Measure actual row column widths and sync to header
+  useEffect(() => {
+    const firstRow = document.querySelector('.request-row-sticky');
+    if (!firstRow) return;
+
+    const children = Array.from(firstRow.children) as HTMLElement[];
+    const widths = children.map(child => child.getBoundingClientRect().width);
+    
+    if (widths.length > 0 && widths.some(w => w > 0)) {
+      setColumnWidths(widths);
+    }
+  }, [filteredHttpRequests]);
 
   // Calculate total considering time range filter
   const totalCount = applyTimeRangeFilter(allHttpRequests, startTime, endTime).length;
@@ -33,8 +86,55 @@ export function HttpRequestsView() {
   const maxTime = times.length > 0 ? Math.max(...times) : 0;
   const totalDuration = Math.max(1, maxTime - minTime);
 
+  // Calculate timeline width using shared logic
+  const visibleTimes = filteredHttpRequests
+    .slice(0, 20)
+    .map((r) => r.request_time)
+    .filter((t) => t)
+    .map(timeToMs);
+  
+  const { timelineWidth } = calculateTimelineWidth(
+    containerWidth,
+    visibleTimes,
+    minTime,
+    maxTime
+  );
+
   // Find common URI prefix to strip from display
   const commonUriPrefix = findCommonUriPrefix(filteredHttpRequests.map(r => r.uri));
+
+  // Handle resize for layout measurements
+  useEffect(() => {
+    const handleResize = () => {
+      if (!waterfallContainerRef.current) return;
+      setContainerWidth(waterfallContainerRef.current.clientWidth);
+    };
+
+    handleResize();
+    const observer = new ResizeObserver(() => handleResize());
+    if (waterfallContainerRef.current) {
+      observer.observe(waterfallContainerRef.current);
+    }
+
+    const container = waterfallContainerRef.current;
+    if (container) {
+      return () => {
+        observer.disconnect();
+      };
+    }
+  }, [timelineWidth]);
+
+  useEffect(() => {
+    // Clear expanded state on unmount (unless navigating with id parameter)
+    return () => {
+      const hash = window.location.hash;
+      const match = hash.match(/id=([^&]+)/);
+      if (!match) {
+        // Clear all at once without iteration to prevent infinite loops
+        useLogStore.setState({ expandedRows: new Set(), openLogViewerIds: new Set() });
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Check for id param in hash
@@ -42,60 +142,66 @@ export function HttpRequestsView() {
     const match = hash.match(/id=([^&]+)/);
     if (match) {
       const reqId = decodeURIComponent(match[1]);
-      // Open the log viewer for this request
-      openLogViewer(reqId);
-      setTimeout(() => {
-        const allRows = Array.from(document.querySelectorAll('.request-row .request-id.clickable.sticky-col'));
-        const target = allRows.find(el => el.textContent === reqId);
-        if (target) {
-          // Expand if not already
-          if (!target.classList.contains('expanded')) {
-            console.log('Clicking to expand target:', target.textContent);
-            (target as HTMLElement).click();
-          }
-          // Scroll the nearest scrollable parent of the expanded row to the top
-          setTimeout(() => {
-            const expandedRow = target.closest('.request-row.expanded');
-            console.log('Target:', target, 'Expanded row:', expandedRow);
-            if (expandedRow) {
-              // Find nearest scrollable parent
-              function getScrollableParent(node: HTMLElement | null): HTMLElement | Window {
-                while (node && node !== document.body) {
-                  const style = window.getComputedStyle(node);
-                  const overflowY = style.overflowY;
-                  if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
-                    return node;
-                  }
-                  node = node.parentElement;
-                }
-                return window;
-              }
-              const scrollParent = getScrollableParent(expandedRow as HTMLElement);
-              const header = document.querySelector('.header-compact');
-              const headerHeight = header ? (header as HTMLElement).offsetHeight : 0;
-              const rowRect = (expandedRow as HTMLElement).getBoundingClientRect();
-              if (scrollParent instanceof HTMLElement) {
-                const parentRect = scrollParent.getBoundingClientRect();
-                const scrollTop = scrollParent.scrollTop + (rowRect.top - parentRect.top) - headerHeight;
-                scrollParent.scrollTo({ top: scrollTop, behavior: 'smooth' });
-                // ...removed debug log...
-              } else {
-                (expandedRow as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
-                setTimeout(() => {
-                  window.scrollBy({ top: -headerHeight, behavior: 'smooth' });
-                  // ...removed debug log...
-                }, 200);
-              }
-            } else {
-              console.log('No expanded row found for target');
-            }
-          }, 100);
-        } else {
-          console.log('No target found for reqId', reqId);
+      // Check if request exists in filtered list
+      const requestExists = filteredHttpRequests.some(r => r.request_id === reqId);
+      
+      if (requestExists) {
+        // Open the log viewer and expand row
+        if (!openLogViewerIds.has(reqId)) {
+          openLogViewer(reqId);
         }
-      }, 300);
+        if (!expandedRows.has(reqId)) {
+          toggleRowExpansion(reqId);
+        }
+        
+        // Scroll only if we haven't scrolled to this ID yet
+        if (scrolledIdRef.current !== reqId) {
+          scrolledIdRef.current = reqId;
+          
+          // Find the index of this request in the filtered list
+          const requestIndex = filteredHttpRequests.findIndex(r => r.request_id === reqId);
+          
+          if (requestIndex === -1) {
+            return;
+          }
+          
+          // Wait for DOM to fully settle before measuring and scrolling
+          const checkAndScroll = () => {
+            const leftPanel = leftPanelRef.current;
+            
+            if (!leftPanel) {
+              setTimeout(checkAndScroll, 100);
+              return;
+            }
+
+            const measuredRow = leftPanel.querySelector('.request-row') as HTMLElement | null;
+            const rowHeight = measuredRow?.offsetHeight ?? 28;
+            const panelHeight = leftPanel.clientHeight;
+            const maxScroll = Math.max(0, leftPanel.scrollHeight - panelHeight);
+
+            // Position: scroll to the row, then center it
+            const rowLogicalTop = requestIndex * rowHeight;
+            const scrollTarget = rowLogicalTop - (panelHeight / 2) + (rowHeight / 2);
+            const clampedTarget = Math.max(0, Math.min(scrollTarget, maxScroll));
+
+            const attemptScroll = (attempt: number) => {
+              leftPanel.scrollTo({ top: clampedTarget, behavior: 'auto' });
+              const delta = Math.abs(leftPanel.scrollTop - clampedTarget);
+
+              if (delta > 4 && attempt < 6) {
+                setTimeout(() => attemptScroll(attempt + 1), 120);
+              }
+            };
+
+            attemptScroll(0);
+          };
+          
+          // Wait longer for virtual scrolling to settle
+          setTimeout(checkAndScroll, 1000);
+        }
+      }
     }
-  }, [filteredHttpRequests, openLogViewer]);
+  }, [filteredHttpRequests, openLogViewerIds, expandedRows, openLogViewer, toggleRowExpansion]);
 
   return (
     <div className="app">
@@ -129,151 +235,209 @@ export function HttpRequestsView() {
       </div>
 
       <div className="timeline-container">
-        <div className="timeline-header" style={{
-          gridTemplateColumns: '90px 300px 130px 65px 65px 75px 75px minmax(800px, 20fr)'
-        }}>
-          <div className="sticky-col" style={{ left: '0' }}>Request</div>
-          <div className="sticky-col" style={{ left: '90px' }}>URI</div>
-          <div className="sticky-col" style={{ left: '390px' }}>Time</div>
-          <div>Method</div>
-          <div>Status</div>
-          <div>↑ Size</div>
-          <div>↓ Size</div>
-          <div>Duration</div>
+        <div className="timeline-header">
+          <div className="timeline-header-sticky" ref={stickyHeaderRef}>
+            <div className="sticky-col" style={columnWidths[0] ? { width: `${columnWidths[0]}px` } : {}}>Request</div>
+            <div className="sticky-col" style={columnWidths[1] ? { width: `${columnWidths[1]}px` } : {}}>URI</div>
+            <div className="sticky-col" style={columnWidths[2] ? { width: `${columnWidths[2]}px` } : {}}>Time</div>
+            <div className="sticky-col" style={columnWidths[3] ? { width: `${columnWidths[3]}px` } : {}}>Method</div>
+            <div className="sticky-col" style={columnWidths[4] ? { width: `${columnWidths[4]}px` } : {}}>↑ Size</div>
+            <div className="sticky-col" style={columnWidths[5] ? { width: `${columnWidths[5]}px` } : {}}>↓ Size</div>
+          </div>
+          <div className="timeline-header-waterfall">
+            <WaterfallTimeline
+              minTime={minTime}
+              maxTime={maxTime}
+              totalDuration={totalDuration}
+              width={timelineWidth}
+              cursorContainerRef={waterfallContainerRef}
+              cursorOffsetLeft={0}
+            />
+          </div>
         </div>
         <div className="scroll-content">
           <div id="timeline-content">
             {filteredHttpRequests.length === 0 ? (
-            <div className="no-data">No HTTP requests found in log file</div>
-          ) : (
-            filteredHttpRequests.map((req, reqIndex) => {
-              const reqTime = timeToMs(req.request_time);
-              const relStart = ((reqTime - minTime) / totalDuration) * 100;
-              const relDuration = req.request_duration_ms
-                ? Math.min(
-                    100,
-                    (parseFloat(String(req.request_duration_ms)) / totalDuration) * 100
-                  )
-                : 2;
-
-              const status = req.status ? req.status : 'Pending';
-              const isPending = !req.status;
-              const statusClass = isPending ? 'pending' : req.status === '200' ? 'success' : 'error';
-              const isExpanded = expandedRows.has(req.request_id);
-              const isLogViewerOpen = openLogViewerIds.has(req.request_id);
-
-              // Calculate prev/next request line ranges
-              const prevRequest = reqIndex > 0 ? filteredHttpRequests[reqIndex - 1] : null;
-              const nextRequest = reqIndex < filteredHttpRequests.length - 1 ? filteredHttpRequests[reqIndex + 1] : null;
-              
-              // Find line numbers by matching the log text
-              const { rawLogLines } = useLogStore.getState();
-              
-              const findLineNumber = (logText: string): number => {
-                if (!logText) return -1;
-                const foundIndex = rawLogLines.findIndex(l => l.rawText === logText);
-                return foundIndex;
-              };
-              
-              const prevRequestLineRange = prevRequest ? {
-                start: findLineNumber(prevRequest.send_line),
-                end: findLineNumber(prevRequest.response_line) || findLineNumber(prevRequest.send_line)
-              } : undefined;
-              
-              const nextRequestLineRange = nextRequest ? {
-                start: findLineNumber(nextRequest.send_line),
-                end: findLineNumber(nextRequest.response_line) || findLineNumber(nextRequest.send_line)
-              } : undefined;
-
-              return (
-                <div key={req.request_id}>
-                  <div
-                    className={`request-row ${isExpanded ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
-                    onClick={() => toggleRowExpansion(req.request_id)}
-                    style={{
-                      gridTemplateColumns: '90px 300px 130px 65px 65px 75px 75px minmax(800px, 20fr)'
-                    }}
-                  >
+              <div className="no-data">No HTTP requests found in log file</div>
+            ) : (
+              <div className="timeline-content-wrapper">
+                <div className="timeline-rows-left" ref={leftPanelRef}>
+                  {filteredHttpRequests.map((req) => (
                     <div
-                      className="request-id clickable sticky-col"
-                      style={{ left: '0' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isLogViewerOpen) {
-                          closeLogViewer(req.request_id);
-                          if (expandedRows.has(req.request_id)) {
-                            toggleRowExpansion(req.request_id);
-                          }
-                          return;
-                        }
-                        if (!isExpanded) {
-                          toggleRowExpansion(req.request_id);
-                        }
-                        openLogViewer(req.request_id);
+                      key={`sticky-${req.request_id}`}
+                      data-row-id={`sticky-${req.request_id}`}
+                      className={`request-row ${(expandedRows.has(req.request_id) && openLogViewerIds.has(req.request_id)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
+                      style={{ minHeight: '28px' }}
+                      onMouseEnter={() => {
+                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
+                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                        leftRow?.classList.add('row-hovered');
+                        rightRow?.classList.add('row-hovered');
+                      }}
+                      onMouseLeave={() => {
+                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
+                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                        leftRow?.classList.remove('row-hovered');
+                        rightRow?.classList.remove('row-hovered');
                       }}
                     >
-                      {req.request_id}
-                    </div>
-                    <div className="uri sticky-col" style={{ left: '90px' }} title={req.uri}>{stripCommonPrefix(extractRelativeUri(req.uri), commonUriPrefix)}</div>
-                    <div className="time sticky-col" style={{ left: '390px' }}>{isoToTime(req.request_time)}</div>
-                    <div className="method">{req.method}</div>
-                    <div className={`status ${statusClass}`}>{status}</div>
-                    <div className="size">{req.request_size || '-'}</div>
-                    <div className="size">{req.response_size || '-'}</div>
-                    <div className="waterfall">
-                      <div
-                        className="waterfall-item"
-                        style={{
-                          left: `${relStart}%`,
-                          position: 'absolute',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                        }}
-                      >
+                      <div className="request-row-sticky">
                         <div
-                          className={`waterfall-bar ${isPending ? 'pending' : ''}`}
-                          style={{
-                            width: `calc((100vw - 200px) * ${Math.max(relDuration, 2)} / 100)`,
-                            minWidth: '40px',
+                          className="request-id clickable sticky-col"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            
+                            // Remove id parameter from URL if clicking a different request
+                            const hash = window.location.hash;
+                            const match = hash.match(/id=([^&]+)/);
+                            if (match) {
+                              const urlId = decodeURIComponent(match[1]);
+                              if (urlId !== req.request_id) {
+                                // Remove the id parameter
+                                const newHash = hash.replace(/[?&]id=[^&]+/, '').replace(/\?&/, '?').replace(/\?$/, '');
+                                window.location.hash = newHash;
+                              }
+                            }
+                            
+                            // If clicking the same request that's already open, close it
+                            if (openLogViewerIds.has(req.request_id) && expandedRows.has(req.request_id)) {
+                              closeLogViewer(req.request_id);
+                              toggleRowExpansion(req.request_id);
+                              return;
+                            }
+                            // Open clicked request and close all others atomically
+                            setActiveRequest(req.request_id);
                           }}
-                          title={`${req.request_duration_ms || '...'}ms`}
                         >
+                          {req.request_id}
                         </div>
-                        <span className="waterfall-duration">
-                          {req.request_duration_ms ? `${req.request_duration_ms}ms` : '...'}
-                        </span>
+                        <div className="uri sticky-col" title={req.uri}>{stripCommonPrefix(extractRelativeUri(req.uri), commonUriPrefix)}</div>
+                        <div className="time sticky-col">{isoToTime(req.request_time)}</div>
+                        <div className="method">{req.method}</div>
+                        <div className="size sticky-col">{req.request_size || '-'}</div>
+                        <div className="size sticky-col">{req.response_size || '-'}</div>
                       </div>
                     </div>
-                  </div>
-                  {isExpanded && isLogViewerOpen && (
-                    <div className="details-row">
-                      <div className="details-content single">
-                        <div className="inline-log-viewer">
-                          <div className="inline-log-body">
-                            <LogDisplayView
-                              requestFilter={`"${req.request_id}"`}
-                              defaultShowOnlyMatching
-                              prevRequestLineRange={prevRequestLineRange}
-                              nextRequestLineRange={nextRequestLineRange}
-                              onClose={() => {
-                                closeLogViewer(req.request_id);
-                                if (expandedRows.has(req.request_id)) {
-                                  toggleRowExpansion(req.request_id);
-                                }
+                  ))}
+                </div>
+                <div className="timeline-rows-right" ref={waterfallContainerRef}>
+                  <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
+                    {filteredHttpRequests.map((req) => {
+                      const reqTime = timeToMs(req.request_time);
+                      const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth);
+                      const barWidth = getWaterfallBarWidth(
+                        parseFloat(String(req.request_duration_ms || 0)),
+                        totalDuration,
+                        timelineWidth,
+                        2
+                      );
+                      const status = req.status ? req.status : 'Pending';
+                      const isPending = !req.status;
+                      const statusClass = isPending ? 'pending' : req.status === '200' ? 'success' : 'error';
+
+                      return (
+                        <div
+                          key={`waterfall-${req.request_id}`}
+                          data-row-id={`waterfall-${req.request_id}`}
+                          className={`request-row ${(expandedRows.has(req.request_id) && openLogViewerIds.has(req.request_id)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
+                          style={{ minHeight: '28px' }}
+                          onMouseEnter={() => {
+                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
+                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                            leftRow?.classList.add('row-hovered');
+                            rightRow?.classList.add('row-hovered');
+                          }}
+                          onMouseLeave={() => {
+                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
+                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                            leftRow?.classList.remove('row-hovered');
+                            rightRow?.classList.remove('row-hovered');
+                          }}
+                        >
+                          <div style={{ flex: 1, overflow: 'visible', position: 'relative', minWidth: `${timelineWidth}px` }}>
+                            <div
+                              className="waterfall-item"
+                              style={{
+                                left: `${barLeft}px`,
+                                position: 'absolute',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
                               }}
-                            />
+                            >
+                              <div
+                                className={`waterfall-bar ${statusClass}`}
+                                style={{
+                                  width: `${barWidth}px`,
+                                  minWidth: '2px',
+                                }}
+                                title={statusClass === 'pending' ? 'Pending' : status}
+                              />
+                              <span className="waterfall-duration" title={statusClass === 'pending' ? 'Pending' : status}>
+                                {isPending ? '...' : status === '200' ? `${req.request_duration_ms}ms` : `${status} - ${req.request_duration_ms}ms`}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
-              );
-            })
-          )}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Expanded log viewer - full width */}
+        {(() => {
+          const expandedRequestId = Array.from(openLogViewerIds).find(id => expandedRows.has(id));
+          if (!expandedRequestId) return null;
+
+          const req = filteredHttpRequests.find(r => r.request_id === expandedRequestId);
+          if (!req) return null;
+
+          const reqIndex = filteredHttpRequests.findIndex(r => r.request_id === expandedRequestId);
+          const prevRequest = reqIndex > 0 ? filteredHttpRequests[reqIndex - 1] : null;
+          const nextRequest = reqIndex < filteredHttpRequests.length - 1 ? filteredHttpRequests[reqIndex + 1] : null;
+          
+          const findLineNumber = (logText: string): number => {
+            if (!logText) return -1;
+            return rawLogLines.findIndex(l => l.rawText === logText);
+          };
+          
+          const prevRequestLineRange = prevRequest ? {
+            start: findLineNumber(prevRequest.send_line),
+            end: findLineNumber(prevRequest.response_line) || findLineNumber(prevRequest.send_line)
+          } : undefined;
+          
+          const nextRequestLineRange = nextRequest ? {
+            start: findLineNumber(nextRequest.send_line),
+            end: findLineNumber(nextRequest.response_line) || findLineNumber(nextRequest.send_line)
+          } : undefined;
+
+          return (
+            <div className="expanded-log-viewer">
+              <LogDisplayView
+                key={expandedRequestId}
+                requestFilter={`"${expandedRequestId}"`}
+                defaultShowOnlyMatching
+                defaultLineWrap
+                logLines={rawLogLines.map(line => ({
+                  ...line,
+                  timestamp: isoToTime(line.timestamp)
+                }))}
+                prevRequestLineRange={prevRequestLineRange}
+                nextRequestLineRange={nextRequestLineRange}
+                onClose={() => {
+                  closeLogViewer(expandedRequestId);
+                  if (expandedRows.has(expandedRequestId)) {
+                    toggleRowExpansion(expandedRequestId);
+                  }
+                }}
+              />
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

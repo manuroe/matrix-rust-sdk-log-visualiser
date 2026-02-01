@@ -16,6 +16,13 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
+// Mock ResizeObserver
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
+
 // Mock scrollIntoView for tests
 Element.prototype.scrollIntoView = vi.fn();
 HTMLElement.prototype.scrollIntoView = vi.fn();

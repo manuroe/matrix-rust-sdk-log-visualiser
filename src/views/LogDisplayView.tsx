@@ -8,13 +8,14 @@ import { buildDisplayItems, calculateGapExpansion } from '../utils/logGapManager
 interface LogDisplayViewProps {
   requestFilter?: string;
   defaultShowOnlyMatching?: boolean;
+  defaultLineWrap?: boolean;
   onClose?: () => void;
   prevRequestLineRange?: { start: number; end: number };
   nextRequestLineRange?: { start: number; end: number };
   logLines?: ParsedLogLine[];
 }
 
-export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _defaultShowOnlyMatching = false, onClose, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
+export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _defaultShowOnlyMatching = false, defaultLineWrap = false, onClose, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
   const { rawLogLines } = useLogStore();
   
   // Use passed logLines if provided, otherwise use all raw log lines from store
@@ -25,7 +26,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
   const [filterQueryInput, setFilterQueryInput] = useState(requestFilter);
   const [filterQuery, setFilterQuery] = useState(requestFilter);
   const [contextLines, setContextLines] = useState(0);
-  const [lineWrap, setLineWrap] = useState(false);
+  const [lineWrap, setLineWrap] = useState(defaultLineWrap);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [stripPrefix, setStripPrefix] = useState(true);
   const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
