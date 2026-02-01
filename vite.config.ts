@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react'
 export default mergeConfig(
   defineConfig({
     plugins: [react()],
-    base: '/matrix-rust-sdk-log-visualiser/',
+    base: process.env.VITE_BASE || '/matrix-rust-sdk-log-visualiser/',
   }),
   defineVitestConfig({
     test: {
