@@ -15,12 +15,15 @@ function createMockHttpRequest(id: string, index: number): HttpRequest {
   return {
     request_id: id,
     method: 'POST',
-    url: url,
     uri: url,
-    start_time: new Date(1000000 + index * 1000).toISOString(),
-    end_time: new Date(1000000 + index * 1000 + 500).toISOString(),
-    duration_ms: 500,
-    status: 200,
+    request_time: new Date(1000000 + index * 1000).toISOString(),
+    response_time: new Date(1000000 + index * 1000 + 500).toISOString(),
+    request_duration_ms: 500,
+    status: '200',
+    request_size: '0',
+    response_size: '0',
+    send_line: '1',
+    response_line: '2',
   };
 }
 
@@ -165,7 +168,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
           if (scrollCount < 3) return 0;
           return 514; // Expected: 25 * 28 - (400 / 2) + (28 / 2) = 700 - 200 + 14 = 514
         },
-        set: (val) => { scrollCount++; },
+        set: () => { scrollCount++; },
         configurable: true,
       });
     }

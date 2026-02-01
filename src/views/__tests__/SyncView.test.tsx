@@ -11,13 +11,20 @@ vi.mock('react-router-dom', () => ({
 }));
 
 function createMockSyncRequest(id: string, index: number): SyncRequest {
+  const url = `https://matrix.example.org/_matrix/client/v3/sync?timeout=30000&request=${index}`;
   return {
     request_id: id,
-    connection_id: 'conn-1',
-    start_time: new Date(1000000 + index * 1000).toISOString(),
-    end_time: new Date(1000000 + index * 1000 + 500).toISOString(),
-    duration_ms: 500,
-    status: 200,
+    conn_id: 'conn-1',
+    method: 'POST',
+    uri: url,
+    request_time: new Date(1000000 + index * 1000).toISOString(),
+    response_time: new Date(1000000 + index * 1000 + 500).toISOString(),
+    request_duration_ms: 500,
+    status: '200',
+    request_size: '0',
+    response_size: '0',
+    send_line: '1',
+    response_line: '2',
   };
 }
 
@@ -162,7 +169,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
           if (scrollCount < 3) return 0;
           return 514; // Expected: 25 * 28 - (400 / 2) + (28 / 2) = 700 - 200 + 14 = 514
         },
-        set: (val) => { scrollCount++; },
+        set: () => { scrollCount++; },
         configurable: true,
       });
     }

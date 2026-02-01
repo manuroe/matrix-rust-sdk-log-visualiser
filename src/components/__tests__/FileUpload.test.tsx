@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { FileUpload } from '../FileUpload';
 import { useLogStore } from '../../stores/logStore';
-import type { LogParserResult } from '../../types/log.types';
 
 const mockNavigate = vi.fn();
 
@@ -10,15 +9,9 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
-const mockParseLogFile = vi.fn<
-  [string],
-  LogParserResult
->();
+const mockParseLogFile = vi.fn();
 
-const mockParseAllHttpRequests = vi.fn<
-  [string],
-  { httpRequests: unknown[] }
->();
+const mockParseAllHttpRequests = vi.fn();
 
 vi.mock('../../utils/logParser', () => ({
   parseLogFile: (content: string) => mockParseLogFile(content),
@@ -32,7 +25,9 @@ class MockFileReader {
 
   readAsText() {
     this.result = 'mock log content';
-    this.onload?.({ target: this } as ProgressEvent<FileReader>);
+    if (this.onload) {
+      this.onload({ target: this } as unknown as ProgressEvent<FileReader>);
+    }
   }
 }
 
