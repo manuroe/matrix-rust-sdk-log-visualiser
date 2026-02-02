@@ -4,6 +4,7 @@ import {
   calculateGapExpansion,
   getGapInfoForLine,
   type FilteredLine,
+  type ForcedRange,
 } from '../logGapManager';
 import type { ParsedLogLine } from '../../types/log.types';
 
@@ -28,14 +29,14 @@ function makeRawLines(count: number): ParsedLogLine[] {
 describe('logGapManager', () => {
   describe('buildDisplayItems', () => {
     it('returns empty array for no filtered lines', () => {
-      const result = buildDisplayItems([], makeRawLines(10), new Map());
+      const result = buildDisplayItems([], makeRawLines(10), []);
       expect(result).toEqual([]);
     });
 
-    it('returns only filtered lines when no gaps expanded', () => {
+    it('returns only filtered lines when no forced ranges exist', () => {
       const filtered = makeFilteredLines([3, 7]);
       const raw = makeRawLines(10);
-      const result = buildDisplayItems(filtered, raw, new Map());
+      const result = buildDisplayItems(filtered, raw, []);
 
       expect(result.length).toBe(2);
       expect(result[0].data.index).toBe(3);
@@ -45,7 +46,7 @@ describe('logGapManager', () => {
     it('attaches gapAbove to first line when it has hidden lines above', () => {
       const filtered = makeFilteredLines([5]);
       const raw = makeRawLines(10);
-      const result = buildDisplayItems(filtered, raw, new Map());
+      const result = buildDisplayItems(filtered, raw, []);
 
       expect(result.length).toBe(1);
       expect(result[0].gapAbove).toBeDefined();
@@ -57,7 +58,7 @@ describe('logGapManager', () => {
     it('attaches gapBelow to last line when it has hidden lines below', () => {
       const filtered = makeFilteredLines([3]);
       const raw = makeRawLines(10);
-      const result = buildDisplayItems(filtered, raw, new Map());
+      const result = buildDisplayItems(filtered, raw, []);
 
       expect(result.length).toBe(1);
       expect(result[0].gapBelow).toBeDefined();
@@ -66,80 +67,63 @@ describe('logGapManager', () => {
       expect(result[0].gapBelow?.isLast).toBe(true);
     });
 
-    it('inserts expanded lines after down expansion', () => {
+    it('inserts forced lines after down expansion', () => {
       const filtered = makeFilteredLines([3, 8]);
       const raw = makeRawLines(10);
-      const expandedGaps = new Map([['down-3', 2]]); // Expand 2 lines after 3
+      const forcedRanges: ForcedRange[] = [{ start: 4, end: 6 }];
 
-      const result = buildDisplayItems(filtered, raw, expandedGaps);
+      const result = buildDisplayItems(filtered, raw, forcedRanges);
 
       // Should have: 3, 4, 5, 8
       expect(result.length).toBe(4);
       expect(result.map((r) => r.data.index)).toEqual([3, 4, 5, 8]);
     });
 
-    it('inserts expanded lines after up expansion', () => {
+    it('inserts forced lines before up expansion', () => {
       const filtered = makeFilteredLines([3, 8]);
       const raw = makeRawLines(10);
-      const expandedGaps = new Map([['up-8', 2]]); // Expand 2 lines before 8
+      const forcedRanges: ForcedRange[] = [{ start: 6, end: 8 }];
 
-      const result = buildDisplayItems(filtered, raw, expandedGaps);
+      const result = buildDisplayItems(filtered, raw, forcedRanges);
 
       // Should have: 3, 6, 7, 8
       expect(result.length).toBe(4);
       expect(result.map((r) => r.data.index)).toEqual([3, 6, 7, 8]);
     });
 
-    it('handles cascading down expansions', () => {
-      const filtered = makeFilteredLines([0, 20]);
-      const raw = makeRawLines(25);
-      const expandedGaps = new Map([
-        ['down-0', 5], // Lines 1-5
-        ['down-5', 3], // Lines 6-8 (from expanded line 5)
-      ]);
+    it('merges overlapping forced ranges', () => {
+      const filtered = makeFilteredLines([3, 8]);
+      const raw = makeRawLines(10);
+      const forcedRanges: ForcedRange[] = [
+        { start: 4, end: 6 },
+        { start: 5, end: 8 },
+      ];
 
-      const result = buildDisplayItems(filtered, raw, expandedGaps);
+      const result = buildDisplayItems(filtered, raw, forcedRanges);
 
-      // Should have: 0, 1, 2, 3, 4, 5, 6, 7, 8, 20
-      expect(result.map((r) => r.data.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 20]);
+      expect(result.map((r) => r.data.index)).toEqual([3, 4, 5, 6, 7, 8]);
     });
 
-    it('handles cascading up expansions', () => {
-      const filtered = makeFilteredLines([5, 20]);
-      const raw = makeRawLines(25);
-      const expandedGaps = new Map([
-        ['up-20', 5], // Lines 15-19
-        ['up-15', 3], // Lines 12-14 (from expanded line 15)
-      ]);
-
-      const result = buildDisplayItems(filtered, raw, expandedGaps);
-
-      // Should have: 5, 12, 13, 14, 15, 16, 17, 18, 19, 20
-      expect(result.map((r) => r.data.index)).toEqual([5, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
-    });
-
-    it('reduces remainingGap when lines are expanded', () => {
+    it('reduces remaining gap based on displayed neighbors', () => {
       const filtered = makeFilteredLines([0, 10]);
       const raw = makeRawLines(15);
-      const expandedGaps = new Map([['down-0', 3]]); // Expanded 3 of 9 gap
+      const forcedRanges: ForcedRange[] = [{ start: 1, end: 4 }];
 
-      const result = buildDisplayItems(filtered, raw, expandedGaps);
+      const result = buildDisplayItems(filtered, raw, forcedRanges);
 
-      // Line 3 should have gapBelow with reduced remaining
       const line3 = result.find((r) => r.data.index === 3);
       expect(line3?.gapBelow).toBeDefined();
       expect(line3?.gapBelow?.gapSize).toBe(6); // 4-9 total gap from 3 to 10
-      expect(line3?.gapBelow?.remainingGap).toBe(6); // None expanded yet from line 3
+      expect(line3?.gapBelow?.remainingGap).toBe(6);
     });
 
     it('removes gap indicator when gap is fully expanded', () => {
       const filtered = makeFilteredLines([0, 3]);
       const raw = makeRawLines(10);
-      const expandedGaps = new Map([['down-0', 2]]); // Fully expand gap (1, 2)
+      const forcedRanges: ForcedRange[] = [{ start: 1, end: 3 }];
 
-      const result = buildDisplayItems(filtered, raw, expandedGaps);
+      const result = buildDisplayItems(filtered, raw, forcedRanges);
 
-      // Line 0 should have no gapBelow, line 2 should have no gapBelow
       const line0 = result.find((r) => r.data.index === 0);
       const line2 = result.find((r) => r.data.index === 2);
       expect(line0?.gapBelow).toBeUndefined();
@@ -149,77 +133,113 @@ describe('logGapManager', () => {
 
   describe('calculateGapExpansion', () => {
     it('expands down gap by specified count', () => {
-      const filtered = makeFilteredLines([5, 15]);
-      const expandedGaps = new Map<string, number>();
+      const displayedIndices = [5, 15];
+      const forcedRanges: ForcedRange[] = [];
 
-      const result = calculateGapExpansion('down-5', 3, filtered, 20, expandedGaps);
+      const result = calculateGapExpansion('down-5', 3, displayedIndices, 20, forcedRanges);
 
-      expect(result.get('down-5')).toBe(3);
+      expect(result).toEqual([{ start: 6, end: 9 }]);
     });
 
     it('expands up gap by specified count', () => {
-      const filtered = makeFilteredLines([5, 15]);
-      const expandedGaps = new Map<string, number>();
+      const displayedIndices = [5, 15];
+      const forcedRanges: ForcedRange[] = [];
 
-      const result = calculateGapExpansion('up-15', 4, filtered, 20, expandedGaps);
+      const result = calculateGapExpansion('up-15', 4, displayedIndices, 20, forcedRanges);
 
-      expect(result.get('up-15')).toBe(4);
+      expect(result).toEqual([{ start: 11, end: 15 }]);
     });
 
     it('expands all remaining lines when count is "all"', () => {
-      const filtered = makeFilteredLines([5, 15]);
-      const expandedGaps = new Map<string, number>();
+      const displayedIndices = [5, 15];
+      const forcedRanges: ForcedRange[] = [];
 
-      const result = calculateGapExpansion('down-5', 'all', filtered, 20, expandedGaps);
+      const result = calculateGapExpansion('down-5', 'all', displayedIndices, 20, forcedRanges);
 
-      expect(result.get('down-5')).toBe(9); // Lines 6-14 = 9 lines
+      expect(result).toEqual([{ start: 6, end: 15 }]); // Lines 6-14
     });
 
     it('accumulates expansion on subsequent calls', () => {
-      const filtered = makeFilteredLines([0, 20]);
-      let expandedGaps = new Map<string, number>();
+      const displayedIndices = [0, 20];
+      let forcedRanges: ForcedRange[] = [];
 
-      expandedGaps = calculateGapExpansion('down-0', 5, filtered, 25, expandedGaps);
-      expect(expandedGaps.get('down-0')).toBe(5);
+      forcedRanges = calculateGapExpansion('down-0', 5, displayedIndices, 25, forcedRanges);
+      expect(forcedRanges).toEqual([{ start: 1, end: 6 }]);
 
-      expandedGaps = calculateGapExpansion('down-0', 3, filtered, 25, expandedGaps);
-      expect(expandedGaps.get('down-0')).toBe(8);
+      const updatedDisplayed = [0, 1, 2, 3, 4, 5, 20];
+      forcedRanges = calculateGapExpansion('down-5', 3, updatedDisplayed, 25, forcedRanges);
+      expect(forcedRanges).toEqual([{ start: 1, end: 9 }]);
     });
 
     it('caps expansion at remaining gap size', () => {
-      const filtered = makeFilteredLines([5, 10]);
-      const expandedGaps = new Map<string, number>();
+      const displayedIndices = [5, 10];
+      const forcedRanges: ForcedRange[] = [];
 
-      const result = calculateGapExpansion('down-5', 100, filtered, 20, expandedGaps);
+      const result = calculateGapExpansion('down-5', 100, displayedIndices, 20, forcedRanges);
 
-      expect(result.get('down-5')).toBe(4); // Only 4 lines between 5 and 10
+      expect(result).toEqual([{ start: 6, end: 10 }]);
     });
 
-    it('returns unchanged map when gap is fully expanded', () => {
-      const filtered = makeFilteredLines([5, 10]);
-      const expandedGaps = new Map([['down-5', 4]]);
+    it('returns unchanged ranges when gap is fully expanded', () => {
+      const displayedIndices = [5, 10];
+      const forcedRanges: ForcedRange[] = [{ start: 6, end: 10 }];
 
-      const result = calculateGapExpansion('down-5', 10, filtered, 20, expandedGaps);
+      const result = calculateGapExpansion('down-5', 10, displayedIndices, 20, forcedRanges);
 
-      expect(result).toBe(expandedGaps); // Same reference, unchanged
+      expect(result).toBe(forcedRanges);
     });
 
-    it('returns unchanged map for invalid gap ID', () => {
-      const filtered = makeFilteredLines([5, 10]);
-      const expandedGaps = new Map<string, number>();
+    it('returns unchanged ranges for invalid gap ID', () => {
+      const displayedIndices = [5, 10];
+      const forcedRanges: ForcedRange[] = [];
 
-      const result = calculateGapExpansion('invalid-5', 10, filtered, 20, expandedGaps);
+      const result = calculateGapExpansion('invalid-5', 10, displayedIndices, 20, forcedRanges);
 
-      expect(result).toBe(expandedGaps);
+      expect(result).toBe(forcedRanges);
+    });
+
+    it('uses request boundary for next-match when provided', () => {
+      const displayedIndices = [5, 15];
+      const forcedRanges: ForcedRange[] = [];
+
+      const result = calculateGapExpansion(
+        'down-5',
+        'next-match',
+        displayedIndices,
+        20,
+        forcedRanges,
+        undefined,
+        undefined,
+        { start: 12, end: 14 }
+      );
+
+      expect(result).toEqual([{ start: 6, end: 13 }]);
+    });
+
+    it('uses request boundary for prev-match when provided', () => {
+      const displayedIndices = [5, 15];
+      const forcedRanges: ForcedRange[] = [];
+
+      const result = calculateGapExpansion(
+        'up-15',
+        'prev-match',
+        displayedIndices,
+        20,
+        forcedRanges,
+        undefined,
+        { start: 7, end: 12 },
+        undefined
+      );
+
+      expect(result).toEqual([{ start: 12, end: 15 }]);
     });
   });
 
   describe('getGapInfoForLine', () => {
     it('returns gap above when there are hidden lines above', () => {
       const displayedIndices = [10, 20];
-      const expandedGaps = new Map<string, number>();
 
-      const result = getGapInfoForLine(10, displayedIndices, 25, expandedGaps);
+      const result = getGapInfoForLine(10, displayedIndices, 25);
 
       expect(result.up).toBeDefined();
       expect(result.up?.gapSize).toBe(10);
@@ -229,9 +249,8 @@ describe('logGapManager', () => {
 
     it('returns gap below when there are hidden lines below', () => {
       const displayedIndices = [10, 20];
-      const expandedGaps = new Map<string, number>();
 
-      const result = getGapInfoForLine(10, displayedIndices, 25, expandedGaps);
+      const result = getGapInfoForLine(10, displayedIndices, 25);
 
       expect(result.down).toBeDefined();
       expect(result.down?.gapSize).toBe(9);
@@ -240,9 +259,8 @@ describe('logGapManager', () => {
 
     it('returns both gaps when line has hidden above and below', () => {
       const displayedIndices = [5, 10, 20];
-      const expandedGaps = new Map<string, number>();
 
-      const result = getGapInfoForLine(10, displayedIndices, 25, expandedGaps);
+      const result = getGapInfoForLine(10, displayedIndices, 25);
 
       expect(result.up).toBeDefined();
       expect(result.down).toBeDefined();
@@ -250,9 +268,8 @@ describe('logGapManager', () => {
 
     it('returns no gaps when line is not in display', () => {
       const displayedIndices = [5, 10, 20];
-      const expandedGaps = new Map<string, number>();
 
-      const result = getGapInfoForLine(99, displayedIndices, 25, expandedGaps);
+      const result = getGapInfoForLine(99, displayedIndices, 25);
 
       expect(result.up).toBeUndefined();
       expect(result.down).toBeUndefined();
@@ -260,23 +277,21 @@ describe('logGapManager', () => {
 
     it('returns no gap above for adjacent lines', () => {
       const displayedIndices = [5, 6, 10];
-      const expandedGaps = new Map<string, number>();
 
-      const result = getGapInfoForLine(6, displayedIndices, 25, expandedGaps);
+      const result = getGapInfoForLine(6, displayedIndices, 25);
 
-      expect(result.up).toBeUndefined(); // No gap between 5 and 6
-      expect(result.down).toBeDefined(); // Gap between 6 and 10
+      expect(result.up).toBeUndefined();
+      expect(result.down).toBeDefined();
     });
 
-    it('accounts for expanded gaps in remaining count', () => {
-      const displayedIndices = [5, 15];
-      const expandedGaps = new Map([['down-5', 3]]);
+    it('reflects smaller gaps when forced lines are displayed', () => {
+      const displayedIndices = [5, 8, 15];
 
-      const result = getGapInfoForLine(5, displayedIndices, 20, expandedGaps);
+      const result = getGapInfoForLine(5, displayedIndices, 20);
 
       expect(result.down).toBeDefined();
-      expect(result.down?.gapSize).toBe(9);
-      expect(result.down?.remainingGap).toBe(6); // 9 - 3 already expanded
+      expect(result.down?.gapSize).toBe(2); // Lines 6-7 are hidden between 5 and 8
+      expect(result.down?.remainingGap).toBe(2);
     });
   });
 });

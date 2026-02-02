@@ -1,5 +1,40 @@
 import type { ParsedLogLine } from '../types/log.types';
 
+/**
+ * # Gap Expansion Manager
+ *
+ * Manages gap expansion for virtualized log display, replacing hidden lines with expanded ranges.
+ *
+ * ## Architecture
+ *
+ * Instead of cascading expansion logic, this module uses:
+ *
+ * **Forced Ranges**: Inclusive-exclusive [start, end) index ranges that must be displayed.
+ * When a gap is expanded, a new forced range is computed and merged with existing ranges.
+ *
+ * **Display Items**: Derived from filtered lines + forced ranges.
+ * Gaps are recomputed based on displayed neighbors, not expansion state.
+ *
+ * **Gap Calculation**: Simple neighbor-based logic:
+ * - For each displayed line, gap size = next displayed line index - current index - 1
+ * - Remaining gap always equals gap size (no subtracting expansion count)
+ *
+ * ## Expansion Modes
+ *
+ * - `+10` or `+N`: Expand N lines (capped to available gap)
+ * - `all`: Expand entire remaining gap
+ * - `next-match`: Expand to next matching line (prefers request boundary if provided)
+ * - `prev-match`: Expand to prev matching line (prefers request boundary if provided)
+ *
+ * ## Helper Functions
+ *
+ * - `mergeRanges()`: Merge overlapping/adjacent ranges
+ * - `normalizeRange()`: Clamp range to valid bounds
+ * - `areRangesEqual()`: Reference equality check
+ * - `findNextMatch()`: Find next match after anchor
+ * - `findPrevMatch()`: Find previous match before anchor
+ */
+
 export interface GapInfo {
   gapId: string;
   gapSize: number;
@@ -23,55 +58,81 @@ export interface FilteredLine {
   index: number;
 }
 
-/**
- * Collects all line indices that should be displayed by cascading through expansions.
- * Used for both up and down directions.
- */
-function collectExpandedLines(
-  startAnchor: number,
-  direction: 'up' | 'down',
-  boundaryMin: number,
-  boundaryMax: number,
-  expandedGaps: Map<string, number>
-): number[] {
-  const linesToDisplay = new Set<number>();
-  const toProcess: number[] = [startAnchor];
-
-  while (toProcess.length > 0) {
-    const anchor = toProcess.shift()!;
-    const gapId = `${direction}-${anchor}`;
-    const expanded = expandedGaps.get(gapId) || 0;
-
-    if (direction === 'up') {
-      for (let j = 1; j <= expanded; j++) {
-        const idx = anchor - j;
-        if (idx > boundaryMin && !linesToDisplay.has(idx)) {
-          linesToDisplay.add(idx);
-          toProcess.push(idx);
-        }
-      }
-    } else {
-      for (let j = 1; j <= expanded; j++) {
-        const idx = anchor + j;
-        if (idx < boundaryMax && !linesToDisplay.has(idx)) {
-          linesToDisplay.add(idx);
-          toProcess.push(idx);
-        }
-      }
-    }
-  }
-
-  return Array.from(linesToDisplay).sort((a, b) => a - b);
+export interface ForcedRange {
+  /** Inclusive start, exclusive end (i.e., [start, end)) */
+  start: number;
+  end: number;
 }
 
 /**
- * Builds the full list of display items including filtered lines and expanded gap lines.
- * This handles cascading expansions where expanded lines can themselves have expansions.
+ * Merges overlapping or adjacent forced ranges.
+ * Forced ranges are inclusive-exclusive: [start, end).
+ */
+function mergeRanges(ranges: ForcedRange[]): ForcedRange[] {
+  if (ranges.length === 0) return [];
+
+  const sorted = [...ranges].sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: ForcedRange[] = [{ ...sorted[0] }];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i];
+    const last = merged[merged.length - 1];
+
+    if (current.start <= last.end) {
+      last.end = Math.max(last.end, current.end);
+    } else {
+      merged.push({ ...current });
+    }
+  }
+
+  return merged;
+}
+
+function normalizeRange(range: ForcedRange, totalLines: number): ForcedRange | null {
+  const start = Math.max(0, Math.min(range.start, totalLines));
+  const end = Math.max(0, Math.min(range.end, totalLines));
+  if (end <= start) return null;
+  return { start, end };
+}
+
+function areRangesEqual(a: ForcedRange[], b: ForcedRange[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].start !== b[i].start || a[i].end !== b[i].end) return false;
+  }
+  return true;
+}
+
+function findNextMatch(anchor: number, gapEnd: number, matchingIndices?: Set<number>): number | null {
+  if (!matchingIndices || matchingIndices.size === 0) return null;
+  let best: number | null = null;
+  matchingIndices.forEach((idx) => {
+    if (idx > anchor && idx < gapEnd) {
+      if (best === null || idx < best) best = idx;
+    }
+  });
+  return best;
+}
+
+function findPrevMatch(anchor: number, gapStart: number, matchingIndices?: Set<number>): number | null {
+  if (!matchingIndices || matchingIndices.size === 0) return null;
+  let best: number | null = null;
+  matchingIndices.forEach((idx) => {
+    if (idx < anchor && idx > gapStart) {
+      if (best === null || idx > best) best = idx;
+    }
+  });
+  return best;
+}
+
+/**
+ * Builds the full list of display items including filtered lines and forced ranges.
+ * Forced ranges are inclusive-exclusive: [start, end).
  */
 export function buildDisplayItems(
   filteredLines: FilteredLine[],
   rawLogLines: ParsedLogLine[],
-  expandedGaps: Map<string, number>
+  forcedRanges: ForcedRange[]
 ): DisplayItem[] {
   const items: DisplayItem[] = [];
 
@@ -79,77 +140,26 @@ export function buildDisplayItems(
     return items;
   }
 
-  // Add expanded lines before the first filtered line (cascading up-expansions)
-  const firstLineIndex = filteredLines[0].index;
-  if (firstLineIndex > 0) {
-    const expandedIndices = collectExpandedLines(
-      firstLineIndex,
-      'up',
-      -1,
-      firstLineIndex,
-      expandedGaps
-    );
-    for (const idx of expandedIndices) {
-      items.push({ type: 'line', data: { line: rawLogLines[idx], index: idx } });
+  const displayIndicesSet = new Set<number>(filteredLines.map((line) => line.index));
+  const mergedForcedRanges = mergeRanges(
+    forcedRanges
+      .map((range) => normalizeRange(range, rawLogLines.length))
+      .filter((range): range is ForcedRange => range !== null)
+  );
+
+  mergedForcedRanges.forEach((range) => {
+    for (let i = range.start; i < range.end; i++) {
+      displayIndicesSet.add(i);
     }
-  }
+  });
 
-  // Process each filtered line and gaps between them
-  for (let i = 0; i < filteredLines.length; i++) {
-    const currentOriginalIndex = filteredLines[i].index;
+  const displayIndices = Array.from(displayIndicesSet).sort((a, b) => a - b);
 
-    // Add expanded lines above this line (cascading up-expansions within the gap)
-    if (i > 0) {
-      const prevOriginalIndex = filteredLines[i - 1].index;
-      const gap = currentOriginalIndex - prevOriginalIndex - 1;
-
-      if (gap > 0) {
-        const expandedIndices = collectExpandedLines(
-          currentOriginalIndex,
-          'up',
-          prevOriginalIndex,
-          currentOriginalIndex,
-          expandedGaps
-        );
-        for (const idx of expandedIndices) {
-          items.push({ type: 'line', data: { line: rawLogLines[idx], index: idx } });
-        }
-      }
-    }
-
-    // Push the current filtered line
-    items.push({ type: 'line', data: filteredLines[i] });
-
-    // Handle gaps after this line (down expansion with cascading support)
-    if (i < filteredLines.length - 1) {
-      const nextOriginalIndex = filteredLines[i + 1].index;
-      const expandedIndices = collectExpandedLines(
-        currentOriginalIndex,
-        'down',
-        currentOriginalIndex,
-        nextOriginalIndex,
-        expandedGaps
-      );
-      for (const idx of expandedIndices) {
-        items.push({ type: 'line', data: { line: rawLogLines[idx], index: idx } });
-      }
-    } else {
-      // Handle gap after the last filtered line to the end of file (with cascading)
-      const expandedIndices = collectExpandedLines(
-        currentOriginalIndex,
-        'down',
-        currentOriginalIndex,
-        rawLogLines.length,
-        expandedGaps
-      );
-      for (const idx of expandedIndices) {
-        items.push({ type: 'line', data: { line: rawLogLines[idx], index: idx } });
-      }
-    }
+  for (const index of displayIndices) {
+    items.push({ type: 'line', data: { line: rawLogLines[index], index } });
   }
 
   // Assign gapAbove/gapBelow based on displayed neighbors
-  const displayIndices = items.map((it) => it.data.index);
   for (let i = 0; i < items.length; i++) {
     const currentIndex = displayIndices[i];
     const prevIndex = i > 0 ? displayIndices[i - 1] : null;
@@ -158,34 +168,24 @@ export function buildDisplayItems(
     // Gap above
     const aboveGapSize = prevIndex === null ? currentIndex : currentIndex - prevIndex - 1;
     if (aboveGapSize > 0) {
-      const gapId = `up-${currentIndex}`;
-      const alreadyExpanded = expandedGaps.get(gapId) || 0;
-      const remainingGap = Math.max(0, aboveGapSize - alreadyExpanded);
-      if (remainingGap > 0) {
-        items[i].gapAbove = {
-          gapId,
-          gapSize: aboveGapSize,
-          remainingGap,
-          isFirst: prevIndex === null,
-        };
-      }
+      items[i].gapAbove = {
+        gapId: `up-${currentIndex}`,
+        gapSize: aboveGapSize,
+        remainingGap: aboveGapSize,
+        isFirst: prevIndex === null,
+      };
     }
 
     // Gap below
     const belowGapSize =
       nextIndex === null ? rawLogLines.length - 1 - currentIndex : nextIndex - currentIndex - 1;
     if (belowGapSize > 0) {
-      const gapId = `down-${currentIndex}`;
-      const alreadyExpanded = expandedGaps.get(gapId) || 0;
-      const remainingGap = Math.max(0, belowGapSize - alreadyExpanded);
-      if (remainingGap > 0) {
-        items[i].gapBelow = {
-          gapId,
-          gapSize: belowGapSize,
-          remainingGap,
-          isLast: nextIndex === null,
-        };
-      }
+      items[i].gapBelow = {
+        gapId: `down-${currentIndex}`,
+        gapSize: belowGapSize,
+        remainingGap: belowGapSize,
+        isLast: nextIndex === null,
+      };
     }
   }
 
@@ -193,93 +193,101 @@ export function buildDisplayItems(
 }
 
 /**
- * Calculates the new expanded gaps map after expanding a gap.
- * Returns the updated map if expansion is valid, or the original map if not.
+ * Calculates the new forced ranges after expanding a gap.
+ * Returns the updated ranges if expansion is valid, or the original reference if not.
  */
 export function calculateGapExpansion(
   gapId: string,
   count: number | 'all' | 'next-match' | 'prev-match',
-  filteredLines: FilteredLine[],
+  displayedIndices: number[],
   totalLines: number,
-  currentExpandedGaps: Map<string, number>,
-  _matchingIndices?: Set<number>,
+  currentForcedRanges: ForcedRange[],
+  matchingIndices?: Set<number>,
   prevRequestLineRange?: { start: number; end: number },
   nextRequestLineRange?: { start: number; end: number }
-): Map<string, number> {
+): ForcedRange[] {
   const isUpGap = gapId.startsWith('up-');
   const isDownGap = gapId.startsWith('down-');
-  
+
   if (!isUpGap && !isDownGap) {
-    return currentExpandedGaps;
+    return currentForcedRanges;
   }
 
-  const anchorIndex = parseInt(gapId.replace(/^(up|down)-/, ''));
-  const filteredIndices = filteredLines.map((f) => f.index);
-
-  let gapStart: number;
-  let gapEnd: number;
-
-  if (isUpGap) {
-    // Gap above: from previous line to current line
-    const prevAnchor = [...filteredIndices].reverse().find((idx) => idx < anchorIndex);
-    gapStart = prevAnchor !== undefined ? prevAnchor : -1;
-    gapEnd = anchorIndex;
-  } else {
-    // Gap below: from current line to next line
-    gapStart = anchorIndex;
-    const nextAnchor = filteredIndices.find((idx) => idx > anchorIndex);
-    gapEnd = nextAnchor !== undefined ? nextAnchor : totalLines;
+  const anchorIndex = Number.parseInt(gapId.replace(/^(up|down)-/, ''), 10);
+  if (Number.isNaN(anchorIndex)) {
+    return currentForcedRanges;
   }
+
+  const anchorPosition = displayedIndices.indexOf(anchorIndex);
+  if (anchorPosition === -1) {
+    return currentForcedRanges;
+  }
+
+  const prevIndex = anchorPosition > 0 ? displayedIndices[anchorPosition - 1] : null;
+  const nextIndex =
+    anchorPosition < displayedIndices.length - 1 ? displayedIndices[anchorPosition + 1] : null;
+
+  const gapStart = isUpGap ? (prevIndex ?? -1) : anchorIndex;
+  const gapEnd = isUpGap ? anchorIndex : (nextIndex ?? totalLines);
 
   const totalGap = gapEnd - gapStart - 1;
   if (totalGap <= 0) {
-    return currentExpandedGaps;
+    return currentForcedRanges;
   }
 
-  const currentExpanded = currentExpandedGaps.get(gapId) || 0;
-  const remaining = totalGap - currentExpanded;
-  
-  if (remaining <= 0) {
-    return currentExpandedGaps;
-  }
-
-  let linesToAdd: number;
+  let newRange: ForcedRange | null = null;
 
   if (count === 'all') {
-    linesToAdd = remaining;
-  } else if (count === 'next-match' && nextRequestLineRange) {
-    // Expand until we reach the start of the next request
+    newRange = { start: gapStart + 1, end: gapEnd };
+  } else if (count === 'next-match') {
     if (isDownGap) {
-      const targetLine = nextRequestLineRange.start;
-      if (targetLine > anchorIndex && targetLine <= gapEnd) {
-        linesToAdd = Math.min(targetLine - anchorIndex, remaining);
-      } else {
-        linesToAdd = remaining;
-      }
+      const targetFromRequest = nextRequestLineRange?.start ?? null;
+      const targetFromMatches = findNextMatch(anchorIndex, gapEnd, matchingIndices);
+      const targetLine =
+        targetFromRequest !== null && targetFromRequest > anchorIndex && targetFromRequest < gapEnd
+          ? targetFromRequest
+          : targetFromMatches;
+
+      newRange = targetLine === null
+        ? { start: gapStart + 1, end: gapEnd }
+        : { start: anchorIndex + 1, end: targetLine + 1 };
     } else {
-      linesToAdd = remaining;
+      newRange = { start: gapStart + 1, end: gapEnd };
     }
-  } else if (count === 'prev-match' && prevRequestLineRange) {
-    // Expand until we reach the end of the previous request
+  } else if (count === 'prev-match') {
     if (isUpGap) {
-      const targetLine = prevRequestLineRange.end;
-      if (targetLine < anchorIndex && targetLine >= gapStart) {
-        linesToAdd = Math.min(anchorIndex - targetLine, remaining);
-      } else {
-        linesToAdd = remaining;
-      }
+      const targetFromRequest = prevRequestLineRange?.end ?? null;
+      const targetFromMatches = findPrevMatch(anchorIndex, gapStart, matchingIndices);
+      const targetLine =
+        targetFromRequest !== null && targetFromRequest < anchorIndex && targetFromRequest > gapStart
+          ? targetFromRequest
+          : targetFromMatches;
+
+      newRange = targetLine === null
+        ? { start: gapStart + 1, end: gapEnd }
+        : { start: targetLine, end: anchorIndex };
     } else {
-      linesToAdd = remaining;
+      newRange = { start: gapStart + 1, end: gapEnd };
     }
   } else if (typeof count === 'number') {
-    linesToAdd = Math.min(count, remaining);
+    const linesToAdd = Math.min(Math.max(0, count), totalGap);
+    if (linesToAdd <= 0) return currentForcedRanges;
+    if (isUpGap) {
+      newRange = { start: anchorIndex - linesToAdd, end: anchorIndex };
+    } else {
+      newRange = { start: anchorIndex + 1, end: anchorIndex + 1 + linesToAdd };
+    }
   } else {
-    linesToAdd = remaining;
+    newRange = { start: gapStart + 1, end: gapEnd };
   }
 
-  const newExpandedGaps = new Map(currentExpandedGaps);
-  newExpandedGaps.set(gapId, currentExpanded + linesToAdd);
-  return newExpandedGaps;
+  if (!newRange) return currentForcedRanges;
+
+  const normalized = normalizeRange(newRange, totalLines);
+  if (!normalized) return currentForcedRanges;
+
+  const merged = mergeRanges([...currentForcedRanges, normalized]);
+  return areRangesEqual(merged, currentForcedRanges) ? currentForcedRanges : merged;
 }
 
 /**
@@ -288,8 +296,7 @@ export function calculateGapExpansion(
 export function getGapInfoForLine(
   lineIndex: number,
   displayedIndices: number[],
-  totalLines: number,
-  expandedGaps: Map<string, number>
+  totalLines: number
 ): { up?: GapInfo; down?: GapInfo } {
   const currentIndexInDisplay = displayedIndices.indexOf(lineIndex);
   if (currentIndexInDisplay === -1) {
@@ -307,33 +314,23 @@ export function getGapInfoForLine(
   // Gap above
   const aboveGapSize = prevIndex === null ? lineIndex : lineIndex - prevIndex - 1;
   if (aboveGapSize > 0) {
-    const gapId = `up-${lineIndex}`;
-    const alreadyExpanded = expandedGaps.get(gapId) || 0;
-    const remainingGap = Math.max(0, aboveGapSize - alreadyExpanded);
-    if (remainingGap > 0) {
-      result.up = {
-        gapId,
-        gapSize: aboveGapSize,
-        remainingGap,
-        isFirst: prevIndex === null,
-      };
-    }
+    result.up = {
+      gapId: `up-${lineIndex}`,
+      gapSize: aboveGapSize,
+      remainingGap: aboveGapSize,
+      isFirst: prevIndex === null,
+    };
   }
 
   // Gap below
   const belowGapSize = nextIndex === null ? totalLines - 1 - lineIndex : nextIndex - lineIndex - 1;
   if (belowGapSize > 0) {
-    const gapId = `down-${lineIndex}`;
-    const alreadyExpanded = expandedGaps.get(gapId) || 0;
-    const remainingGap = Math.max(0, belowGapSize - alreadyExpanded);
-    if (remainingGap > 0) {
-      result.down = {
-        gapId,
-        gapSize: belowGapSize,
-        remainingGap,
-        isLast: nextIndex === null,
-      };
-    }
+    result.down = {
+      gapId: `down-${lineIndex}`,
+      gapSize: belowGapSize,
+      remainingGap: belowGapSize,
+      isLast: nextIndex === null,
+    };
   }
 
   return result;

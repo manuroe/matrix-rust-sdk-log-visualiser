@@ -36,6 +36,18 @@ export function LogsView() {
   // Calculate total (all raw log lines)
   const totalCount = rawLogLines.length;
 
+  // For LogsView, define prev/next boundaries as the edges of filtered logs
+  // This allows users to expand gaps to/from the start and end of the filtered set
+  const prevRequestLineRange = filteredLines.length > 0 ? {
+    start: 0,
+    end: 0
+  } : undefined;
+
+  const nextRequestLineRange = filteredLines.length > 0 ? {
+    start: rawLogLines.length - 1,
+    end: rawLogLines.length - 1
+  } : undefined;
+
   return (
     <div className="app">
       <div className="header-compact">
@@ -64,6 +76,8 @@ export function LogsView() {
             timestamp: isoToTime(line.timestamp)
           }))}
           requestFilter={filterPrefill}
+          prevRequestLineRange={prevRequestLineRange}
+          nextRequestLineRange={nextRequestLineRange}
         />
       </div>
     </div>

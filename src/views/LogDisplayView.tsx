@@ -3,7 +3,7 @@ import type React from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useLogStore } from '../stores/logStore';
 import type { ParsedLogLine } from '../types/log.types';
-import { buildDisplayItems, calculateGapExpansion } from '../utils/logGapManager';
+import { buildDisplayItems, calculateGapExpansion, type ForcedRange } from '../utils/logGapManager';
 
 interface LogDisplayViewProps {
   requestFilter?: string;
@@ -30,7 +30,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [stripPrefix, setStripPrefix] = useState(true);
   const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
-  const [expandedGaps, setExpandedGaps] = useState<Map<string, number>>(new Map());
+  const [forcedRanges, setForcedRanges] = useState<ForcedRange[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -136,8 +136,12 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
 
   // Build display items with gap indicators
   const displayItems = useMemo(() => {
-    return buildDisplayItems(filteredLines, displayLogLines, expandedGaps);
-  }, [filteredLines, displayLogLines, expandedGaps]);
+    return buildDisplayItems(filteredLines, displayLogLines, forcedRanges);
+  }, [filteredLines, displayLogLines, forcedRanges]);
+
+  const displayIndices = useMemo(() => {
+    return displayItems.map((item) => item.data.index);
+  }, [displayItems]);
 
   const rowVirtualizer = useVirtualizer({
     count: displayItems.length,
@@ -152,7 +156,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     // Reset all measurements and force remeasure when wrap state or filters change
     rowVirtualizer.measurementsCache = [];
     rowVirtualizer.measure();
-  }, [rowVirtualizer, lineWrap, contextLines, searchQuery, displayItems.length, expandedGaps, filterQuery]);
+  }, [rowVirtualizer, lineWrap, contextLines, searchQuery, displayItems.length, forcedRanges, filterQuery]);
 
   // Auto-scroll to current search match
   useEffect(() => {
@@ -226,17 +230,17 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
 
   // Expand a gap by including the missing lines
   const expandGap = (gapId: string, count: number | 'all' | 'next-match' | 'prev-match') => {
-    const newExpandedGaps = calculateGapExpansion(
+    const newForcedRanges = calculateGapExpansion(
       gapId,
       count,
-      filteredLines,
+      displayIndices,
       displayLogLines.length,
-      expandedGaps,
+      forcedRanges,
       filterMatchingLineIndices,
       prevRequestLineRange,
       nextRequestLineRange
     );
-    setExpandedGaps(newExpandedGaps);
+    setForcedRanges(newForcedRanges);
   };
 
   // Handle gap expansion with click detection
