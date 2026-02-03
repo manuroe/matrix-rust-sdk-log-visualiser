@@ -11,10 +11,10 @@ import {
 describe('Time Filter Utilities', () => {
   describe('parseTimeInput', () => {
     it('should parse shortcut strings', () => {
-      expect(parseTimeInput('last-5-min')).toBe('last-5-min');
-      expect(parseTimeInput('last-10-min')).toBe('last-10-min');
-      expect(parseTimeInput('last-hour')).toBe('last-hour');
-      expect(parseTimeInput('last-day')).toBe('last-day');
+      expect(parseTimeInput('lastFiveMin')).toBe('lastFiveMin');
+      expect(parseTimeInput('lastTenMin')).toBe('lastTenMin');
+      expect(parseTimeInput('lastHour')).toBe('lastHour');
+      expect(parseTimeInput('lastDay')).toBe('lastDay');
     });
 
     it('should parse ISO time format', () => {
@@ -30,17 +30,17 @@ describe('Time Filter Utilities', () => {
     });
 
     it('should handle whitespace', () => {
-      expect(parseTimeInput('  last-5-min  ')).toBe('last-5-min');
+      expect(parseTimeInput('  lastFiveMin  ')).toBe('lastFiveMin');
       expect(parseTimeInput('  12:34:56  ')).toBe('12:34:56');
     });
   });
 
   describe('shortcutToMs', () => {
     it('should convert shortcuts to milliseconds', () => {
-      expect(shortcutToMs('last-5-min')).toBe(5 * 60 * 1000);
-      expect(shortcutToMs('last-10-min')).toBe(10 * 60 * 1000);
-      expect(shortcutToMs('last-hour')).toBe(60 * 60 * 1000);
-      expect(shortcutToMs('last-day')).toBe(24 * 60 * 60 * 1000);
+      expect(shortcutToMs('lastFiveMin')).toBe(5 * 60 * 1000);
+      expect(shortcutToMs('lastTenMin')).toBe(10 * 60 * 1000);
+      expect(shortcutToMs('lastHour')).toBe(60 * 60 * 1000);
+      expect(shortcutToMs('lastDay')).toBe(24 * 60 * 60 * 1000);
     });
 
     it('should return 0 for unknown shortcut', () => {
@@ -50,10 +50,10 @@ describe('Time Filter Utilities', () => {
 
   describe('getTimeDisplayName', () => {
     it('should return display names for shortcuts', () => {
-      expect(getTimeDisplayName('last-5-min')).toBe('Last 5 min');
-      expect(getTimeDisplayName('last-10-min')).toBe('Last 10 min');
-      expect(getTimeDisplayName('last-hour')).toBe('Last hour');
-      expect(getTimeDisplayName('last-day')).toBe('Last day');
+      expect(getTimeDisplayName('lastFiveMin')).toBe('Last 5 min');
+      expect(getTimeDisplayName('lastTenMin')).toBe('Last 10 min');
+      expect(getTimeDisplayName('lastHour')).toBe('Last hour');
+      expect(getTimeDisplayName('lastDay')).toBe('Last day');
     });
 
     it('should return time string for ISO times', () => {
@@ -78,7 +78,7 @@ describe('Time Filter Utilities', () => {
 
     it('should handle shortcut as start time', () => {
       const maxMs = timeToMs('12:45:00'); // 45900000 ms
-      const result = calculateTimeRange('last-5-min', 'end', maxMs);
+      const result = calculateTimeRange('lastFiveMin', 'end', maxMs);
       expect(result.endMs).toBe(maxMs);
       expect(result.startMs).toBe(maxMs - 5 * 60 * 1000);
     });
@@ -92,7 +92,7 @@ describe('Time Filter Utilities', () => {
 
     it('should not allow start time before 0', () => {
       const maxMs = timeToMs('00:01:00'); // 60000 ms
-      const result = calculateTimeRange('last-hour', 'end', maxMs); // 3600000 ms offset
+      const result = calculateTimeRange('lastHour', 'end', maxMs); // 3600000 ms offset
       expect(result.startMs).toBeGreaterThanOrEqual(0);
       expect(result.startMs).toBe(0); // Clamped to 0
     });

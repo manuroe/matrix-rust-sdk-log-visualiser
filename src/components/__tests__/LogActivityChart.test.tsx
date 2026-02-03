@@ -70,7 +70,7 @@ describe('LogActivityChart', () => {
     // Move mouse over the chart
     fireEvent.mouseMove(overlay, { clientX: 100, clientY: 50 });
     await new Promise(resolve => setTimeout(resolve, 50));
-    let cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
+    const cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
     expect(cursorLine).toBeInTheDocument();
 
     // Verify component still renders after mouse leave (hideTooltip should work)
@@ -215,7 +215,7 @@ describe('LogActivityChart', () => {
 
     // Move to a valid position first
     fireEvent.mouseMove(overlay, { clientX: 150, clientY: 50 });
-    let cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
+    const cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
     expect(cursorLine).toBeInTheDocument();
 
     // Move to invalid position (outside the chart area)
@@ -387,7 +387,7 @@ describe('LogActivityChart', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     // Should have cursor line
-    let cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
+    const cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
     expect(cursorLine).toBeInTheDocument();
 
     // Now start selection (which should hide normal cursor)

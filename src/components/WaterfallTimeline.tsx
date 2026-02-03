@@ -56,8 +56,7 @@ export function WaterfallTimeline({
   useEffect(() => {
     const target = cursorContainerRef?.current ?? null;
     setPortalTarget(target);
-    
-    // Set initial height and listen for resize
+
     if (target) {
       setCursorContainerHeight(target.scrollHeight);
       const resizeObserver = new ResizeObserver(() => {
@@ -247,25 +246,4 @@ function formatTimestamp(ms: number, interval: number): string {
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
-}
-
-// Utility function to calculate pixel position for a request
-export function getWaterfallPosition(
-  requestTime: number,
-  minTime: number,
-  totalDuration: number,
-  timelineWidth: number
-): number {
-  return ((requestTime - minTime) / totalDuration) * timelineWidth;
-}
-
-// Utility function to calculate bar width
-export function getWaterfallBarWidth(
-  durationMs: number,
-  totalDuration: number,
-  timelineWidth: number,
-  minWidth: number = 2
-): number {
-  const calculatedWidth = (durationMs / totalDuration) * timelineWidth;
-  return Math.max(calculatedWidth, minWidth);
 }

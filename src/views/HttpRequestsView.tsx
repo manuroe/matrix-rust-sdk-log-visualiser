@@ -3,7 +3,8 @@ import { timeToMs, applyTimeRangeFilter, isoToTime } from '../utils/timeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { useEffect, useState, useRef } from 'react';
-import { WaterfallTimeline, getWaterfallPosition, getWaterfallBarWidth } from '../components/WaterfallTimeline';
+import { WaterfallTimeline } from '../components/WaterfallTimeline';
+import { getWaterfallPosition, getWaterfallBarWidth } from '../utils/timelineUtils';
 import { calculateTimelineWidth } from '../utils/timelineUtils';
 import { LogDisplayView } from './LogDisplayView';
 
@@ -79,7 +80,7 @@ export function HttpRequestsView() {
 
   // Calculate timeline scale
   const times = filteredHttpRequests
-    .map((r) => r.request_time)
+    .map((r) => r.requestTime)
     .filter((t) => t)
     .map(timeToMs);
   const minTime = times.length > 0 ? Math.min(...times) : 0;
@@ -89,7 +90,7 @@ export function HttpRequestsView() {
   // Calculate timeline width using shared logic
   const visibleTimes = filteredHttpRequests
     .slice(0, 20)
-    .map((r) => r.request_time)
+    .map((r) => r.requestTime)
     .filter((t) => t)
     .map(timeToMs);
   
@@ -143,7 +144,7 @@ export function HttpRequestsView() {
     if (match) {
       const reqId = decodeURIComponent(match[1]);
       // Check if request exists in filtered list
-      const requestExists = filteredHttpRequests.some(r => r.request_id === reqId);
+      const requestExists = filteredHttpRequests.some(r => r.requestId === reqId);
       
       if (requestExists) {
         // Open the log viewer and expand row
@@ -159,7 +160,7 @@ export function HttpRequestsView() {
           scrolledIdRef.current = reqId;
           
           // Find the index of this request in the filtered list
-          const requestIndex = filteredHttpRequests.findIndex(r => r.request_id === reqId);
+          const requestIndex = filteredHttpRequests.findIndex(r => r.requestId === reqId);
           
           if (requestIndex === -1) {
             return;
@@ -264,19 +265,19 @@ export function HttpRequestsView() {
                 <div className="timeline-rows-left" ref={leftPanelRef}>
                   {filteredHttpRequests.map((req) => (
                     <div
-                      key={`sticky-${req.request_id}`}
-                      data-row-id={`sticky-${req.request_id}`}
-                      className={`request-row ${(expandedRows.has(req.request_id) && openLogViewerIds.has(req.request_id)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
+                      key={`sticky-${req.requestId}`}
+                      data-row-id={`sticky-${req.requestId}`}
+                      className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
                       style={{ minHeight: '28px' }}
                       onMouseEnter={() => {
-                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                         leftRow?.classList.add('row-hovered');
                         rightRow?.classList.add('row-hovered');
                       }}
                       onMouseLeave={() => {
-                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                         leftRow?.classList.remove('row-hovered');
                         rightRow?.classList.remove('row-hovered');
                       }}
@@ -292,7 +293,7 @@ export function HttpRequestsView() {
                             const match = hash.match(/id=([^&]+)/);
                             if (match) {
                               const urlId = decodeURIComponent(match[1]);
-                              if (urlId !== req.request_id) {
+                              if (urlId !== req.requestId) {
                                 // Remove the id parameter
                                 const newHash = hash.replace(/[?&]id=[^&]+/, '').replace(/\?&/, '?').replace(/\?$/, '');
                                 window.location.hash = newHash;
@@ -300,22 +301,22 @@ export function HttpRequestsView() {
                             }
                             
                             // If clicking the same request that's already open, close it
-                            if (openLogViewerIds.has(req.request_id) && expandedRows.has(req.request_id)) {
-                              closeLogViewer(req.request_id);
-                              toggleRowExpansion(req.request_id);
+                            if (openLogViewerIds.has(req.requestId) && expandedRows.has(req.requestId)) {
+                              closeLogViewer(req.requestId);
+                              toggleRowExpansion(req.requestId);
                               return;
                             }
                             // Open clicked request and close all others atomically
-                            setActiveRequest(req.request_id);
+                            setActiveRequest(req.requestId);
                           }}
                         >
-                          {req.request_id}
+                          {req.requestId}
                         </div>
                         <div className="uri sticky-col" title={req.uri}>{stripCommonPrefix(extractRelativeUri(req.uri), commonUriPrefix)}</div>
-                        <div className="time sticky-col">{isoToTime(req.request_time)}</div>
+                        <div className="time sticky-col">{isoToTime(req.requestTime)}</div>
                         <div className="method">{req.method}</div>
-                        <div className="size sticky-col">{req.request_size || '-'}</div>
-                        <div className="size sticky-col">{req.response_size || '-'}</div>
+                        <div className="size sticky-col">{req.requestSize || '-'}</div>
+                        <div className="size sticky-col">{req.responseSize || '-'}</div>
                       </div>
                     </div>
                   ))}
@@ -323,10 +324,10 @@ export function HttpRequestsView() {
                 <div className="timeline-rows-right" ref={waterfallContainerRef}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
                     {filteredHttpRequests.map((req) => {
-                      const reqTime = timeToMs(req.request_time);
+                      const reqTime = timeToMs(req.requestTime);
                       const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth);
                       const barWidth = getWaterfallBarWidth(
-                        parseFloat(String(req.request_duration_ms || 0)),
+                        parseFloat(String(req.requestDurationMs || 0)),
                         totalDuration,
                         timelineWidth,
                         2
@@ -337,19 +338,19 @@ export function HttpRequestsView() {
 
                       return (
                         <div
-                          key={`waterfall-${req.request_id}`}
-                          data-row-id={`waterfall-${req.request_id}`}
-                          className={`request-row ${(expandedRows.has(req.request_id) && openLogViewerIds.has(req.request_id)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
+                          key={`waterfall-${req.requestId}`}
+                          data-row-id={`waterfall-${req.requestId}`}
+                          className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
                           style={{ minHeight: '28px' }}
                           onMouseEnter={() => {
-                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                             leftRow?.classList.add('row-hovered');
                             rightRow?.classList.add('row-hovered');
                           }}
                           onMouseLeave={() => {
-                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                             leftRow?.classList.remove('row-hovered');
                             rightRow?.classList.remove('row-hovered');
                           }}
@@ -374,7 +375,7 @@ export function HttpRequestsView() {
                                 title={statusClass === 'pending' ? 'Pending' : status}
                               />
                               <span className="waterfall-duration" title={statusClass === 'pending' ? 'Pending' : status}>
-                                {isPending ? '...' : status === '200' ? `${req.request_duration_ms}ms` : `${status} - ${req.request_duration_ms}ms`}
+                                {isPending ? '...' : status === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
                               </span>
                             </div>
                           </div>
@@ -393,10 +394,10 @@ export function HttpRequestsView() {
           const expandedRequestId = Array.from(openLogViewerIds).find(id => expandedRows.has(id));
           if (!expandedRequestId) return null;
 
-          const req = filteredHttpRequests.find(r => r.request_id === expandedRequestId);
+          const req = filteredHttpRequests.find(r => r.requestId === expandedRequestId);
           if (!req) return null;
 
-          const reqIndex = filteredHttpRequests.findIndex(r => r.request_id === expandedRequestId);
+          const reqIndex = filteredHttpRequests.findIndex(r => r.requestId === expandedRequestId);
           const prevRequest = reqIndex > 0 ? filteredHttpRequests[reqIndex - 1] : null;
           const nextRequest = reqIndex < filteredHttpRequests.length - 1 ? filteredHttpRequests[reqIndex + 1] : null;
           
@@ -406,13 +407,13 @@ export function HttpRequestsView() {
           };
           
           const prevRequestLineRange = prevRequest ? {
-            start: findLineNumber(prevRequest.send_line),
-            end: findLineNumber(prevRequest.response_line) || findLineNumber(prevRequest.send_line)
+            start: findLineNumber(prevRequest.sendLine),
+            end: findLineNumber(prevRequest.responseLine) || findLineNumber(prevRequest.sendLine)
           } : undefined;
           
           const nextRequestLineRange = nextRequest ? {
-            start: findLineNumber(nextRequest.send_line),
-            end: findLineNumber(nextRequest.response_line) || findLineNumber(nextRequest.send_line)
+            start: findLineNumber(nextRequest.sendLine),
+            end: findLineNumber(nextRequest.responseLine) || findLineNumber(nextRequest.sendLine)
           } : undefined;
 
           return (
@@ -450,7 +451,7 @@ function extractRelativeUri(uri: string): string {
     return url.pathname + url.search + url.hash;
   } catch {
     // If not a valid URL, check if it starts with http:// or https://
-    const match = uri.match(/^https?:\/\/[^\/]+(.*)$/);
+    const match = uri.match(/^https?:\/\/[^/]+(.*)$/);
     return match ? match[1] || '/' : uri;
   }
 }

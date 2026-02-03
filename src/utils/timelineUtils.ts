@@ -25,3 +25,28 @@ export function calculateTimelineWidth(
 
   return { timelineWidth, pixelsPerMs };
 }
+
+/**
+ * Utility function to calculate pixel position for a request
+ */
+export function getWaterfallPosition(
+  requestTime: number,
+  minTime: number,
+  totalDuration: number,
+  timelineWidth: number
+): number {
+  return ((requestTime - minTime) / totalDuration) * timelineWidth;
+}
+
+/**
+ * Utility function to calculate bar width
+ */
+export function getWaterfallBarWidth(
+  durationMs: number,
+  totalDuration: number,
+  timelineWidth: number,
+  minWidth: number = 2
+): number {
+  const calculatedWidth = (durationMs / totalDuration) * timelineWidth;
+  return Math.max(calculatedWidth, minWidth);
+}

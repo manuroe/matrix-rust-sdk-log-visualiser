@@ -146,16 +146,16 @@ export function SummaryView() {
     // Filter HTTP requests by time range
     const filteredHttpRequests = allHttpRequests.filter((req) => {
       if (!timeRangeMs) return true;
-      if (!req.response_time) return false;
-      const reqTimeMs = timeToMs(req.response_time);
+      if (!req.responseTime) return false;
+      const reqTimeMs = timeToMs(req.responseTime);
       return reqTimeMs >= timeRangeMs.startMs && reqTimeMs <= timeRangeMs.endMs;
     });
 
     // Filter sync requests by time range
     const filteredSyncRequests = allRequests.filter((req) => {
       if (!timeRangeMs) return true;
-      if (!req.response_time) return false;
-      const reqTimeMs = timeToMs(req.response_time);
+      if (!req.responseTime) return false;
+      const reqTimeMs = timeToMs(req.responseTime);
       return reqTimeMs >= timeRangeMs.startMs && reqTimeMs <= timeRangeMs.endMs;
     });
 
@@ -233,11 +233,11 @@ export function SummaryView() {
     const slowestHttpRequests = filteredHttpRequests
       .filter(req => !/\/sync(\?|$)/i.test(req.uri))
       .map((req) => ({
-        id: req.request_id,
+        id: req.requestId,
         duration:
-          typeof req.request_duration_ms === 'number'
-            ? req.request_duration_ms
-            : parseInt(req.request_duration_ms as string, 10) || 0,
+          typeof req.requestDurationMs === 'number'
+            ? req.requestDurationMs
+            : parseInt(req.requestDurationMs as string, 10) || 0,
         method: req.method,
         uri: req.uri,
         status: req.status,
@@ -248,7 +248,7 @@ export function SummaryView() {
     // Sync requests by connection (from filtered requests)
     const syncByConn: Record<string, number> = {};
     filteredSyncRequests.forEach((req) => {
-      syncByConn[req.conn_id] = (syncByConn[req.conn_id] || 0) + 1;
+      syncByConn[req.connId] = (syncByConn[req.connId] || 0) + 1;
     });
 
     const syncRequestsByConnection = connectionIds

@@ -70,7 +70,7 @@ export function isoToTime(isoStr: string): string {
 export function timeToURLFormat(timeValue: string | null): string | null {
   if (!timeValue) return null;
   // Keep shortcuts and keywords as-is
-  if (timeValue === 'start' || timeValue === 'end' || timeValue.startsWith('last-')) {
+  if (timeValue === 'start' || timeValue === 'end' || timeValue.startsWith('last')) {
     return timeValue;
   }
   // Convert time strings to ISO format
@@ -83,7 +83,7 @@ export function timeToURLFormat(timeValue: string | null): string | null {
 export function urlToTimeFormat(urlValue: string | null): string | null {
   if (!urlValue) return null;
   // Keep shortcuts and keywords as-is
-  if (urlValue === 'start' || urlValue === 'end' || urlValue.startsWith('last-')) {
+  if (urlValue === 'start' || urlValue === 'end' || urlValue.startsWith('last')) {
     return urlValue;
   }
   // Convert ISO datetime to time-only format
@@ -94,7 +94,7 @@ export function urlToTimeFormat(urlValue: string | null): string | null {
 }
 
 /**
- * Parse a time string which can be either a shortcut like "last-5-min"
+ * Parse a time string which can be either a shortcut like "lastFiveMin"
  * or an ISO time like "12:34:56.123456"
  */
 export function parseTimeInput(input: string): string | null {
@@ -104,11 +104,11 @@ export function parseTimeInput(input: string): string | null {
 
   // Handle shortcuts
   if (trimmed === 'start') return 'start';
-  if (trimmed === 'last-min') return 'last-min';
-  if (trimmed === 'last-5-min') return 'last-5-min';
-  if (trimmed === 'last-10-min') return 'last-10-min';
-  if (trimmed === 'last-hour') return 'last-hour';
-  if (trimmed === 'last-day') return 'last-day';
+  if (trimmed === 'lastMin') return 'lastMin';
+  if (trimmed === 'lastFiveMin') return 'lastFiveMin';
+  if (trimmed === 'lastTenMin') return 'lastTenMin';
+  if (trimmed === 'lastHour') return 'lastHour';
+  if (trimmed === 'lastDay') return 'lastDay';
   if (trimmed === 'end') return 'end';
 
   // Handle ISO time format (HH:MM:SS or HH:MM:SS.ffffff)
@@ -147,11 +147,11 @@ export function parseTimeInput(input: string): string | null {
  */
 export function shortcutToMs(shortcut: string): number {
   const shortcuts: Record<string, number> = {
-    'last-min': 60 * 1000,
-    'last-5-min': 5 * 60 * 1000,
-    'last-10-min': 10 * 60 * 1000,
-    'last-hour': 60 * 60 * 1000,
-    'last-day': 24 * 60 * 60 * 1000,
+    lastMin: 60 * 1000,
+    lastFiveMin: 5 * 60 * 1000,
+    lastTenMin: 10 * 60 * 1000,
+    lastHour: 60 * 60 * 1000,
+    lastDay: 24 * 60 * 60 * 1000,
   };
   return shortcuts[shortcut] || 0;
 }
@@ -163,11 +163,11 @@ export function getTimeDisplayName(timeValue: string | null): string {
   if (!timeValue) return '';
   if (timeValue === 'start') return 'Start of log';
   if (timeValue === 'end') return 'End of log';
-  if (timeValue === 'last-min') return 'Last min';
-  if (timeValue === 'last-5-min') return 'Last 5 min';
-  if (timeValue === 'last-10-min') return 'Last 10 min';
-  if (timeValue === 'last-hour') return 'Last hour';
-  if (timeValue === 'last-day') return 'Last day';
+  if (timeValue === 'lastMin') return 'Last min';
+  if (timeValue === 'lastFiveMin') return 'Last 5 min';
+  if (timeValue === 'lastTenMin') return 'Last 10 min';
+  if (timeValue === 'lastHour') return 'Last hour';
+  if (timeValue === 'lastDay') return 'Last day';
   return timeValue;
 }
 
@@ -201,7 +201,7 @@ export function calculateTimeRange(
     if (startTime === 'start') {
       // Start of log
       startMs = 0;
-    } else if (startTime.startsWith('last-')) {
+    } else if (startTime.startsWith('last')) {
       // Shortcut: calculate offset from endTime
       const offsetMs = shortcutToMs(startTime);
       startMs = Math.max(0, endMs - offsetMs);
@@ -227,9 +227,9 @@ export function isInTimeRange(
 
 /**
  * Apply time range filter to a list of requests
- * Returns requests that fall within the time range (by response_time)
+ * Returns requests that fall within the time range (by responseTime)
  */
-export function applyTimeRangeFilter<T extends { response_time: string }>(
+export function applyTimeRangeFilter<T extends { responseTime: string }>(
   requests: T[],
   startTime: string | null,
   endTime: string | null
@@ -238,7 +238,7 @@ export function applyTimeRangeFilter<T extends { response_time: string }>(
 
   // Find max time from requests to use as reference
   const times = requests
-    .map((r) => r.response_time)
+    .map((r) => r.responseTime)
     .filter((t) => t)
     .map(timeToMs);
   const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
@@ -246,5 +246,5 @@ export function applyTimeRangeFilter<T extends { response_time: string }>(
   // Calculate actual start and end times
   const { startMs, endMs } = calculateTimeRange(startTime, endTime, maxLogTimeMs);
 
-  return requests.filter((r) => r.response_time && isInTimeRange(r.response_time, startMs, endMs));
+  return requests.filter((r) => r.responseTime && isInTimeRange(r.responseTime, startMs, endMs));
 }

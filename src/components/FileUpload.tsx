@@ -22,6 +22,39 @@ export function FileUpload() {
     return file.type === 'application/gzip' || file.type === 'application/x-gzip';
   };
 
+  // Helper functions defined before use
+  const readFileAsText = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (typeof result === 'string') {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to read file as text'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file, 'UTF-8');
+    });
+  }, []);
+
+  const readFileAsArrayBuffer = useCallback((file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (result instanceof ArrayBuffer) {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to read file as ArrayBuffer'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  }, []);
+
   const handleFile = useCallback(
     async (file: File) => {
       setValidationError(null);
@@ -70,7 +103,7 @@ export function FileUpload() {
         setRequests(requests, connectionIds, rawLogLines);
         setHttpRequests(httpRequests, rawLogLines);
         const targetRoute = lastRoute && lastRoute !== '/' ? lastRoute : '/summary';
-        navigate(targetRoute);
+        void navigate(targetRoute);
       } catch (error) {
         console.error('Error processing file:', error);
         setValidationError(
@@ -78,7 +111,7 @@ export function FileUpload() {
         );
       }
     },
-    [setRequests, setHttpRequests, navigate, lastRoute]
+    [setRequests, setHttpRequests, navigate, lastRoute, readFileAsText, readFileAsArrayBuffer]
   );
 
   const handleDrop = useCallback(
@@ -88,7 +121,7 @@ export function FileUpload() {
 
       const files = e.dataTransfer.files;
       if (files.length > 0) {
-        handleFile(files[0]);
+        void handleFile(files[0]);
       }
     },
     [handleFile]
@@ -106,47 +139,16 @@ export function FileUpload() {
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
-        handleFile(e.target.files[0]);
+        void handleFile(e.target.files[0]);
       }
     },
     [handleFile]
   );
 
+
   const handleClick = useCallback(() => {
     document.getElementById('file-input')?.click();
   }, []);
-
-  const readFileAsText = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result;
-        if (typeof result === 'string') {
-          resolve(result);
-        } else {
-          reject(new Error('Failed to read file as text'));
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file, 'UTF-8');
-    });
-  };
-
-  const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result;
-        if (result instanceof ArrayBuffer) {
-          resolve(result);
-        } else {
-          reject(new Error('Failed to read file as ArrayBuffer'));
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
-    });
-  };
 
   return (
     <div

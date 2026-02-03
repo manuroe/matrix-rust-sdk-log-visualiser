@@ -26,12 +26,12 @@ export function BurgerMenu() {
   const handleNewSession = () => {
     clearData();
     clearLastRoute();
-    navigate('/');
+    void navigate('/');
     setIsOpen(false);
   };
 
   const handleNavigate = (path: string) => {
-    navigate(path);
+    void navigate(path);
     setIsOpen(false);
   };
 

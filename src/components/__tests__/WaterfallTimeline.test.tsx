@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
-import { WaterfallTimeline, getWaterfallPosition, getWaterfallBarWidth } from '../WaterfallTimeline';
+import { WaterfallTimeline } from '../WaterfallTimeline';
+import { getWaterfallPosition, getWaterfallBarWidth } from '../../utils/timelineUtils';
 import { createRef } from 'react';
 
 // Mock ResizeObserver

@@ -71,15 +71,15 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       }
 
       const rec = records.get(requestId)!;
-      rec.request_id = requestId;
-      rec.response_time = rec.response_time || timeStr || '';
+      rec.requestId = requestId;
+      rec.responseTime = rec.responseTime || timeStr || '';
       rec.method = rec.method || respMatch.groups.method;
       rec.uri = rec.uri || respMatch.groups.uri;
       rec.status = rec.status || respMatch.groups.status;
-      rec.response_size = rec.response_size || respMatch.groups.resp_size;
-      rec.request_size = rec.request_size || respMatch.groups.req_size;
-      rec.request_duration_ms = rec.request_duration_ms || durationMs;
-      rec.response_line = line;
+      rec.responseSize = rec.responseSize || respMatch.groups.resp_size;
+      rec.requestSize = rec.requestSize || respMatch.groups.req_size;
+      rec.requestDurationMs = rec.requestDurationMs || durationMs;
+      rec.responseLine = line;
       continue;
     }
 
@@ -93,33 +93,33 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       }
 
       const rec = records.get(requestId)!;
-      rec.request_id = requestId;
-      rec.request_time = rec.request_time || timeStr || '';
+      rec.requestId = requestId;
+      rec.requestTime = rec.requestTime || timeStr || '';
       rec.method = rec.method || sendMatch.groups.method;
       rec.uri = rec.uri || sendMatch.groups.uri;
-      rec.request_size = rec.request_size || sendMatch.groups.req_size;
-      rec.send_line = line;
+      rec.requestSize = rec.requestSize || sendMatch.groups.req_size;
+      rec.sendLine = line;
     }
   }
 
   // Filter and convert to array - include any request with at least a send or response line
   const allRequests = Array.from(records.values()).filter(
     (rec): rec is HttpRequest =>
-      !!rec.uri && (!!rec.send_line || !!rec.response_line)
+      !!rec.uri && (!!rec.sendLine || !!rec.responseLine)
   ) as HttpRequest[];
 
   // Fill in missing fields with empty strings
   allRequests.forEach((rec) => {
-    rec.request_time = rec.request_time || '';
-    rec.response_time = rec.response_time || '';
+    rec.requestTime = rec.requestTime || '';
+    rec.responseTime = rec.responseTime || '';
     rec.method = rec.method || '';
     rec.uri = rec.uri || '';
     rec.status = rec.status || '';
-    rec.request_size = rec.request_size || '';
-    rec.response_size = rec.response_size || '';
-    rec.request_duration_ms = rec.request_duration_ms || '';
-    rec.send_line = rec.send_line || '';
-    rec.response_line = rec.response_line || '';
+    rec.requestSize = rec.requestSize || '';
+    rec.responseSize = rec.responseSize || '';
+    rec.requestDurationMs = rec.requestDurationMs || '';
+    rec.sendLine = rec.sendLine || '';
+    rec.responseLine = rec.responseLine || '';
   });
 
   return {
@@ -132,11 +132,11 @@ export function parseLogFile(logContent: string): LogParserResult {
   // First parse all HTTP requests
   const { httpRequests, rawLogLines } = parseAllHttpRequests(logContent);
 
-  // Filter for sync-specific requests and add conn_id
+  // Filter for sync-specific requests and add connId
   const syncRequests: SyncRequest[] = [];
   const lines = logContent.split('\n');
 
-  // Build a map of request_id to conn_id by scanning lines again
+  // Build a map of request_id to connId by scanning lines again
   const connIdMap = new Map<string, string>();
   for (const line of lines) {
     if (line.includes('request_id=') && line.includes('/sync')) {
@@ -148,20 +148,20 @@ export function parseLogFile(logContent: string): LogParserResult {
     }
   }
 
-  // Filter HTTP requests for sync URIs and add conn_id
+  // Filter HTTP requests for sync URIs and add connId
   for (const httpReq of httpRequests) {
     if (httpReq.uri.includes('/sync')) {
-      const connId = connIdMap.get(httpReq.request_id) || '';
+      const connId = connIdMap.get(httpReq.requestId) || '';
       syncRequests.push({
         ...httpReq,
-        conn_id: connId,
+        connId,
       });
     }
   }
 
   // Extract unique connection IDs
   const connectionIds = [
-    ...new Set(syncRequests.map((r) => r.conn_id).filter((c) => c)),
+    ...new Set(syncRequests.map((r) => r.connId).filter((c) => c)),
   ];
 
   return {

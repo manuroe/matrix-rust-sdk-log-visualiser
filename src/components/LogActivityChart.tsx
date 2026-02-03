@@ -55,16 +55,16 @@ export function LogActivityChart({ logLines, onTimeRangeSelected, onResetZoom }:
     return date.toISOString().split('T')[1].split('.')[0]; // Gets HH:MM:SS in UTC
   }, []);
 
-  const { buckets, maxCount, minTime, maxTime } = useMemo(() => {
+  const chartData = useMemo(() => {
     if (logLines.length === 0) {
       return { buckets: [], maxCount: 0, minTime: 0, maxTime: 0 };
     }
 
     // Find time range
     const timestamps = logLines.map((line) => timeToMs(line.timestamp));
-    const minTime = Math.min(...timestamps);
-    const maxTime = Math.max(...timestamps);
-    const timeRange = maxTime - minTime;
+    const dataMinTime = Math.min(...timestamps);
+    const dataMaxTime = Math.max(...timestamps);
+    const timeRange = dataMaxTime - dataMinTime;
 
     // Calculate bucket size to display ~100 bars
     const targetBars = 100;
@@ -73,18 +73,12 @@ export function LogActivityChart({ logLines, onTimeRangeSelected, onResetZoom }:
       bucketSize = Math.max(1000, Math.ceil(timeRange / targetBars));
     }
 
-    // Helper to format timestamp as HH:MM:SS in UTC
-    const formatTime = (timestampMs: number): string => {
-      const date = new Date(timestampMs);
-      return date.toISOString().split('T')[1].split('.')[0]; // Gets HH:MM:SS in UTC
-    };
-
     // Create buckets for the entire time range
     const bucketMap = new Map<number, TimeBucket>();
     
     // Initialize all buckets in the time range
-    const firstBucketKey = Math.floor(minTime / bucketSize) * bucketSize;
-    const lastBucketKey = Math.floor(maxTime / bucketSize) * bucketSize;
+    const firstBucketKey = Math.floor(dataMinTime / bucketSize) * bucketSize;
+    const lastBucketKey = Math.floor(dataMaxTime / bucketSize) * bucketSize;
     
     for (let bucketKey = firstBucketKey; bucketKey <= lastBucketKey; bucketKey += bucketSize) {
       bucketMap.set(bucketKey, {
@@ -115,19 +109,17 @@ export function LogActivityChart({ logLines, onTimeRangeSelected, onResetZoom }:
     });
 
     // Convert to sorted array
-    const buckets = Array.from(bucketMap.values()).sort((a, b) => a.timestamp - b.timestamp);
-    const maxCount = Math.max(...buckets.map((b) => b.total));
+    const dataBuckets = Array.from(bucketMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+    const dataMaxCount = Math.max(...dataBuckets.map((b) => b.total));
 
-    return { buckets, maxCount, minTime, maxTime };
+    return { buckets: dataBuckets, maxCount: dataMaxCount, minTime: dataMinTime, maxTime: dataMaxTime };
   }, [logLines, formatTime]);
 
-  if (buckets.length === 0) {
-    return <div className="chart-empty">No log data to display</div>;
-  }
+  const { buckets, maxCount, minTime, maxTime } = chartData;
 
   const width = 800;
   const height = 120;
-  const margin = { top: 10, right: 10, bottom: 30, left: 50 };
+  const margin = useMemo(() => ({ top: 10, right: 10, bottom: 30, left: 50 }), []);
   const xMax = width - margin.left - margin.right;
   const yMax = height - margin.top - margin.bottom;
 
@@ -244,6 +236,10 @@ export function LogActivityChart({ logLines, onTimeRangeSelected, onResetZoom }:
     },
     [buckets, xScale, xMax, margin, minTime, maxTime, formatTime, showTooltip, hideTooltip, isSelecting]
   );
+
+  if (buckets.length === 0) {
+    return <div className="chart-empty">No log data to display</div>;
+  }
 
   return (
     <div className="log-activity-chart" style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>

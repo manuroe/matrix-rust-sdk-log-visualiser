@@ -13,18 +13,18 @@ vi.mock('react-router-dom', () => ({
 function createMockSyncRequest(id: string, index: number): SyncRequest {
   const url = `https://matrix.example.org/_matrix/client/v3/sync?timeout=30000&request=${index}`;
   return {
-    request_id: id,
-    conn_id: 'conn-1',
+    requestId: id,
+    connId: 'conn-1',
     method: 'POST',
     uri: url,
-    request_time: new Date(1000000 + index * 1000).toISOString(),
-    response_time: new Date(1000000 + index * 1000 + 500).toISOString(),
-    request_duration_ms: 500,
+    requestTime: new Date(1000000 + index * 1000).toISOString(),
+    responseTime: new Date(1000000 + index * 1000 + 500).toISOString(),
+    requestDurationMs: 500,
     status: '200',
-    request_size: '0',
-    response_size: '0',
-    send_line: '1',
-    response_line: '2',
+    requestSize: '0',
+    responseSize: '0',
+    sendLine: '1',
+    responseLine: '2',
   };
 }
 

@@ -3,7 +3,8 @@ import { timeToMs, applyTimeRangeFilter } from '../utils/timeUtils';
 import { isoToTime } from '../utils/timeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import { WaterfallTimeline, getWaterfallPosition, getWaterfallBarWidth } from '../components/WaterfallTimeline';
+import { WaterfallTimeline } from '../components/WaterfallTimeline';
+import { getWaterfallPosition, getWaterfallBarWidth } from '../utils/timelineUtils';
 import { calculateTimelineWidth } from '../utils/timelineUtils';
 import { LogDisplayView } from './LogDisplayView';
 import { useState, useRef, useEffect } from 'react';
@@ -81,13 +82,13 @@ export function SyncView() {
 
   // Calculate total for selected connection, considering time range filter
   const connFilteredRequests = allRequests.filter(
-    (r) => !selectedConnId || r.conn_id === selectedConnId
+    (r) => !selectedConnId || r.connId === selectedConnId
   );
   const totalForConn = applyTimeRangeFilter(connFilteredRequests, startTime, endTime).length;
 
   // Calculate timeline scale
   const times = filteredRequests
-    .map((r) => r.request_time)
+    .map((r) => r.requestTime)
     .filter((t) => t)
     .map(timeToMs);
   const minTime = times.length > 0 ? Math.min(...times) : 0;
@@ -104,7 +105,7 @@ export function SyncView() {
   // Calculate timeline width using shared logic
   const visibleTimes = filteredRequests
     .slice(0, 20)
-    .map((r) => r.request_time)
+    .map((r) => r.requestTime)
     .filter((t) => t)
     .map(timeToMs);
   
@@ -156,7 +157,7 @@ export function SyncView() {
     const match = hash.match(/id=([^&]+)/);
     if (match) {
       const reqId = decodeURIComponent(match[1]);
-      const requestExists = filteredRequests.some(r => r.request_id === reqId);
+      const requestExists = filteredRequests.some(r => r.requestId === reqId);
       
       if (requestExists) {
         if (!openLogViewerIds.has(reqId)) {
@@ -168,7 +169,7 @@ export function SyncView() {
         
         if (scrolledIdRef.current !== reqId) {
           scrolledIdRef.current = reqId;
-          const requestIndex = filteredRequests.findIndex(r => r.request_id === reqId);
+          const requestIndex = filteredRequests.findIndex(r => r.requestId === reqId);
           
           if (requestIndex === -1) return;
           
@@ -290,19 +291,19 @@ export function SyncView() {
                 <div className="timeline-rows-left" ref={leftPanelRef}>
                   {filteredRequests.map((req) => (
                     <div
-                      key={`sticky-${req.request_id}`}
-                      data-row-id={`sticky-${req.request_id}`}
-                      className={`request-row ${(expandedRows.has(req.request_id) && openLogViewerIds.has(req.request_id)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
+                      key={`sticky-${req.requestId}`}
+                      data-row-id={`sticky-${req.requestId}`}
+                      className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
                       style={{ minHeight: '28px' }}
                       onMouseEnter={() => {
-                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                         leftRow?.classList.add('row-hovered');
                         rightRow?.classList.add('row-hovered');
                       }}
                       onMouseLeave={() => {
-                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                        const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                        const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                         leftRow?.classList.remove('row-hovered');
                         rightRow?.classList.remove('row-hovered');
                       }}
@@ -318,7 +319,7 @@ export function SyncView() {
                             const match = hash.match(/id=([^&]+)/);
                             if (match) {
                               const urlId = decodeURIComponent(match[1]);
-                              if (urlId !== req.request_id) {
+                              if (urlId !== req.requestId) {
                                 // Remove the id parameter
                                 const newHash = hash.replace(/[?&]id=[^&]+/, '').replace(/\?&/, '?').replace(/\?$/, '');
                                 window.location.hash = newHash;
@@ -326,20 +327,20 @@ export function SyncView() {
                             }
                             
                             // If clicking the same request that's already open, close it
-                            if (openLogViewerIds.has(req.request_id) && expandedRows.has(req.request_id)) {
-                              closeLogViewer(req.request_id);
-                              toggleRowExpansion(req.request_id);
+                            if (openLogViewerIds.has(req.requestId) && expandedRows.has(req.requestId)) {
+                              closeLogViewer(req.requestId);
+                              toggleRowExpansion(req.requestId);
                               return;
                             }
                             // Open clicked request and close all others atomically
-                            setActiveRequest(req.request_id);
+                            setActiveRequest(req.requestId);
                           }}
                         >
-                          {req.request_id}
+                          {req.requestId}
                         </div>
-                        <div className="time sticky-col">{isoToTime(req.request_time)}</div>
-                        <div className="size sticky-col">{req.request_size || '-'}</div>
-                        <div className="size sticky-col">{req.response_size || '-'}</div>
+                        <div className="time sticky-col">{isoToTime(req.requestTime)}</div>
+                        <div className="size sticky-col">{req.requestSize || '-'}</div>
+                        <div className="size sticky-col">{req.responseSize || '-'}</div>
                       </div>
                     </div>
                   ))}
@@ -347,10 +348,10 @@ export function SyncView() {
                 <div className="timeline-rows-right" ref={waterfallContainerRef}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
                     {filteredRequests.map((req) => {
-                      const reqTime = timeToMs(req.request_time);
+                      const reqTime = timeToMs(req.requestTime);
                       const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth);
                       const barWidth = getWaterfallBarWidth(
-                        parseFloat(String(req.request_duration_ms || 0)),
+                        parseFloat(String(req.requestDurationMs || 0)),
                         totalDuration,
                         timelineWidth,
                         2
@@ -361,19 +362,19 @@ export function SyncView() {
 
                       return (
                         <div
-                          key={`waterfall-${req.request_id}`}
-                          data-row-id={`waterfall-${req.request_id}`}
-                          className={`request-row ${(expandedRows.has(req.request_id) && openLogViewerIds.has(req.request_id)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
+                          key={`waterfall-${req.requestId}`}
+                          data-row-id={`waterfall-${req.requestId}`}
+                          className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
                           style={{ minHeight: '28px' }}
                           onMouseEnter={() => {
-                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                             leftRow?.classList.add('row-hovered');
                             rightRow?.classList.add('row-hovered');
                           }}
                           onMouseLeave={() => {
-                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.request_id}"]`);
-                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.request_id}"]`);
+                            const leftRow = document.querySelector(`[data-row-id="sticky-${req.requestId}"]`);
+                            const rightRow = document.querySelector(`[data-row-id="waterfall-${req.requestId}"]`);
                             leftRow?.classList.remove('row-hovered');
                             rightRow?.classList.remove('row-hovered');
                           }}
@@ -399,7 +400,7 @@ export function SyncView() {
                               >
                               </div>
                               <span className="waterfall-duration" title={statusClass === 'pending' ? 'Pending' : status}>
-                                {isPending ? '...' : status === '200' ? `${req.request_duration_ms}ms` : `${status} - ${req.request_duration_ms}ms`}
+                                {isPending ? '...' : status === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
                               </span>
                             </div>
                           </div>
@@ -418,10 +419,10 @@ export function SyncView() {
           const expandedRequestId = Array.from(openLogViewerIds).find(id => expandedRows.has(id));
           if (!expandedRequestId) return null;
 
-          const req = filteredRequests.find(r => r.request_id === expandedRequestId);
+          const req = filteredRequests.find(r => r.requestId === expandedRequestId);
           if (!req) return null;
 
-          const reqIndex = filteredRequests.findIndex(r => r.request_id === expandedRequestId);
+          const reqIndex = filteredRequests.findIndex(r => r.requestId === expandedRequestId);
           const prevRequest = reqIndex > 0 ? filteredRequests[reqIndex - 1] : null;
           const nextRequest = reqIndex < filteredRequests.length - 1 ? filteredRequests[reqIndex + 1] : null;
           
@@ -431,13 +432,13 @@ export function SyncView() {
           };
           
           const prevRequestLineRange = prevRequest ? {
-            start: findLineNumber(prevRequest.send_line),
-            end: findLineNumber(prevRequest.response_line) || findLineNumber(prevRequest.send_line)
+            start: findLineNumber(prevRequest.sendLine),
+            end: findLineNumber(prevRequest.responseLine) || findLineNumber(prevRequest.sendLine)
           } : undefined;
           
           const nextRequestLineRange = nextRequest ? {
-            start: findLineNumber(nextRequest.send_line),
-            end: findLineNumber(nextRequest.response_line) || findLineNumber(nextRequest.send_line)
+            start: findLineNumber(nextRequest.sendLine),
+            end: findLineNumber(nextRequest.responseLine) || findLineNumber(nextRequest.sendLine)
           } : undefined;
 
           return (

@@ -32,7 +32,7 @@ function AppContent() {
     if (start || end) {
       setTimeFilter(urlToTimeFormat(start), urlToTimeFormat(end));
     }
-  }, []);
+  }, [searchParams, setTimeFilter]);
 
   // Sync store changes to URL
   useEffect(() => {
@@ -70,7 +70,7 @@ function AppContent() {
   useEffect(() => {
     const hasData = rawLogLines.length > 0;
     if (!hasData && location.pathname !== '/') {
-      navigate('/', { replace: true });
+      void navigate('/', { replace: true });
     }
   }, [rawLogLines.length, location.pathname, navigate]);
 

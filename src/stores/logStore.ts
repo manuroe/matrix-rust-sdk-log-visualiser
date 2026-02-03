@@ -143,7 +143,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
     if (startTime || endTime) {
       // Find max time from all requests to use as reference (end of log)
       const times = allRequests
-        .map((r) => r.response_time)
+        .map((r) => r.responseTime)
         .filter((t) => t)
         .map(timeToMs);
       const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
@@ -154,14 +154,14 @@ export const useLogStore = create<LogStore>((set, get) => ({
     
     const filtered = allRequests.filter((r) => {
       // Connection filter
-      if (selectedConnId && r.conn_id !== selectedConnId) return false;
+      if (selectedConnId && r.connId !== selectedConnId) return false;
       
       // Pending filter
       if (hidePending && !r.status) return false;
       
       // Time filter
-      if (timeRangeMs && r.response_time) {
-        if (!isInTimeRange(r.response_time, timeRangeMs.startMs, timeRangeMs.endMs)) {
+      if (timeRangeMs && r.responseTime) {
+        if (!isInTimeRange(r.responseTime, timeRangeMs.startMs, timeRangeMs.endMs)) {
           return false;
         }
       }
@@ -179,7 +179,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
     if (startTime || endTime) {
       // Find max time from all HTTP requests to use as reference (end of log)
       const times = allHttpRequests
-        .map((r) => r.response_time)
+        .map((r) => r.responseTime)
         .filter((t) => t)
         .map(timeToMs);
       const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
@@ -193,8 +193,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
       if (hidePendingHttp && !r.status) return false;
       
       // Time filter
-      if (timeRangeMs && r.response_time) {
-        if (!isInTimeRange(r.response_time, timeRangeMs.startMs, timeRangeMs.endMs)) {
+      if (timeRangeMs && r.responseTime) {
+        if (!isInTimeRange(r.responseTime, timeRangeMs.startMs, timeRangeMs.endMs)) {
           return false;
         }
       }

@@ -1,19 +1,19 @@
 export interface HttpRequest {
-  request_id: string;
-  request_time: string;
-  response_time: string;
+  requestId: string;
+  requestTime: string;
+  responseTime: string;
   method: string;
   uri: string;
   status: string;
-  request_size: string;
-  response_size: string;
-  request_duration_ms: number | string;
-  send_line: string;
-  response_line: string;
+  requestSize: string;
+  responseSize: string;
+  requestDurationMs: number | string;
+  sendLine: string;
+  responseLine: string;
 }
 
 export interface SyncRequest extends HttpRequest {
-  conn_id: string;
+  connId: string;
 }
 
 export interface LogParserResult {

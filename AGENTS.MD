@@ -3,63 +3,80 @@
 ## Project Overview
 A web application for visualizing and analyzing Matrix Rust SDK logs.
 
-## Tech Stack
-- **Vite** - Build tool and dev server
-- **React 18+** - UI framework
-- **TypeScript** - Type safety
-- **React Router** - Hash-based navigation for static hosting
-- **Zustand** - State management
-- **@tanstack/react-virtual** - Virtual scrolling for large log files
+## Audience & Scope
+This document is a lightweight guide for contributors and automated agents. It focuses on stable concepts and boundaries, not implementation details.
 
-## State Management Architecture
+## Tech Stack (High-Level)
+- Vite + React + TypeScript
+- React Router (hash-based)
+- Zustand state management
+- Virtualized rendering for large datasets
+- ESLint enforcing camelCase naming
 
-**State Library**: Zustand (simple, lightweight state management)
+## Repository Layout (Intent-Oriented)
+- Entry + routing: [src/main.tsx](src/main.tsx), [src/App.tsx](src/App.tsx)
+- Views: [src/views](src/views)
+- Components: [src/components](src/components)
+- State: [src/stores](src/stores)
+- Domain utilities: [src/utils](src/utils)
+- Types: [src/types](src/types)
+- Tests: [src/__tests__](src/__tests__), [src/components/__tests__](src/components/__tests__), [src/views/__tests__](src/views/__tests__), [src/utils/__tests__](src/utils/__tests__)
 
-**Global Filters**: 
-- `startTime` and `endTime` - time range filters shared across all views
-- Synced with URL query parameters (`?start=...&end=...`)
-- Managed centrally in Zustand store
-- Applied consistently to HTTP Requests view and Sync Requests view
-
-**Data Separation**:
-- **Sync-specific state**: `allRequests`, `filteredRequests`, `connectionIds`, `selectedConnId`, `hidePending`
-- **HTTP requests state**: `allHttpRequests`, `filteredHttpRequests`, `hidePendingHttp`
-- **Shared state**: `startTime`, `endTime`, `rawLogLines`, `expandedRows`, `openLogViewerIds`
-
-**Filtering Strategy**:
-- Each view has its own filter function (`filterRequests()`, `filterHttpRequests()`)
-- Global time filters trigger re-filtering of both views
-- View-specific filters (e.g., connection ID for sync) only affect that view
+## Core Principles
+- Precompute expensive parsing once; filtering should be cheap.
+- Keep domain logic in stores/utils, UI-specific logic in views/components.
+- Prefer predictable, immutable updates for state (e.g., replace sets/arrays to trigger updates).
+- Shareable URLs: global time filters should sync to query parameters.
+- Default to fast, readable UI for debugging large logs.
+- After parsing, most UI and filtering logic is log-agnostic; Matrix-specific behavior is mainly in the some views.
 
 ## UX/UI Design
-
 **Target Audience**: Developers debugging Matrix Rust SDK issues
 
 **Core Principles**:
-- **Efficiency First**: Fast loading, instant search, no unnecessary clicks
-- **Keyboard Shortcuts**: Navigate, search, filter without touching the mouse
-- **Shareable URLs**: Deep links to specific requests, time ranges, and filtered views
-- **Dark Mode**: Essential for long debugging sessions
-- **Copy-Friendly**: One-click copy for request IDs, timestamps, error messages
-- **Smart Defaults**: Remember last filters, auto-focus search, sensible view preferences
+- Efficiency first: fast loading, instant search, minimal clicks.
+- Shareable URLs for filters and views.
+- Dark mode and copy-friendly UI for long sessions.
+- Sensible defaults that reduce setup time.
 
-## How to Launch
+## Useful Commands
+- Start dev server: `npm start`
+- Build: `npm run build`
+- Preview build: `npm run preview`
+- Lint: `npm run lint`
+- Unit tests: `npm test`
 
-### Development
-```bash
-npm install
-npm start
-```
+## Architecture (Conceptual)
+1. Parse log text into structured records once.
+2. Store parsed results and filters centrally in Zustand.
+3. Views render filtered results; view-specific filters do not affect other views.
+4. Large lists are virtualized to avoid rendering all rows.
 
-### Production Build
-```bash
-npm run build
-npm run preview
-```
+## State Management (Conceptual)
+- Global filters (e.g., time range) are shared across views.
+- Each view applies its own view-specific filters on top of global ones.
+- UI state (expanded rows, open log viewers) is kept in the store for consistent behavior.
 
-## How to Test
-```bash
-npm test            # Unit tests (Vitest)
-npm run test:e2e    # End-to-end tests (Playwright)
-```
+## Minimal Examples (Non-Exhaustive)
+- When adding a new view: keep data access in the store and render-only logic in the view.
+- When adding a filter: update store filter logic, then read the filtered list in the view.
+- When dealing with large lists: use virtualized rendering.
+
+## Anti-Patterns to Avoid
+- Computing expensive parsing in render.
+- Re-filtering large collections on every render.
+- Mixing domain parsing logic inside UI components.
+- Storing cross-view filters in local component state.
+
+## Contribution Guidelines
+- Use camelCase for identifiers (lint enforced).
+- Avoid embedding parsing logic directly in components.
+- Prefer additive changes over refactors unless necessary.
+- Keep documentation high-level; link to code for implementation specifics.
+
+## Reference Files (Entry Points)
+- Store: [src/stores/logStore.ts](src/stores/logStore.ts)
+- Parser: [src/utils/logParser.ts](src/utils/logParser.ts)
+- Time utilities: [src/utils/timeUtils.ts](src/utils/timeUtils.ts)
+- Log views: [src/views](src/views)
 

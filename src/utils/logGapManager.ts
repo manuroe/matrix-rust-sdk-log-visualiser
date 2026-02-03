@@ -19,6 +19,20 @@ import type { ParsedLogLine } from '../types/log.types';
  * - For each displayed line, gap size = next displayed line index - current index - 1
  * - Remaining gap always equals gap size (no subtracting expansion count)
  *
+ * ## Gap Expansion Diagram
+ *
+ * Filtered display (T = shown, . = hidden):
+ *
+ * Index:   0  1  2  3  4  5  6  7  8  9
+ * Line:    T  .  .  T  .  .  .  .  T  .
+ *          ▲     gap     ▲     gap     ▲
+ *       display         display    display
+ *          [start:1, end:3)
+ *
+ * After expanding +1:
+ *        T  T  .  T  .  T  .  .  T  .
+ *          ▲     gap(reduced)  ▲  forced
+ *
  * ## Expansion Modes
  *
  * - `+10` or `+N`: Expand N lines (capped to available gap)

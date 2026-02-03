@@ -143,6 +143,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     return displayItems.map((item) => item.data.index);
   }, [displayItems]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: displayItems.length,
     getItemKey: (index) => `line-${displayItems[index]?.data.index ?? index}`,
@@ -410,11 +411,14 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
         >
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const item = displayItems[virtualRow.index];
-            const { line, index } = item?.data;
+            if (!item) {
+              return null;
+            }
+            const { line, index } = item.data;
             const isMatch = searchMatchingLineIndices.has(index);
             const isCurrentSearchMatch = searchMatchesArray.length > 0 && index === searchMatchesArray[currentSearchMatchIndex];
-            const gapAbove = item?.gapAbove;
-            const gapBelow = item?.gapBelow;
+            const gapAbove = item.gapAbove;
+            const gapBelow = item.gapBelow;
 
             return (
               <div
