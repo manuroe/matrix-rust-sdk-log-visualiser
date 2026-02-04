@@ -45,6 +45,10 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Preview build: `npm run preview`
 - Lint: `npm run lint`
 - Unit tests: `npm test`
+- Performance benchmarks: `npm run bench <output-path>`
+  - Example: `npm run bench benchmark/local/report.json`
+- Build benchmark report: `npm run bench:report <json-path> [-- --output <md-path>] [-- --baseline <baseline-path>]`
+  - Local: `npm run bench:report benchmark/local/report.json -- --output benchmark/local/report.md`
 
 ## Architecture (Conceptual)
 1. Parse log text into structured records once.
@@ -67,6 +71,11 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Re-filtering large collections on every render.
 - Mixing domain parsing logic inside UI components.
 - Storing cross-view filters in local component state.
+
+## Performance Regression Detection
+CI runs benchmarks on PRs, generates `benchmark/baseline.json` directly, and builds baseline reports. The workflow fetches the main baseline for comparison in the PR comment, then commits `benchmark/baseline.json` and `benchmark/baseline.md` back to the PR branch.
+
+**Local Development**: Run `npm run bench benchmark/local/report.json` and `npm run bench:report benchmark/local/report.json -- --output benchmark/local/report.md` to inspect benchmark reports locally. The `benchmark/local/` folder is gitignored for local-only artifacts.
 
 ## Contribution Guidelines
 - Use camelCase for identifiers (lint enforced).

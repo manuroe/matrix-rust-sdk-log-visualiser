@@ -105,6 +105,7 @@ export function FileUpload() {
         const targetRoute = lastRoute && lastRoute !== '/' ? lastRoute : '/summary';
         void navigate(targetRoute);
       } catch (error) {
+        // Error handler: log error for debugging (allowed in error handlers)
         console.error('Error processing file:', error);
         setValidationError(
           error instanceof Error ? error.message : 'Error processing file. Please try again.'

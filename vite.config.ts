@@ -14,6 +14,11 @@ export default mergeConfig(
       setupFiles: ['./src/test/setup.ts'],
       css: true,
       globals: true,
+      exclude: ['**/node_modules/**', '**/dist/**', '**/*.perf.test.ts'],
+      benchmark: {
+        include: ['**/*.perf.test.ts'],
+        outputJson: process.env.BENCHMARK_OUTPUT,
+      },
     },
   })
 );

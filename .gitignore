@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .vite
 
+# Local benchmark reports
+benchmark/local/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

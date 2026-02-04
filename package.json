@@ -9,6 +9,8 @@
     "build": "tsc -b && vite build",
     "test": "vitest",
     "test:watch": "vitest --watch",
+    "bench": "sh -c 'mkdir -p $(dirname \"$1\") && BENCHMARK_OUTPUT=\"$1\" vitest bench --run && tsx scripts/profileBenchmarks.ts \"$1\"' --",
+    "bench:report": "node scripts/buildBenchmarksReport.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -42,6 +44,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "jsdom": "^25.0.1",
+    "tsx": "^4.19.2",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
