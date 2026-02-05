@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLogStore } from '../stores/logStore';
 import { getTimeDisplayName, parseTimeInput } from '../utils/timeUtils';
+import { ValidationError } from '../utils/errorHandling';
+import ErrorDisplay from './ErrorDisplay';
 
 const SHORTCUTS = [
   { value: 'last-min', label: 'Last min' },
@@ -16,7 +18,7 @@ export function TimeRangeSelector() {
   const [showCustom, setShowCustom] = useState(false);
   const [customStart, setCustomStart] = useState(startTime || '');
   const [customEnd, setCustomEnd] = useState(endTime || '');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ValidationError | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -25,7 +27,7 @@ export function TimeRangeSelector() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setShowCustom(false);
-        setError('');
+        setError(null);
       }
     };
 
@@ -39,7 +41,7 @@ export function TimeRangeSelector() {
     setTimeFilter(shortcut, 'end');
     setIsOpen(false);
     setShowCustom(false);
-    setError('');
+    setError(null);
   };
 
   const handleClear = () => {
@@ -48,7 +50,7 @@ export function TimeRangeSelector() {
     setCustomEnd('');
     setIsOpen(false);
     setShowCustom(false);
-    setError('');
+    setError(null);
   };
 
   const handleCustomApply = () => {
@@ -56,7 +58,7 @@ export function TimeRangeSelector() {
     const end = customEnd.trim();
 
     if (!start && !end) {
-      setError('Please enter at least a start or end time');
+      setError(new ValidationError('Please enter at least a start or end time'));
       return;
     }
 
@@ -64,12 +66,12 @@ export function TimeRangeSelector() {
     const validEnd = !end || parseTimeInput(end);
 
     if (!validStart) {
-      setError(`Invalid start time: "${start}"`);
+      setError(new ValidationError(`Invalid start time: "${start}"`));
       return;
     }
 
     if (!validEnd) {
-      setError(`Invalid end time: "${end}"`);
+      setError(new ValidationError(`Invalid end time: "${end}"`));
       return;
     }
 
@@ -79,7 +81,7 @@ export function TimeRangeSelector() {
     );
     setIsOpen(false);
     setShowCustom(false);
-    setError('');
+    setError(null);
   };
 
   const getDisplayText = () => {
@@ -153,7 +155,7 @@ export function TimeRangeSelector() {
                   value={customStart}
                   onChange={(e) => {
                     setCustomStart(e.target.value);
-                    setError('');
+                    setError(null);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleCustomApply();
@@ -169,14 +171,14 @@ export function TimeRangeSelector() {
                   value={customEnd}
                   onChange={(e) => {
                     setCustomEnd(e.target.value);
-                    setError('');
+                    setError(null);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleCustomApply();
                   }}
                 />
               </div>
-              {error && <div className="time-range-error">{error}</div>}
+              <ErrorDisplay error={error} onDismiss={() => setError(null)} />
               <div className="custom-actions">
                 <button className="btn-secondary btn-sm" onClick={() => setShowCustom(false)}>
                   Cancel

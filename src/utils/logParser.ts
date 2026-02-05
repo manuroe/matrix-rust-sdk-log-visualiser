@@ -1,5 +1,6 @@
 import type { HttpRequest, SyncRequest, LogParserResult, ParsedLogLine, LogLevel } from '../types/log.types';
 import { timeToMs } from './timeUtils';
+import { ParsingError } from './errorHandling';
 
 // Regex patterns for parsing HTTP requests - generic (all URIs)
 const HTTP_RESP_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"\s+request_size="(?<req_size>[^"]+)"\s+status=(?<status>\S+)\s+response_size="(?<resp_size>[^"]+)"\s+request_duration=(?<duration_val>[0-9.]+)(?<duration_unit>ms|s)/;
@@ -51,9 +52,15 @@ export interface AllHttpRequestsResult {
 }
 
 export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult {
+  // Validate input
+  if (!logContent || logContent.trim().length === 0) {
+    throw new ParsingError('Log file is empty', 'error');
+  }
+
   const lines = logContent.split('\n');
   const records = new Map<string, Partial<HttpRequest>>();
   const rawLogLines: ParsedLogLine[] = [];
+  let linesWithTimestamps = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -65,6 +72,11 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       const timestampMs = timeToMs(timestamp);
       const displayTime = formatDisplayTime(timestamp);
       const strippedMessage = stripMessagePrefix(line);
+      
+      if (timestamp) {
+        linesWithTimestamps++;
+      }
+      
       rawLogLines.push({
         lineNumber: i + 1,
         rawText: line,
@@ -122,6 +134,15 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       rec.requestSize = rec.requestSize || sendMatch.groups.req_size;
       rec.sendLineNumber = i + 1;
     }
+  }
+
+  // Validate that we found at least some timestamps
+  const timestampPercentage = rawLogLines.length > 0 ? (linesWithTimestamps / rawLogLines.length) * 100 : 0;
+  if (rawLogLines.length > 100 && timestampPercentage < 10) {
+    throw new ParsingError(
+      'Log file appears to be invalid. Please ensure this is a Matrix Rust SDK log file.',
+      'error'
+    );
   }
 
   // Filter and convert to array - include any request with at least a send or response line

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { HttpRequest, SyncRequest, ParsedLogLine } from '../types/log.types';
 import { calculateTimeRange } from '../utils/timeUtils';
+import { wrapError, type AppError } from '../utils/errorHandling';
 
 interface LogStore {
   // Sync-specific state
@@ -27,6 +28,9 @@ interface LogStore {
   openLogViewerIds: Set<string>;
   lastRoute: string | null;
   
+  // Error state
+  error: AppError | null;
+  
   // Sync-specific actions
   setRequests: (requests: SyncRequest[], connIds: string[], rawLines: ParsedLogLine[]) => void;
   setSelectedConnId: (connId: string) => void;
@@ -51,6 +55,10 @@ interface LogStore {
   // Navigation memory
   setLastRoute: (route: string) => void;
   clearLastRoute: () => void;
+  
+  // Error handling
+  setError: (error: AppError | null) => void;
+  clearError: () => void;
   
   // Helper to get displayTime by line number
   getDisplayTime: (lineNumber: number) => string;
@@ -79,16 +87,23 @@ export const useLogStore = create<LogStore>((set, get) => ({
   rawLogLines: [],
   openLogViewerIds: new Set(),
   lastRoute: null,
+  error: null,
 
   setRequests: (requests, connIds, rawLines) => {
-    const defaultConn = connIds.includes('room-list') ? 'room-list' : connIds[0] || '';
-    set({ 
-      allRequests: requests, 
-      connectionIds: connIds,
-      selectedConnId: defaultConn,
-      rawLogLines: rawLines
-    });
-    get().filterRequests();
+    try {
+      const defaultConn = connIds.includes('room-list') ? 'room-list' : connIds[0] || '';
+      set({ 
+        allRequests: requests, 
+        connectionIds: connIds,
+        selectedConnId: defaultConn,
+        rawLogLines: rawLines,
+        error: null
+      });
+      get().filterRequests();
+    } catch (error) {
+      const appError = wrapError(error, 'Failed to process log data');
+      set({ error: appError });
+    }
   },
 
   setSelectedConnId: (connId) => {
@@ -241,6 +256,14 @@ export const useLogStore = create<LogStore>((set, get) => ({
 
   clearLastRoute: () => {
     set({ lastRoute: null });
+  },
+  
+  setError: (error) => {
+    set({ error });
+  },
+  
+  clearError: () => {
+    set({ error: null });
   },
   
   getDisplayTime: (lineNumber) => {

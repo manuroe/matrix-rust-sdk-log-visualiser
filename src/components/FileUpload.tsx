@@ -8,14 +8,16 @@ import {
   validateGzipFile,
   decodeTextBytes,
 } from '../utils/fileValidator';
+import { wrapError, FileError, type AppError } from '../utils/errorHandling';
+import ErrorDisplay from './ErrorDisplay';
 
 export function FileUpload() {
   const navigate = useNavigate();
   const setRequests = useLogStore((state) => state.setRequests);
   const setHttpRequests = useLogStore((state) => state.setHttpRequests);
   const lastRoute = useLogStore((state) => state.lastRoute);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [validationError, setValidationError] = useState<AppError | null>(null);
+  const [validationWarnings, setValidationWarnings] = useState<AppError[]>([]);
 
   const isGzipFile = (file: File): boolean => {
     // Check by MIME type only (no extension check)
@@ -62,13 +64,14 @@ export function FileUpload() {
 
       try {
         let logContent: string;
-        let warnings: string[] = [];
+        let warnings: AppError[] = [];
 
         if (isGzipFile(file)) {
           // Validate gzip file
           const gzipValidation = await validateGzipFile(file, decompressSync);
           if (!gzipValidation.isValid) {
-            setValidationError(gzipValidation.error || 'Invalid gzip file');
+            // Set first error, or generic message if none
+            setValidationError(gzipValidation.errors[0] || new FileError('Invalid gzip file'));
             return;
           }
           warnings = gzipValidation.warnings;
@@ -77,12 +80,13 @@ export function FileUpload() {
           const fileBuffer = await readFileAsArrayBuffer(file);
           const compressedUint8 = new Uint8Array(fileBuffer);
           const decompressedUint8 = decompressSync(compressedUint8);
-          logContent = decodeTextBytes(decompressedUint8, gzipValidation.encoding);
+          logContent = decodeTextBytes(decompressedUint8, gzipValidation.metadata?.encoding as string);
         } else {
           // Validate plain text file
           const textValidation = await validateTextFile(file);
           if (!textValidation.isValid) {
-            setValidationError(textValidation.error || 'Invalid text file');
+            // Set first error, or generic message if none
+            setValidationError(textValidation.errors[0] || new FileError('Invalid text file'));
             return;
           }
           warnings = textValidation.warnings;
@@ -107,9 +111,8 @@ export function FileUpload() {
       } catch (error) {
         // Error handler: log error for debugging (allowed in error handlers)
         console.error('Error processing file:', error);
-        setValidationError(
-          error instanceof Error ? error.message : 'Error processing file. Please try again.'
-        );
+        const appError = wrapError(error, 'Error processing file. Please try again.');
+        setValidationError(appError);
       }
     },
     [setRequests, setHttpRequests, navigate, lastRoute, readFileAsText, readFileAsArrayBuffer]
@@ -172,14 +175,20 @@ export function FileUpload() {
           Supports .log or .log.gz files
         </p>
         {validationError && (
-          <div style={{ color: '#ef4444', marginTop: '10px', fontSize: '14px' }}>
-            ❌ {validationError}
-          </div>
+          <ErrorDisplay
+            error={validationError}
+            onDismiss={() => setValidationError(null)}
+            className="drop-zone-error"
+          />
         )}
         {validationWarnings.length > 0 && !validationError && (
-          <div style={{ color: '#f59e0b', marginTop: '10px', fontSize: '14px' }}>
+          <div style={{ marginTop: '10px' }}>
             {validationWarnings.map((warning, idx) => (
-              <div key={idx}>⚠️ {warning}</div>
+              <ErrorDisplay
+                key={idx}
+                error={warning}
+                onDismiss={() => setValidationWarnings(validationWarnings.filter((_, i) => i !== idx))}
+              />
             ))}
           </div>
         )}

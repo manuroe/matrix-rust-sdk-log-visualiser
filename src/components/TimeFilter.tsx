@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useLogStore } from '../stores/logStore';
 import { getTimeDisplayName, parseTimeInput } from '../utils/timeUtils';
+import { ValidationError } from '../utils/errorHandling';
+import ErrorDisplay from './ErrorDisplay';
 
 const SHORTCUTS = [
   { value: 'last-min', label: 'Last min' },
@@ -15,12 +17,12 @@ export function TimeFilter() {
   const [showCustom, setShowCustom] = useState(false);
   const [customStart, setCustomStart] = useState(startTime || '');
   const [customEnd, setCustomEnd] = useState(endTime || '');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ValidationError | null>(null);
 
   const handleShortcut = (shortcut: string) => {
     setTimeFilter(shortcut, 'end');
     setShowCustom(false);
-    setError('');
+    setError(null);
   };
 
   const handleClear = () => {
@@ -28,7 +30,7 @@ export function TimeFilter() {
     setCustomStart('');
     setCustomEnd('');
     setShowCustom(false);
-    setError('');
+    setError(null);
   };
 
   const handleCustomApply = () => {
@@ -37,7 +39,7 @@ export function TimeFilter() {
     const end = customEnd.trim();
 
     if (!start && !end) {
-      setError('Please enter at least a start or end time');
+      setError(new ValidationError('Please enter at least a start or end time'));
       return;
     }
 
@@ -45,12 +47,12 @@ export function TimeFilter() {
     const validEnd = !end || parseTimeInput(end);
 
     if (!validStart) {
-      setError(`Invalid start time: "${start}". Use HH:MM:SS or a shortcut like "last-5-min"`);
+      setError(new ValidationError(`Invalid start time: "${start}". Use HH:MM:SS or a shortcut like "last-5-min"`));
       return;
     }
 
     if (!validEnd) {
-      setError(`Invalid end time: "${end}". Use HH:MM:SS or "end"`);
+      setError(new ValidationError(`Invalid end time: "${end}". Use HH:MM:SS or "end"`));
       return;
     }
 
@@ -59,7 +61,7 @@ export function TimeFilter() {
       typeof validEnd === 'string' ? validEnd : null
     );
     setShowCustom(false);
-    setError('');
+    setError(null);
   };
 
   const getDisplayText = () => {
@@ -113,7 +115,7 @@ export function TimeFilter() {
                 value={customStart}
                 onChange={(e) => {
                   setCustomStart(e.target.value);
-                  setError('');
+                  setError(null);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleCustomApply();
@@ -129,7 +131,7 @@ export function TimeFilter() {
                 value={customEnd}
                 onChange={(e) => {
                   setCustomEnd(e.target.value);
-                  setError('');
+                  setError(null);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleCustomApply();
@@ -140,7 +142,7 @@ export function TimeFilter() {
               Apply
             </button>
           </div>
-          {error && <div className="time-filter-error">{error}</div>}
+          <ErrorDisplay error={error} onDismiss={() => setError(null)} />
           <div className="custom-help">
             Examples: <code>12:34:56</code> or <code>12:34:56.123456</code> for absolute times,{' '}
             <code>last-5-min</code>, <code>last-10-min</code>, <code>last-hour</code>,{' '}

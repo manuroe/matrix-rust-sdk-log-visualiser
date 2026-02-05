@@ -14,6 +14,7 @@ import { HttpRequestsView } from './views/HttpRequestsView';
 import { LogsView } from './views/LogsView';
 import { useLogStore } from './stores/logStore';
 import { urlToTimeFormat, timeToURLFormat } from './utils/timeUtils';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -87,9 +88,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <AppContent />
+      </Router>
+    </ErrorBoundary>
   );
 }
 

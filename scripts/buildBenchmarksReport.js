@@ -33,13 +33,13 @@ const baselineFile = getFlagValue('--baseline');
 const outputFile = getFlagValue('--output');
 
 if (!currentFile) {
-  console.error('❌ Missing report.json path');
+  console.error('Missing report.json path');
   console.error('   Usage: buildBenchmarksReport.js report.json [--baseline path] [--output path]');
   process.exit(1);
 }
 
 if (!fs.existsSync(currentFile)) {
-  console.error('❌ Current benchmarks not found');
+  console.error('Current benchmarks not found');
   console.error(`   Missing: ${currentFile}`);
   process.exit(1);
 }
@@ -146,7 +146,7 @@ const currentMap = buildTableMap(currentEntries);
 const baselineMap = buildTableMap(baselineEntries);
 
 if (currentMap.size === 0) {
-  console.error('❌ No benchmarks found in current results');
+  console.error('No benchmarks found in current results');
   process.exit(1);
 }
 
@@ -193,7 +193,7 @@ for (const testName of sortedTests) {
 }
 
 reportLines.push('');
-reportLines.push('✅ **Report generated**');
+reportLines.push('Report generated successfully');
 
 const report = reportLines.join('\n');
 
