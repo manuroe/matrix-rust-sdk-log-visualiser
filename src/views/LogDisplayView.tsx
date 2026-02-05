@@ -4,6 +4,9 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useLogStore } from '../stores/logStore';
 import type { ParsedLogLine } from '../types/log.types';
 import { buildDisplayItems, calculateGapExpansion, type ForcedRange } from '../utils/logGapManager';
+import { findMatchingIndices, expandWithContext, highlightText as highlightTextUtil } from '../utils/textMatching';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useMatchNavigation } from '../hooks/useMatchNavigation';
 
 interface LogDisplayViewProps {
   requestFilter?: string;
@@ -22,14 +25,15 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
   const displayLogLines = logLines || rawLogLines;
 
   const [searchQueryInput, setSearchQueryInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [filterQueryInput, setFilterQueryInput] = useState(requestFilter);
-  const [filterQuery, setFilterQuery] = useState(requestFilter);
+  
+  // Debounce inputs to avoid recalculating on every keystroke
+  const searchQuery = useDebouncedValue(searchQueryInput, 300);
+  const filterQuery = useDebouncedValue(filterQueryInput, 300);
   const [contextLines, setContextLines] = useState(0);
   const [lineWrap, setLineWrap] = useState(defaultLineWrap);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [stripPrefix, setStripPrefix] = useState(true);
-  const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
   const [forcedRanges, setForcedRanges] = useState<ForcedRange[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -41,36 +45,9 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
   } | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // Debounce search input to avoid recalculating on every keystroke
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(searchQueryInput);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQueryInput]);
-
-  // Debounce filter input to avoid recalculating on every keystroke
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setFilterQuery(filterQueryInput);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [filterQueryInput]);
-
   // Filter determines which lines to show/hide (like old showOnlyMatching behavior)
   const filterMatchingLineIndices = useMemo(() => {
-    if (!filterQuery.trim()) return new Set<number>();
-    const query = caseSensitive ? filterQuery : filterQuery.toLowerCase();
-    const indices = new Set<number>();
-
-    displayLogLines.forEach((line, index) => {
-      const haystack = caseSensitive ? line.rawText : line.rawText.toLowerCase();
-      if (haystack.includes(query)) {
-        indices.add(index);
-      }
-    });
-
-    return indices;
+    return findMatchingIndices(displayLogLines, filterQuery, caseSensitive, (line) => line.rawText);
   }, [displayLogLines, filterQuery, caseSensitive]);
 
   // Build the filtered lines based on filter query and context
@@ -83,33 +60,26 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     // If filter is set but no matches, show empty
     if (filterMatchingLineIndices.size === 0) return [];
 
-    if (contextLines === 0) return allLines.filter(({ index }) => filterMatchingLineIndices.has(index));
-
-    const linesToShow = new Set<number>();
-    filterMatchingLineIndices.forEach((matchIndex) => {
-      for (let i = Math.max(0, matchIndex - contextLines); i <= Math.min(displayLogLines.length - 1, matchIndex + contextLines); i++) {
-        linesToShow.add(i);
-      }
-    });
+    // Expand matches with context lines using utility
+    const linesToShow = expandWithContext(filterMatchingLineIndices, displayLogLines.length, contextLines);
 
     return allLines.filter(({ index }) => linesToShow.has(index));
   }, [displayLogLines, filterQuery, contextLines, filterMatchingLineIndices]);
 
   // Search determines highlighting within visible lines
+  // Returns a Set of original line indices (not filtered indices) that match the search
   const searchMatchingLineIndices = useMemo(() => {
     if (!searchQuery.trim()) return new Set<number>();
-    const query = caseSensitive ? searchQuery : searchQuery.toLowerCase();
-    const indices = new Set<number>();
-
-    // Search only within filtered lines (respects active filter)
+    // Build a set of original indices that match the search within filtered lines
+    const matchingOriginalIndices = new Set<number>();
     filteredLines.forEach(({ line, index }) => {
-      const haystack = caseSensitive ? line.rawText : line.rawText.toLowerCase();
-      if (haystack.includes(query)) {
-        indices.add(index);
+      const text = caseSensitive ? line.rawText : line.rawText.toLowerCase();
+      const query = caseSensitive ? searchQuery : searchQuery.toLowerCase();
+      if (text.includes(query)) {
+        matchingOriginalIndices.add(index);
       }
     });
-
-    return indices;
+    return matchingOriginalIndices;
   }, [filteredLines, searchQuery, caseSensitive]);
 
   // Convert search matches to sorted array for navigation
@@ -117,22 +87,12 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     return Array.from(searchMatchingLineIndices).sort((a, b) => a - b);
   }, [searchMatchingLineIndices]);
 
-  // Reset current match index when search changes
-  useEffect(() => {
-    setCurrentSearchMatchIndex(0);
-  }, [searchQuery, caseSensitive]);
-
-  // Navigate to previous search match
-  const goToPreviousMatch = () => {
-    if (searchMatchesArray.length === 0) return;
-    setCurrentSearchMatchIndex((prev) => (prev - 1 + searchMatchesArray.length) % searchMatchesArray.length);
-  };
-
-  // Navigate to next search match
-  const goToNextMatch = () => {
-    if (searchMatchesArray.length === 0) return;
-    setCurrentSearchMatchIndex((prev) => (prev + 1) % searchMatchesArray.length);
-  };
+  // Use navigation hook for next/prev match functionality
+  const {
+    currentIndex: currentSearchMatchIndex,
+    goToNext: goToNextMatch,
+    goToPrevious: goToPreviousMatch,
+  } = useMatchNavigation(searchMatchesArray);
 
   // Build display items with gap indicators
   const displayItems = useMemo(() => {
@@ -177,43 +137,20 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     }
   }, [currentSearchMatchIndex, searchMatchesArray, displayItems]);
 
-  const highlightText = (line: ParsedLogLine, originalIndex: number) => {
+  const highlightText = (line: ParsedLogLine, originalIndex: number): React.ReactNode => {
     const isMatch = searchMatchingLineIndices.has(originalIndex);
-    if (!searchQuery || !isMatch) {
-      return getDisplayText(line);
-    }
-
     const displayText = getDisplayText(line);
-    const query = caseSensitive ? searchQuery : searchQuery.toLowerCase();
-    const text = caseSensitive ? displayText : displayText.toLowerCase();
-
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-    let searchIndex = 0;
-
-    while ((searchIndex = text.indexOf(query, lastIndex)) !== -1) {
-      if (searchIndex > lastIndex) {
-        parts.push(
-          <span key={`text-${originalIndex}-${lastIndex}`}>
-            {displayText.substring(lastIndex, searchIndex)}
-          </span>
-        );
-      }
-      parts.push(
-        <mark key={`mark-${originalIndex}-${searchIndex}`} className="search-highlight">
-          {displayText.substring(searchIndex, searchIndex + query.length)}
-        </mark>
-      );
-      lastIndex = searchIndex + query.length;
+    
+    if (!searchQuery || !isMatch) {
+      return displayText;
     }
 
-    if (lastIndex < displayText.length) {
-      parts.push(
-        <span key={`text-${originalIndex}-${lastIndex}`}>
-          {displayText.substring(lastIndex)}
-        </span>
-      );
-    }
+    const parts = highlightTextUtil(displayText, {
+      query: searchQuery,
+      caseSensitive,
+      keyPrefix: `line-${originalIndex}`,
+      highlightClassName: 'search-highlight',
+    });
 
     return <>{parts}</>;
   };
