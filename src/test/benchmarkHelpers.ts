@@ -106,6 +106,6 @@ export function convertTimestamps(logLines: LogLines) {
   // instead of converting timestamps on the fly
   logLines.forEach((line) => {
     // Access precomputed displayTime (no conversion needed)
-    line.displayTime;
+    void line.displayTime;
   });
 }

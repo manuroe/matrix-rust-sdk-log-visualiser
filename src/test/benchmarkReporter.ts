@@ -5,20 +5,16 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 import type { Benchmark, Reporter } from 'vitest';
-import { fileURLToPath } from 'url';
-import { profileMemoryUsage } from './performanceFixtures';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outputPath = process.env.BENCHMARK_OUTPUT!;
 
 interface BenchmarkWithMemory {
   id: string;
   name: string;
   mean: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   memory_mb?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface GroupWithMemory {
@@ -36,6 +32,7 @@ interface BenchmarksJsonWithMemory {
   timestamp: string;
   environment: string;
   files: FileWithMemory[];
+  memoryNote?: string;
 }
 
 /**
@@ -43,11 +40,8 @@ interface BenchmarksJsonWithMemory {
  * Runs after Vitest completes and enriches the JSON output with MB measurements.
  */
 export default class BenchmarkReporterWithMemory implements Reporter {
-  private benchmarkData: Map<string, number> = new Map();
-
-  onBenchmarkStart?(_file: any, benchmark: Benchmark) {
+  onBenchmarkStart?(_file: unknown, _benchmark: Benchmark) {
     // Store benchmark info for later memory profiling
-    const key = `${benchmark.task.name}`;
     // Note: We can't directly profile here because we don't have access to the test function
     // Instead, we'll post-process the JSON file after completion
   }
@@ -65,7 +59,7 @@ export default class BenchmarkReporterWithMemory implements Reporter {
         // This is a placeholder - actual memory data would come from instrumented tests
         const enriched: BenchmarksJsonWithMemory = {
           ...benchmarks,
-          _memory_note:
+          memoryNote:
             'Memory data captured via profileMemoryUsage() in test fixtures. See benchmark names for scale. Negative values indicate GC activity during measurement.',
         };
 

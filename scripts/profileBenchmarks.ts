@@ -10,8 +10,6 @@
  */
 
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import {
   generateLogContent,
   generateLogLines,
@@ -25,7 +23,6 @@ import {
 } from '../src/test/benchmarkHelpers';
 import { parseAllHttpRequests, parseLogFile } from '../src/utils/logParser';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const benchmarksFile = process.argv[2];
 
 function parseScaleValue(label: string) {
@@ -105,7 +102,7 @@ try {
 
       for (const bench of group.benchmarks || []) {
         const memoryMb = profileMemoryForGroup(groupName, bench.name);
-        if (memoryMb != null) {
+        if (memoryMb !== null) {
           bench.memory_mb = Number(memoryMb.toFixed(2));
         }
       }
@@ -113,7 +110,7 @@ try {
   }
 
   fs.writeFileSync(benchmarksFile, JSON.stringify(benchmarks, null, 2) + '\n');
-  console.log(`✅ Memory data added to ${benchmarksFile}`);
+  process.stdout.write(`✅ Memory data added to ${benchmarksFile}\n`);
 } catch (error) {
   console.error('❌ Error profiling benchmarks:', error instanceof Error ? error.message : error);
   process.exit(1);
