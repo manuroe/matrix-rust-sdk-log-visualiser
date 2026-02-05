@@ -13,7 +13,28 @@ permissions:
   pull-requests: write
 
 jobs:
+  wait-for-other-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Test workflow
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: 'test'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+          
+      - name: Wait for PR Preview workflow  
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: 'deploy-preview'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+          allowed-conclusions: success,skipped
+
   benchmarks:
+    needs: [wait-for-other-checks]
     runs-on: ubuntu-latest
 
     steps:
