@@ -1,0 +1,192 @@
+import type { HttpRequest, SyncRequest, LogParserResult, ParsedLogLine, LogLevel } from '../types/log.types';
+import { timeToMs } from './timeUtils';
+
+// Regex patterns for parsing HTTP requests - generic (all URIs)
+const HTTP_RESP_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"\s+request_size="(?<req_size>[^"]+)"\s+status=(?<status>\S+)\s+response_size="(?<resp_size>[^"]+)"\s+request_duration=(?<duration_val>[0-9.]+)(?<duration_unit>ms|s)/;
+const HTTP_SEND_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"\s+request_size="(?<req_size>[^"]+)"(?![^}]*(?:status=|response_size=|request_duration=))/;
+
+// Pattern for extracting log level - matches common Rust log formats
+const LOG_LEVEL_RE = /\s(TRACE|DEBUG|INFO|WARN|ERROR)\s/;
+
+function extractLogLevel(line: string): LogLevel {
+  const match = line.match(LOG_LEVEL_RE);
+  return match ? (match[1] as LogLevel) : 'UNKNOWN';
+}
+
+function stripMessagePrefix(message: string): string {
+  // Strip timestamp, log level, and common prefixes to get the actual message content
+  const stripped = message
+    .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\s+/, '') // ISO timestamp
+    .replace(/^\d{2}:\d{2}:\d{2}\.\d+Z?\s+/, '') // Time-only timestamp
+    .replace(/\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+/, ' '); // Log level
+  return stripped.trim();
+}
+
+function formatDisplayTime(timestamp: string): string {
+  if (!timestamp) return '';
+  // If it's already in HH:MM:SS format, return as-is
+  if (timestamp.match(/^\d{2}:\d{2}:\d{2}/)) {
+    return timestamp;
+  }
+  // Extract time from ISO format
+  const match = timestamp.match(/T([\d:.]+)Z?$/);
+  return match ? match[1] : timestamp;
+}
+
+function extractTimestamp(line: string): string {
+  // Prefer full ISO timestamp if present
+  const isoMatch = line.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/);
+  if (isoMatch) {
+    return isoMatch[0];
+  }
+
+  // Fallback to time-only (HH:MM:SS.microseconds)
+  const timeMatch = line.slice(11).match(/(\d{2}:\d{2}:\d{2}\.\d+)Z?/);
+  return timeMatch ? timeMatch[1] : '';
+}
+
+export interface AllHttpRequestsResult {
+  httpRequests: HttpRequest[];
+  rawLogLines: ParsedLogLine[];
+}
+
+export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult {
+  const lines = logContent.split('\n');
+  const records = new Map<string, Partial<HttpRequest>>();
+  const rawLogLines: ParsedLogLine[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Parse every line for the raw log view
+    if (line.trim()) {
+      const timestamp = extractTimestamp(line);
+      const level = extractLogLevel(line);
+      const timestampMs = timeToMs(timestamp);
+      const displayTime = formatDisplayTime(timestamp);
+      const strippedMessage = stripMessagePrefix(line);
+      rawLogLines.push({
+        lineNumber: i + 1,
+        rawText: line,
+        timestamp,
+        timestampMs,
+        displayTime,
+        level,
+        message: line,
+        strippedMessage,
+      });
+    }
+
+    // Early filter for performance - look for HTTP request patterns
+    if (!line.includes('request_id=') || !line.includes('send{')) {
+      continue;
+    }
+
+    // Try to match response pattern first
+    const respMatch = line.match(HTTP_RESP_RE);
+    if (respMatch && respMatch.groups) {
+      const requestId = respMatch.groups.id;
+      const durationVal = parseFloat(respMatch.groups.duration_val);
+      const durationUnit = respMatch.groups.duration_unit;
+      const durationMs = Math.round(durationVal * (durationUnit === 's' ? 1000.0 : 1.0));
+
+      if (!records.has(requestId)) {
+        records.set(requestId, {});
+      }
+
+      const rec = records.get(requestId)!;
+      rec.requestId = requestId;
+      rec.method = rec.method || respMatch.groups.method;
+      rec.uri = rec.uri || respMatch.groups.uri;
+      rec.status = rec.status || respMatch.groups.status;
+      rec.responseSize = rec.responseSize || respMatch.groups.resp_size;
+      rec.requestSize = rec.requestSize || respMatch.groups.req_size;
+      rec.requestDurationMs = rec.requestDurationMs || durationMs;
+      rec.responseLineNumber = i + 1;
+      continue;
+    }
+
+    // Try to match send pattern
+    const sendMatch = line.match(HTTP_SEND_RE);
+    if (sendMatch && sendMatch.groups) {
+      const requestId = sendMatch.groups.id;
+
+      if (!records.has(requestId)) {
+        records.set(requestId, {});
+      }
+
+      const rec = records.get(requestId)!;
+      rec.requestId = requestId;
+      rec.method = rec.method || sendMatch.groups.method;
+      rec.uri = rec.uri || sendMatch.groups.uri;
+      rec.requestSize = rec.requestSize || sendMatch.groups.req_size;
+      rec.sendLineNumber = i + 1;
+    }
+  }
+
+  // Filter and convert to array - include any request with at least a send or response line
+  const allRequests = Array.from(records.values()).filter(
+    (rec): rec is HttpRequest =>
+      !!rec.uri && (!!rec.sendLineNumber || !!rec.responseLineNumber)
+  ) as HttpRequest[];
+
+  // Fill in missing fields with empty strings or default values
+  allRequests.forEach((rec) => {
+    rec.method = rec.method || '';
+    rec.uri = rec.uri || '';
+    rec.status = rec.status || '';
+    rec.requestSize = rec.requestSize || '';
+    rec.responseSize = rec.responseSize || '';
+    rec.requestDurationMs = rec.requestDurationMs || 0;
+    rec.sendLineNumber = rec.sendLineNumber || 0;
+    rec.responseLineNumber = rec.responseLineNumber || 0;
+  });
+
+  return {
+    httpRequests: allRequests,
+    rawLogLines,
+  };
+}
+
+export function parseLogFile(logContent: string): LogParserResult {
+  // First parse all HTTP requests
+  const { httpRequests, rawLogLines } = parseAllHttpRequests(logContent);
+
+  // Filter for sync-specific requests and add connId
+  const syncRequests: SyncRequest[] = [];
+  const lines = logContent.split('\n');
+
+  // Build a map of request_id to connId by scanning lines again
+  const connIdMap = new Map<string, string>();
+  for (const line of lines) {
+    if (line.includes('request_id=') && line.includes('/sync')) {
+      const reqIdMatch = line.match(/request_id="([^"]+)"/);
+      const connMatch = line.match(/conn_id="([^"]+)"/);
+      if (reqIdMatch && connMatch) {
+        connIdMap.set(reqIdMatch[1], connMatch[1]);
+      }
+    }
+  }
+
+  // Filter HTTP requests for sync URIs and add connId
+  for (const httpReq of httpRequests) {
+    if (httpReq.uri.includes('/sync')) {
+      const connId = connIdMap.get(httpReq.requestId) || '';
+      syncRequests.push({
+        ...httpReq,
+        connId,
+      });
+    }
+  }
+
+  // Extract unique connection IDs
+  const connectionIds = [
+    ...new Set(syncRequests.map((r) => r.connId).filter((c) => c)),
+  ];
+
+  return {
+    requests: syncRequests,
+    connectionIds,
+    rawLogLines,
+  };
+}
