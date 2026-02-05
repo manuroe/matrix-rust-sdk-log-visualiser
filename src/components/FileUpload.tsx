@@ -1,0 +1,196 @@
+import { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { decompressSync } from 'fflate';
+import { parseLogFile, parseAllHttpRequests } from '../utils/logParser';
+import { useLogStore } from '../stores/logStore';
+import {
+  validateTextFile,
+  validateGzipFile,
+  decodeTextBytes,
+} from '../utils/fileValidator';
+
+export function FileUpload() {
+  const navigate = useNavigate();
+  const setRequests = useLogStore((state) => state.setRequests);
+  const setHttpRequests = useLogStore((state) => state.setHttpRequests);
+  const lastRoute = useLogStore((state) => state.lastRoute);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+
+  const isGzipFile = (file: File): boolean => {
+    // Check by MIME type only (no extension check)
+    return file.type === 'application/gzip' || file.type === 'application/x-gzip';
+  };
+
+  // Helper functions defined before use
+  const readFileAsText = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (typeof result === 'string') {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to read file as text'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file, 'UTF-8');
+    });
+  }, []);
+
+  const readFileAsArrayBuffer = useCallback((file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (result instanceof ArrayBuffer) {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to read file as ArrayBuffer'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  }, []);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setValidationError(null);
+      setValidationWarnings([]);
+
+      try {
+        let logContent: string;
+        let warnings: string[] = [];
+
+        if (isGzipFile(file)) {
+          // Validate gzip file
+          const gzipValidation = await validateGzipFile(file, decompressSync);
+          if (!gzipValidation.isValid) {
+            setValidationError(gzipValidation.error || 'Invalid gzip file');
+            return;
+          }
+          warnings = gzipValidation.warnings;
+
+          // Decompress
+          const fileBuffer = await readFileAsArrayBuffer(file);
+          const compressedUint8 = new Uint8Array(fileBuffer);
+          const decompressedUint8 = decompressSync(compressedUint8);
+          logContent = decodeTextBytes(decompressedUint8, gzipValidation.encoding);
+        } else {
+          // Validate plain text file
+          const textValidation = await validateTextFile(file);
+          if (!textValidation.isValid) {
+            setValidationError(textValidation.error || 'Invalid text file');
+            return;
+          }
+          warnings = textValidation.warnings;
+
+          // Read as text
+          logContent = await readFileAsText(file);
+        }
+
+        // Show warnings if any
+        if (warnings.length > 0) {
+          setValidationWarnings(warnings);
+        }
+
+        // Parse both sync-specific and all HTTP requests
+        const { requests, connectionIds, rawLogLines } = parseLogFile(logContent);
+        const { httpRequests } = parseAllHttpRequests(logContent);
+
+        setRequests(requests, connectionIds, rawLogLines);
+        setHttpRequests(httpRequests, rawLogLines);
+        const targetRoute = lastRoute && lastRoute !== '/' ? lastRoute : '/summary';
+        void navigate(targetRoute);
+      } catch (error) {
+        // Error handler: log error for debugging (allowed in error handlers)
+        console.error('Error processing file:', error);
+        setValidationError(
+          error instanceof Error ? error.message : 'Error processing file. Please try again.'
+        );
+      }
+    },
+    [setRequests, setHttpRequests, navigate, lastRoute, readFileAsText, readFileAsArrayBuffer]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        void handleFile(files[0]);
+      }
+    },
+    [handleFile]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('dragover');
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove('dragover');
+  }, []);
+
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+        void handleFile(e.target.files[0]);
+      }
+    },
+    [handleFile]
+  );
+
+
+  const handleClick = useCallback(() => {
+    document.getElementById('file-input')?.click();
+  }, []);
+
+  return (
+    <div
+      id="drop-zone"
+      className="drop-zone"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onClick={handleClick}
+    >
+      <div className="drop-zone-content">
+        <svg className="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <h2>Drop Matrix SDK Log File Here</h2>
+        <p>or click to browse</p>
+        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+          Supports .log or .log.gz files
+        </p>
+        {validationError && (
+          <div style={{ color: '#ef4444', marginTop: '10px', fontSize: '14px' }}>
+            ❌ {validationError}
+          </div>
+        )}
+        {validationWarnings.length > 0 && !validationError && (
+          <div style={{ color: '#f59e0b', marginTop: '10px', fontSize: '14px' }}>
+            {validationWarnings.map((warning, idx) => (
+              <div key={idx}>⚠️ {warning}</div>
+            ))}
+          </div>
+        )}
+        <input
+          type="file"
+          id="file-input"
+          accept=".log,.txt,.log.gz,.gz"
+          onChange={handleFileInput}
+          style={{ display: 'none' }}
+        />
+      </div>
+    </div>
+  );
+}
