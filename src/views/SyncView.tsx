@@ -1,6 +1,5 @@
 import { useLogStore } from '../stores/logStore';
-import { timeToMs, applyTimeRangeFilter } from '../utils/timeUtils';
-import { isoToTime } from '../utils/timeUtils';
+import { applyTimeRangeFilter } from '../utils/timeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { WaterfallTimeline } from '../components/WaterfallTimeline';
@@ -21,6 +20,7 @@ export function SyncView() {
     expandedRows,
     openLogViewerIds,
     rawLogLines,
+    getDisplayTime,
     setSelectedConnId,
     setHidePending,
     toggleRowExpansion,
@@ -84,13 +84,15 @@ export function SyncView() {
   const connFilteredRequests = allRequests.filter(
     (r) => !selectedConnId || r.connId === selectedConnId
   );
-  const totalForConn = applyTimeRangeFilter(connFilteredRequests, startTime, endTime).length;
+  const totalForConn = applyTimeRangeFilter(connFilteredRequests, rawLogLines, startTime, endTime).length;
 
   // Calculate timeline scale
   const times = filteredRequests
-    .map((r) => r.requestTime)
-    .filter((t) => t)
-    .map(timeToMs);
+    .map((r) => {
+      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      return sendLine?.timestampMs || 0;
+    })
+    .filter((t) => t > 0);
   const minTime = times.length > 0 ? Math.min(...times) : 0;
   const maxTime = times.length > 0 ? Math.max(...times) : 0;
   const totalDuration = Math.max(1, maxTime - minTime);
@@ -105,9 +107,11 @@ export function SyncView() {
   // Calculate timeline width using shared logic
   const visibleTimes = filteredRequests
     .slice(0, 20)
-    .map((r) => r.requestTime)
-    .filter((t) => t)
-    .map(timeToMs);
+    .map((r) => {
+      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      return sendLine?.timestampMs || 0;
+    })
+    .filter((t) => t > 0);
   
   const { timelineWidth } = calculateTimelineWidth(
     availableWaterfallWidth,
@@ -338,7 +342,7 @@ export function SyncView() {
                         >
                           {req.requestId}
                         </div>
-                        <div className="time sticky-col">{isoToTime(req.requestTime)}</div>
+                        <div className="time sticky-col">{getDisplayTime(req.sendLineNumber)}</div>
                         <div className="size sticky-col">{req.requestSize || '-'}</div>
                         <div className="size sticky-col">{req.responseSize || '-'}</div>
                       </div>
@@ -348,10 +352,11 @@ export function SyncView() {
                 <div className="timeline-rows-right" ref={waterfallContainerRef}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
                     {filteredRequests.map((req) => {
-                      const reqTime = timeToMs(req.requestTime);
+                      const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+                      const reqTime = sendLine?.timestampMs || 0;
                       const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth);
                       const barWidth = getWaterfallBarWidth(
-                        parseFloat(String(req.requestDurationMs || 0)),
+                        req.requestDurationMs,
                         totalDuration,
                         timelineWidth,
                         2
@@ -426,19 +431,14 @@ export function SyncView() {
           const prevRequest = reqIndex > 0 ? filteredRequests[reqIndex - 1] : null;
           const nextRequest = reqIndex < filteredRequests.length - 1 ? filteredRequests[reqIndex + 1] : null;
           
-          const findLineNumber = (logText: string): number => {
-            if (!logText) return -1;
-            return rawLogLines.findIndex(l => l.rawText === logText);
-          };
-          
           const prevRequestLineRange = prevRequest ? {
-            start: findLineNumber(prevRequest.sendLine),
-            end: findLineNumber(prevRequest.responseLine) || findLineNumber(prevRequest.sendLine)
+            start: prevRequest.sendLineNumber,
+            end: prevRequest.responseLineNumber || prevRequest.sendLineNumber
           } : undefined;
           
           const nextRequestLineRange = nextRequest ? {
-            start: findLineNumber(nextRequest.sendLine),
-            end: findLineNumber(nextRequest.responseLine) || findLineNumber(nextRequest.sendLine)
+            start: nextRequest.sendLineNumber,
+            end: nextRequest.responseLineNumber || nextRequest.sendLineNumber
           } : undefined;
 
           return (
@@ -450,7 +450,7 @@ export function SyncView() {
                 defaultLineWrap
                 logLines={rawLogLines.map(line => ({
                   ...line,
-                  timestamp: isoToTime(line.timestamp)
+                  timestamp: line.displayTime
                 }))}
                 prevRequestLineRange={prevRequestLineRange}
                 nextRequestLineRange={nextRequestLineRange}

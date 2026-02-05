@@ -30,13 +30,18 @@ function createLogLine(
   const date = new Date(timestampMs);
   const isoTimestamp = date.toISOString();
   const level = LOG_LEVELS[lineNumber % LOG_LEVELS.length];
+  const timeStr = isoTimestamp.match(/T([\d:.]+)Z?$/)?.[1] || isoTimestamp;
+  const message = `message ${lineNumber}: processing event`;
 
   return {
     lineNumber,
-    rawText: `${isoTimestamp} ${level} [matrix-rust-sdk] message ${lineNumber}: processing event`,
+    rawText: `${isoTimestamp} ${level} [matrix-rust-sdk] ${message}`,
     timestamp: isoTimestamp,
+    timestampMs,
+    displayTime: timeStr,
     level,
-    message: `message ${lineNumber}: processing event`,
+    message,
+    strippedMessage: `[matrix-rust-sdk] ${message}`,
   };
 }
 
@@ -53,25 +58,20 @@ function createHttpRequest(
   const responseTimeMs = requestTimeMs + (Math.random() * 500) + 50; // 50-550ms duration
   const durationMs = Math.round(responseTimeMs - requestTimeMs);
 
-  const requestDate = new Date(requestTimeMs);
-  const responseDate = new Date(responseTimeMs);
-
   const method = METHODS[lineNumber % METHODS.length];
   const uri = URIS[lineNumber % URIS.length];
   const status = Math.random() > 0.1 ? '200' : (Math.random() > 0.5 ? '400' : '500');
 
   return {
     requestId,
-    requestTime: requestDate.toISOString(),
-    responseTime: responseDate.toISOString(),
     method,
     uri,
     status,
     requestSize: String(Math.floor(Math.random() * 2000) + 100),
     responseSize: String(Math.floor(Math.random() * 5000) + 500),
     requestDurationMs: durationMs,
-    sendLine: `send{request_id="${requestId}" method=${method} uri="${uri}" request_size="${100}"}`,
-    responseLine: `send{request_id="${requestId}" method=${method} uri="${uri}" request_size="${100}" status=${status} response_size="${500}" request_duration=${(durationMs / 1000).toFixed(2)}s}`,
+    sendLineNumber: lineNumber,
+    responseLineNumber: lineNumber + 1,
   };
 }
 
@@ -187,8 +187,15 @@ export function generateLogContent(
   for (let i = 0; i < totalLines; i++) {
     if (i > 0 && i % logLinesPerRequest === 0 && reqIdx < httpRequests.length) {
       const req = httpRequests[reqIdx++];
-      lines.push(req.sendLine);
-      lines.push(req.responseLine);
+      const requestTimeMs = baseTimeMs + req.sendLineNumber * 1000;
+      const responseTimeMs = requestTimeMs + req.requestDurationMs;
+      const requestDate = new Date(requestTimeMs);
+      const responseDate = new Date(responseTimeMs);
+      
+      // Add send line
+      lines.push(`${requestDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}"}`);
+      // Add response line
+      lines.push(`${responseDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}" status=${req.status} response_size="${req.responseSize}" request_duration=${(req.requestDurationMs / 1000).toFixed(2)}s}`);
     }
 
     if (logIdx < logLines.length) {
@@ -199,8 +206,13 @@ export function generateLogContent(
   // Add remaining requests
   while (reqIdx < httpRequests.length) {
     const req = httpRequests[reqIdx++];
-    lines.push(req.sendLine);
-    lines.push(req.responseLine);
+    const requestTimeMs = baseTimeMs + req.sendLineNumber * 1000;
+    const responseTimeMs = requestTimeMs + req.requestDurationMs;
+    const requestDate = new Date(requestTimeMs);
+    const responseDate = new Date(responseTimeMs);
+    
+    lines.push(`${requestDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}"}`);
+    lines.push(`${responseDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}" status=${req.status} response_size="${req.responseSize}" request_duration=${(req.requestDurationMs / 1000).toFixed(2)}s}`);
   }
 
   return lines.join('\n');

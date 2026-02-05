@@ -4,7 +4,7 @@ import { useLogStore } from '../stores/logStore';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
-import { calculateTimeRange, timeToMs } from '../utils/timeUtils';
+import { calculateTimeRange } from '../utils/timeUtils';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
 
 export function SummaryView() {
@@ -41,11 +41,10 @@ export function SummaryView() {
       setLocalEndTime(null);
     } else if (rawLogLines.length > 0 && startTime && endTime) {
       // No local selection - check if we can zoom out to full range
-      const times = rawLogLines.map((line) => timeToMs(line.timestamp));
+      const times = rawLogLines.map((line) => line.timestampMs);
       const fullMinTime = Math.min(...times);
       const fullMaxTime = Math.max(...times);
-      const currentStartMs = timeToMs(startTime);
-      const currentEndMs = timeToMs(endTime);
+      const { startMs: currentStartMs, endMs: currentEndMs } = calculateTimeRange(startTime, endTime, fullMaxTime);
       
       // Only zoom out if current range is narrower than full range (with 1ms tolerance)
       if (currentStartMs > fullMinTime + 1 || currentEndMs < fullMaxTime - 1) {
@@ -60,7 +59,7 @@ export function SummaryView() {
     if (localStartTime !== null && localEndTime !== null) {
       // Check if the selection is the full log range
       if (rawLogLines.length > 0) {
-        const times = rawLogLines.map((line) => timeToMs(line.timestamp));
+        const times = rawLogLines.map((line) => line.timestampMs);
         const fullMinTime = Math.min(...times);
         const fullMaxTime = Math.max(...times);
         
@@ -87,12 +86,13 @@ export function SummaryView() {
     // If no global filter, always show apply button
     if (!startTime || !endTime) return true;
     
-    const globalStartMs = timeToMs(startTime);
-    const globalEndMs = timeToMs(endTime);
+    const times = rawLogLines.map((line) => line.timestampMs);
+    const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
+    const { startMs: globalStartMs, endMs: globalEndMs } = calculateTimeRange(startTime, endTime, maxLogTimeMs);
     
     // Show if selection differs from global filter (with 1ms tolerance)
     return Math.abs(localStartTime - globalStartMs) > 1 || Math.abs(localEndTime - globalEndMs) > 1;
-  }, [localStartTime, localEndTime, startTime, endTime]);
+  }, [localStartTime, localEndTime, startTime, endTime, rawLogLines]);
 
   // Calculate log statistics
   const stats = useMemo(() => {
@@ -120,10 +120,7 @@ export function SummaryView() {
     // Calculate time range if filters are set
     let timeRangeMs: { startMs: number; endMs: number } | null = null;
     if (startTime || endTime) {
-      const times = rawLogLines
-        .map((line) => line.timestamp)
-        .filter((t) => t)
-        .map((t) => timeToMs(t));
+      const times = rawLogLines.map((line) => line.timestampMs).filter((t) => t > 0);
       const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
       timeRangeMs = calculateTimeRange(startTime, endTime, maxLogTimeMs);
     }
@@ -139,29 +136,30 @@ export function SummaryView() {
     // Filter log lines by time range
     const filteredLogLines = rawLogLines.filter((line) => {
       if (!timeRangeMs) return true;
-      const lineTimeMs = timeToMs(line.timestamp);
-      return lineTimeMs >= timeRangeMs.startMs && lineTimeMs <= timeRangeMs.endMs;
+      return line.timestampMs >= timeRangeMs.startMs && line.timestampMs <= timeRangeMs.endMs;
     });
 
     // Filter HTTP requests by time range
     const filteredHttpRequests = allHttpRequests.filter((req) => {
       if (!timeRangeMs) return true;
-      if (!req.responseTime) return false;
-      const reqTimeMs = timeToMs(req.responseTime);
-      return reqTimeMs >= timeRangeMs.startMs && reqTimeMs <= timeRangeMs.endMs;
+      if (!req.responseLineNumber) return false;
+      const responseLine = rawLogLines.find(l => l.lineNumber === req.responseLineNumber);
+      if (!responseLine || !responseLine.timestampMs) return false;
+      return responseLine.timestampMs >= timeRangeMs.startMs && responseLine.timestampMs <= timeRangeMs.endMs;
     });
 
     // Filter sync requests by time range
     const filteredSyncRequests = allRequests.filter((req) => {
       if (!timeRangeMs) return true;
-      if (!req.responseTime) return false;
-      const reqTimeMs = timeToMs(req.responseTime);
-      return reqTimeMs >= timeRangeMs.startMs && reqTimeMs <= timeRangeMs.endMs;
+      if (!req.responseLineNumber) return false;
+      const responseLine = rawLogLines.find(l => l.lineNumber === req.responseLineNumber);
+      if (!responseLine || !responseLine.timestampMs) return false;
+      return responseLine.timestampMs >= timeRangeMs.startMs && responseLine.timestampMs <= timeRangeMs.endMs;
     });
 
     // Time span (from filtered logs)
-    const firstTimestamp = filteredLogLines[0]?.timestamp || '';
-    const lastTimestamp = filteredLogLines[filteredLogLines.length - 1]?.timestamp || '';
+    const firstTimestamp = filteredLogLines[0]?.displayTime || '';
+    const lastTimestamp = filteredLogLines[filteredLogLines.length - 1]?.displayTime || '';
 
     // Helper function to extract the core error message without timestamp and log level
     const extractCoreMessage = (message: string): string => {

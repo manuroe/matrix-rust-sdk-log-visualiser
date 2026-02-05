@@ -1,4 +1,5 @@
 import type { HttpRequest, SyncRequest, LogParserResult, ParsedLogLine, LogLevel } from '../types/log.types';
+import { timeToMs } from './timeUtils';
 
 // Regex patterns for parsing HTTP requests - generic (all URIs)
 const HTTP_RESP_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"\s+request_size="(?<req_size>[^"]+)"\s+status=(?<status>\S+)\s+response_size="(?<resp_size>[^"]+)"\s+request_duration=(?<duration_val>[0-9.]+)(?<duration_unit>ms|s)/;
@@ -10,6 +11,26 @@ const LOG_LEVEL_RE = /\s(TRACE|DEBUG|INFO|WARN|ERROR)\s/;
 function extractLogLevel(line: string): LogLevel {
   const match = line.match(LOG_LEVEL_RE);
   return match ? (match[1] as LogLevel) : 'UNKNOWN';
+}
+
+function stripMessagePrefix(message: string): string {
+  // Strip timestamp, log level, and common prefixes to get the actual message content
+  const stripped = message
+    .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\s+/, '') // ISO timestamp
+    .replace(/^\d{2}:\d{2}:\d{2}\.\d+Z?\s+/, '') // Time-only timestamp
+    .replace(/\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+/, ' '); // Log level
+  return stripped.trim();
+}
+
+function formatDisplayTime(timestamp: string): string {
+  if (!timestamp) return '';
+  // If it's already in HH:MM:SS format, return as-is
+  if (timestamp.match(/^\d{2}:\d{2}:\d{2}/)) {
+    return timestamp;
+  }
+  // Extract time from ISO format
+  const match = timestamp.match(/T([\d:.]+)Z?$/);
+  return match ? match[1] : timestamp;
 }
 
 function extractTimestamp(line: string): string {
@@ -41,12 +62,18 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     if (line.trim()) {
       const timestamp = extractTimestamp(line);
       const level = extractLogLevel(line);
+      const timestampMs = timeToMs(timestamp);
+      const displayTime = formatDisplayTime(timestamp);
+      const strippedMessage = stripMessagePrefix(line);
       rawLogLines.push({
         lineNumber: i + 1,
         rawText: line,
         timestamp,
+        timestampMs,
+        displayTime,
         level,
         message: line,
+        strippedMessage,
       });
     }
 
@@ -54,9 +81,6 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     if (!line.includes('request_id=') || !line.includes('send{')) {
       continue;
     }
-
-    // Extract timestamp
-    const timeStr = extractTimestamp(line);
 
     // Try to match response pattern first
     const respMatch = line.match(HTTP_RESP_RE);
@@ -72,14 +96,13 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
 
       const rec = records.get(requestId)!;
       rec.requestId = requestId;
-      rec.responseTime = rec.responseTime || timeStr || '';
       rec.method = rec.method || respMatch.groups.method;
       rec.uri = rec.uri || respMatch.groups.uri;
       rec.status = rec.status || respMatch.groups.status;
       rec.responseSize = rec.responseSize || respMatch.groups.resp_size;
       rec.requestSize = rec.requestSize || respMatch.groups.req_size;
       rec.requestDurationMs = rec.requestDurationMs || durationMs;
-      rec.responseLine = line;
+      rec.responseLineNumber = i + 1;
       continue;
     }
 
@@ -94,32 +117,29 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
 
       const rec = records.get(requestId)!;
       rec.requestId = requestId;
-      rec.requestTime = rec.requestTime || timeStr || '';
       rec.method = rec.method || sendMatch.groups.method;
       rec.uri = rec.uri || sendMatch.groups.uri;
       rec.requestSize = rec.requestSize || sendMatch.groups.req_size;
-      rec.sendLine = line;
+      rec.sendLineNumber = i + 1;
     }
   }
 
   // Filter and convert to array - include any request with at least a send or response line
   const allRequests = Array.from(records.values()).filter(
     (rec): rec is HttpRequest =>
-      !!rec.uri && (!!rec.sendLine || !!rec.responseLine)
+      !!rec.uri && (!!rec.sendLineNumber || !!rec.responseLineNumber)
   ) as HttpRequest[];
 
-  // Fill in missing fields with empty strings
+  // Fill in missing fields with empty strings or default values
   allRequests.forEach((rec) => {
-    rec.requestTime = rec.requestTime || '';
-    rec.responseTime = rec.responseTime || '';
     rec.method = rec.method || '';
     rec.uri = rec.uri || '';
     rec.status = rec.status || '';
     rec.requestSize = rec.requestSize || '';
     rec.responseSize = rec.responseSize || '';
-    rec.requestDurationMs = rec.requestDurationMs || '';
-    rec.sendLine = rec.sendLine || '';
-    rec.responseLine = rec.responseLine || '';
+    rec.requestDurationMs = rec.requestDurationMs || 0;
+    rec.sendLineNumber = rec.sendLineNumber || 0;
+    rec.responseLineNumber = rec.responseLineNumber || 0;
   });
 
   return {

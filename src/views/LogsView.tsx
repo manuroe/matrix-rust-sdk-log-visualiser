@@ -4,7 +4,7 @@ import { useLogStore } from '../stores/logStore';
 import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import { calculateTimeRange, timeToMs, isoToTime } from '../utils/timeUtils';
+import { calculateTimeRange } from '../utils/timeUtils';
 
 export function LogsView() {
   const [searchParams] = useSearchParams();
@@ -19,17 +19,15 @@ export function LogsView() {
 
     // Calculate time range with max log time as reference
     const times = rawLogLines
-      .map((line) => line.timestamp)
-      .filter((t) => t)
-      .map((t) => timeToMs(t));
+      .map((line) => line.timestampMs)
+      .filter((t) => t > 0);
     const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
 
     const { startMs, endMs } = calculateTimeRange(startTime, endTime, maxLogTimeMs);
 
     return rawLogLines.filter((line) => {
       // Time range filter only
-      const lineTimeMs = timeToMs(line.timestamp);
-      return lineTimeMs >= startMs && lineTimeMs <= endMs;
+      return line.timestampMs >= startMs && line.timestampMs <= endMs;
     });
   }, [rawLogLines, startTime, endTime]);
 
@@ -73,7 +71,7 @@ export function LogsView() {
         <LogDisplayView 
           logLines={filteredLines.map(line => ({
             ...line,
-            timestamp: isoToTime(line.timestamp)
+            timestamp: line.displayTime
           }))}
           requestFilter={filterPrefill}
           prevRequestLineRange={prevRequestLineRange}

@@ -1,5 +1,5 @@
 import { useLogStore } from '../stores/logStore';
-import { timeToMs, applyTimeRangeFilter, isoToTime } from '../utils/timeUtils';
+import { applyTimeRangeFilter } from '../utils/timeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { useEffect, useState, useRef } from 'react';
@@ -18,6 +18,7 @@ export function HttpRequestsView() {
     expandedRows,
     openLogViewerIds,
     rawLogLines,
+    getDisplayTime,
     setHidePendingHttp,
     toggleRowExpansion,
     openLogViewer,
@@ -76,13 +77,15 @@ export function HttpRequestsView() {
   }, [filteredHttpRequests]);
 
   // Calculate total considering time range filter
-  const totalCount = applyTimeRangeFilter(allHttpRequests, startTime, endTime).length;
+  const totalCount = applyTimeRangeFilter(allHttpRequests, rawLogLines, startTime, endTime).length;
 
   // Calculate timeline scale
   const times = filteredHttpRequests
-    .map((r) => r.requestTime)
-    .filter((t) => t)
-    .map(timeToMs);
+    .map((r) => {
+      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      return sendLine?.timestampMs || 0;
+    })
+    .filter((t) => t > 0);
   const minTime = times.length > 0 ? Math.min(...times) : 0;
   const maxTime = times.length > 0 ? Math.max(...times) : 0;
   const totalDuration = Math.max(1, maxTime - minTime);
@@ -90,9 +93,11 @@ export function HttpRequestsView() {
   // Calculate timeline width using shared logic
   const visibleTimes = filteredHttpRequests
     .slice(0, 20)
-    .map((r) => r.requestTime)
-    .filter((t) => t)
-    .map(timeToMs);
+    .map((r) => {
+      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      return sendLine?.timestampMs || 0;
+    })
+    .filter((t) => t > 0);
   
   const { timelineWidth } = calculateTimelineWidth(
     containerWidth,
@@ -313,7 +318,7 @@ export function HttpRequestsView() {
                           {req.requestId}
                         </div>
                         <div className="uri sticky-col" title={req.uri}>{stripCommonPrefix(extractRelativeUri(req.uri), commonUriPrefix)}</div>
-                        <div className="time sticky-col">{isoToTime(req.requestTime)}</div>
+                        <div className="time sticky-col">{getDisplayTime(req.sendLineNumber)}</div>
                         <div className="method">{req.method}</div>
                         <div className="size sticky-col">{req.requestSize || '-'}</div>
                         <div className="size sticky-col">{req.responseSize || '-'}</div>
@@ -324,10 +329,11 @@ export function HttpRequestsView() {
                 <div className="timeline-rows-right" ref={waterfallContainerRef}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
                     {filteredHttpRequests.map((req) => {
-                      const reqTime = timeToMs(req.requestTime);
+                      const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+                      const reqTime = sendLine?.timestampMs || 0;
                       const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth);
                       const barWidth = getWaterfallBarWidth(
-                        parseFloat(String(req.requestDurationMs || 0)),
+                        req.requestDurationMs,
                         totalDuration,
                         timelineWidth,
                         2
@@ -401,19 +407,14 @@ export function HttpRequestsView() {
           const prevRequest = reqIndex > 0 ? filteredHttpRequests[reqIndex - 1] : null;
           const nextRequest = reqIndex < filteredHttpRequests.length - 1 ? filteredHttpRequests[reqIndex + 1] : null;
           
-          const findLineNumber = (logText: string): number => {
-            if (!logText) return -1;
-            return rawLogLines.findIndex(l => l.rawText === logText);
-          };
-          
           const prevRequestLineRange = prevRequest ? {
-            start: findLineNumber(prevRequest.sendLine),
-            end: findLineNumber(prevRequest.responseLine) || findLineNumber(prevRequest.sendLine)
+            start: prevRequest.sendLineNumber,
+            end: prevRequest.responseLineNumber || prevRequest.sendLineNumber
           } : undefined;
           
           const nextRequestLineRange = nextRequest ? {
-            start: findLineNumber(nextRequest.sendLine),
-            end: findLineNumber(nextRequest.responseLine) || findLineNumber(nextRequest.sendLine)
+            start: nextRequest.sendLineNumber,
+            end: nextRequest.responseLineNumber || nextRequest.sendLineNumber
           } : undefined;
 
           return (
@@ -425,7 +426,7 @@ export function HttpRequestsView() {
                 defaultLineWrap
                 logLines={rawLogLines.map(line => ({
                   ...line,
-                  timestamp: isoToTime(line.timestamp)
+                  timestamp: line.displayTime
                 }))}
                 prevRequestLineRange={prevRequestLineRange}
                 nextRequestLineRange={nextRequestLineRange}

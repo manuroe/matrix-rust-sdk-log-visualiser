@@ -1,4 +1,4 @@
-import { calculateTimeRange, isoToTime, timeToMs } from '../utils/timeUtils';
+import { calculateTimeRange } from '../utils/timeUtils';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
 
 type LogLines = ParsedLogLine[];
@@ -8,7 +8,8 @@ export function computeChartData(logLines: LogLines) {
     return { buckets: [], maxCount: 0, minTime: 0, maxTime: 0 };
   }
 
-  const timestamps = logLines.map((line) => timeToMs(line.timestamp));
+  // Use precomputed timestampMs instead of converting timestamps
+  const timestamps = logLines.map((line) => line.timestampMs);
   const dataMinTime = Math.min(...timestamps);
   const dataMaxTime = Math.max(...timestamps);
   const timeRange = dataMaxTime - dataMinTime;
@@ -52,7 +53,8 @@ export function computeChartData(logLines: LogLines) {
   }
 
   logLines.forEach((line) => {
-    const time = timeToMs(line.timestamp);
+    // Use precomputed timestampMs
+    const time = line.timestampMs;
     const bucketKey = Math.floor(time / bucketSize) * bucketSize;
 
     const bucket = bucketMap.get(bucketKey);
@@ -71,10 +73,8 @@ export function computeChartData(logLines: LogLines) {
 }
 
 export function extractTimes(logLines: LogLines) {
-  const times = logLines
-    .map((line) => line.timestamp)
-    .filter((t) => t)
-    .map((t) => timeToMs(t));
+  // Use precomputed timestampMs instead of converting
+  const times = logLines.map((line) => line.timestampMs).filter((t) => t > 0);
   const maxTime = times.length > 0 ? Math.max(...times) : 0;
   return { times, maxTime };
 }
@@ -86,22 +86,26 @@ export function computeFilteredLines(
 ) {
   if (logLines.length === 0) return [];
 
-  const { times, maxTime } = extractTimes(logLines);
+  const { maxTime } = extractTimes(logLines);
   const { startMs, endMs } = calculateTimeRange(startTime, endTime, maxTime);
 
+  // Use precomputed timestampMs for filtering
   const filtered = logLines.filter((line) => {
-    const lineTimeMs = timeToMs(line.timestamp);
-    return lineTimeMs >= startMs && lineTimeMs <= endMs;
+    return line.timestampMs >= startMs && line.timestampMs <= endMs;
   });
 
+  // Use precomputed displayTime instead of converting
   return filtered.map((line) => ({
     ...line,
-    timestamp: isoToTime(line.timestamp),
+    timestamp: line.displayTime,
   }));
 }
 
 export function convertTimestamps(logLines: LogLines) {
+  // This benchmark now tests accessing precomputed displayTime
+  // instead of converting timestamps on the fly
   logLines.forEach((line) => {
-    isoToTime(line.timestamp);
+    // Access precomputed displayTime (no conversion needed)
+    line.displayTime;
   });
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { HttpRequest, SyncRequest, ParsedLogLine } from '../types/log.types';
-import { isInTimeRange, calculateTimeRange, timeToMs } from '../utils/timeUtils';
+import { calculateTimeRange } from '../utils/timeUtils';
 
 interface LogStore {
   // Sync-specific state
@@ -51,6 +51,9 @@ interface LogStore {
   // Navigation memory
   setLastRoute: (route: string) => void;
   clearLastRoute: () => void;
+  
+  // Helper to get displayTime by line number
+  getDisplayTime: (lineNumber: number) => string;
 }
 
 export const useLogStore = create<LogStore>((set, get) => ({
@@ -136,16 +139,13 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   filterRequests: () => {
-    const { allRequests, selectedConnId, hidePending, startTime, endTime } = get();
+    const { allRequests, rawLogLines, selectedConnId, hidePending, startTime, endTime } = get();
     
     // Calculate time range if filters are set
     let timeRangeMs: { startMs: number; endMs: number } | null = null;
     if (startTime || endTime) {
-      // Find max time from all requests to use as reference (end of log)
-      const times = allRequests
-        .map((r) => r.responseTime)
-        .filter((t) => t)
-        .map(timeToMs);
+      // Find max time from rawLogLines to use as reference (end of log)
+      const times = rawLogLines.map((l) => l.timestampMs).filter((t) => t > 0);
       const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
       
       // Calculate time range relative to the log's maximum time
@@ -160,9 +160,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
       if (hidePending && !r.status) return false;
       
       // Time filter
-      if (timeRangeMs && r.responseTime) {
-        if (!isInTimeRange(r.responseTime, timeRangeMs.startMs, timeRangeMs.endMs)) {
-          return false;
+      if (timeRangeMs && r.responseLineNumber) {
+        const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
+        if (responseLine && responseLine.timestampMs) {
+          if (responseLine.timestampMs < timeRangeMs.startMs || responseLine.timestampMs > timeRangeMs.endMs) {
+            return false;
+          }
         }
       }
       
@@ -172,16 +175,13 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   
   filterHttpRequests: () => {
-    const { allHttpRequests, hidePendingHttp, startTime, endTime } = get();
+    const { allHttpRequests, rawLogLines, hidePendingHttp, startTime, endTime } = get();
     
     // Calculate time range if filters are set
     let timeRangeMs: { startMs: number; endMs: number } | null = null;
     if (startTime || endTime) {
-      // Find max time from all HTTP requests to use as reference (end of log)
-      const times = allHttpRequests
-        .map((r) => r.responseTime)
-        .filter((t) => t)
-        .map(timeToMs);
+      // Find max time from rawLogLines to use as reference (end of log)
+      const times = rawLogLines.map((l) => l.timestampMs).filter((t) => t > 0);
       const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
       
       // Calculate time range relative to the log's maximum time
@@ -193,9 +193,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
       if (hidePendingHttp && !r.status) return false;
       
       // Time filter
-      if (timeRangeMs && r.responseTime) {
-        if (!isInTimeRange(r.responseTime, timeRangeMs.startMs, timeRangeMs.endMs)) {
-          return false;
+      if (timeRangeMs && r.responseLineNumber) {
+        const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
+        if (responseLine && responseLine.timestampMs) {
+          if (responseLine.timestampMs < timeRangeMs.startMs || responseLine.timestampMs > timeRangeMs.endMs) {
+            return false;
+          }
         }
       }
       
@@ -238,5 +241,11 @@ export const useLogStore = create<LogStore>((set, get) => ({
 
   clearLastRoute: () => {
     set({ lastRoute: null });
+  },
+  
+  getDisplayTime: (lineNumber) => {
+    const { rawLogLines } = get();
+    const line = rawLogLines.find(l => l.lineNumber === lineNumber);
+    return line?.displayTime || '';
   },
 }));

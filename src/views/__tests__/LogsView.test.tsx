@@ -41,12 +41,17 @@ function makeLogs(count: number, startTime: Date = new Date(0)): ParsedLogLine[]
   const logs: ParsedLogLine[] = [];
   for (let i = 0; i < count; i++) {
     const timestamp = new Date(startTime.getTime() + i * 1000);
+    const isoTimestamp = timestamp.toISOString();
+    const timeStr = isoTimestamp.match(/T([\d:.]+)Z?$/)?.[1] || isoTimestamp;
     logs.push({
       lineNumber: i,
-      rawText: `${timestamp.toISOString()} INFO line ${i}`,
-      timestamp: timestamp.toISOString(),
+      rawText: `${isoTimestamp} INFO line ${i}`,
+      timestamp: isoTimestamp,
+      timestampMs: timestamp.getTime(),
+      displayTime: timeStr,
       level: 'INFO',
       message: `line ${i}`,
+      strippedMessage: `line ${i}`,
     });
   }
   return logs;

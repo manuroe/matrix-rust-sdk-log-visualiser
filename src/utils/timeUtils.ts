@@ -226,25 +226,29 @@ export function isInTimeRange(
 }
 
 /**
- * Apply time range filter to a list of requests
- * Returns requests that fall within the time range (by responseTime)
+ * Apply time range filter to a list of requests using rawLogLines for timestamps
+ * Returns requests that fall within the time range (by responseLineNumber)
  */
-export function applyTimeRangeFilter<T extends { responseTime: string }>(
+export function applyTimeRangeFilter<T extends { responseLineNumber: number }>(
   requests: T[],
+  rawLogLines: Array<{ lineNumber: number; timestampMs: number }>,
   startTime: string | null,
   endTime: string | null
 ): T[] {
   if (!startTime && !endTime) return requests;
 
-  // Find max time from requests to use as reference
-  const times = requests
-    .map((r) => r.responseTime)
-    .filter((t) => t)
-    .map(timeToMs);
+  // Find max time from rawLogLines to use as reference
+  const times = rawLogLines.map((l) => l.timestampMs).filter((t) => t > 0);
   const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
 
   // Calculate actual start and end times
   const { startMs, endMs } = calculateTimeRange(startTime, endTime, maxLogTimeMs);
 
-  return requests.filter((r) => r.responseTime && isInTimeRange(r.responseTime, startMs, endMs));
+  return requests.filter((r) => {
+    if (!r.responseLineNumber) return false;
+    const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
+    if (!responseLine || !responseLine.timestampMs) return false;
+    return responseLine.timestampMs >= startMs && responseLine.timestampMs <= endMs;
+  });
 }
+

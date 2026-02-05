@@ -23,12 +23,19 @@ function makeLogs(total: number, matchIndices: number[]): ParsedLogLine[] {
   const logs: ParsedLogLine[] = [];
   for (let i = 0; i < total; i++) {
     const isMatch = matchIndices.includes(i);
+    const timestamp = new Date(0);
+    const isoTimestamp = timestamp.toISOString();
+    const timeStr = isoTimestamp.match(/T([\d:.]+)Z?$/)?.[1] || isoTimestamp;
+    const message = isMatch ? `MATCH ${i}` : `line ${i}`;
     logs.push({
       lineNumber: i,
-      rawText: `${new Date(0).toISOString()} INFO ${isMatch ? 'MATCH' : 'line'} ${i}`,
-      timestamp: new Date(0).toISOString(),
+      rawText: `${isoTimestamp} INFO ${message}`,
+      timestamp: isoTimestamp,
+      timestampMs: timestamp.getTime(),
+      displayTime: timeStr,
       level: 'INFO',
-      message: isMatch ? `MATCH ${i}` : `line ${i}`,
+      message,
+      strippedMessage: message,
     });
   }
   return logs;
@@ -395,15 +402,21 @@ describe('LogDisplayView filter & search behaviors', () => {
         lineNumber: 0,
         rawText: '2024-01-01T00:00:00.000Z INFO uppercase TEXT',
         timestamp: '2024-01-01T00:00:00.000Z',
+        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
+        displayTime: '00:00:00.000',
         level: 'INFO',
         message: 'uppercase TEXT',
+        strippedMessage: 'uppercase TEXT',
       },
       {
         lineNumber: 1,
         rawText: '2024-01-01T00:00:00.000Z INFO lowercase text',
         timestamp: '2024-01-01T00:00:00.000Z',
+        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
+        displayTime: '00:00:00.000',
         level: 'INFO',
         message: 'lowercase text',
+        strippedMessage: 'lowercase text',
       },
     ];
     useLogStore.setState({ rawLogLines: logs });
@@ -459,22 +472,31 @@ describe('LogDisplayView filter & search behaviors', () => {
         lineNumber: 0,
         rawText: '2024-01-01T00:00:00.000Z INFO request-001',
         timestamp: '2024-01-01T00:00:00.000Z',
+        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
+        displayTime: '00:00:00.000',
         level: 'INFO',
         message: 'request-001',
+        strippedMessage: 'request-001',
       },
       {
         lineNumber: 1,
         rawText: '2024-01-01T00:00:00.000Z INFO response-data',
         timestamp: '2024-01-01T00:00:00.000Z',
+        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
+        displayTime: '00:00:00.000',
         level: 'INFO',
         message: 'response-data',
+        strippedMessage: 'response-data',
       },
       {
         lineNumber: 2,
         rawText: '2024-01-01T00:00:00.000Z INFO request-002',
         timestamp: '2024-01-01T00:00:00.000Z',
+        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
+        displayTime: '00:00:00.000',
         level: 'INFO',
         message: 'request-002',
+        strippedMessage: 'request-002',
       },
     ];
     useLogStore.setState({ rawLogLines: logs });

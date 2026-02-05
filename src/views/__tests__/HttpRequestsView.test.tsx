@@ -16,14 +16,12 @@ function createMockHttpRequest(id: string, index: number): HttpRequest {
     requestId: id,
     method: 'POST',
     uri: url,
-    requestTime: new Date(1000000 + index * 1000).toISOString(),
-    responseTime: new Date(1000000 + index * 1000 + 500).toISOString(),
     requestDurationMs: 500,
     status: '200',
     requestSize: '0',
     responseSize: '0',
-    sendLine: '1',
-    responseLine: '2',
+    sendLineNumber: index * 2,
+    responseLineNumber: index * 2 + 1,
   };
 }
 
