@@ -7,57 +7,57 @@
 
 | LogActivityChart Performance > Data aggregation (chartData useMemo) | Scaling | Time (ms) | Memory (MB) |
 | --- | --- | --- | --- |
-| small (1K lines) | 1.0x | 1.03ms | 0.20MB |
-| medium (10K lines) | 9.1x | 9.35ms | 1.24MB |
-| large (100K lines) | 144.8x | 148.47ms | 4.14MB |
+| small (1K lines) | 1.0x | 0.88ms | 0.20MB |
+| medium (10K lines) | 9.4x | 8.24ms | 1.29MB |
+| large (100K lines) | 163.8x | 143.56ms | 4.06MB |
 
 #### LogActivityChart Performance > Time extraction (timeToMs calls)
 
 | LogActivityChart Performance > Time extraction (timeToMs calls) | Scaling | Time (ms) | Memory (MB) |
 | --- | --- | --- | --- |
-| extract 1K timestamps | 1.0x | 0.82ms | 0.10MB |
-| extract 10K timestamps | 10.7x | 8.75ms | 0.95MB |
-| extract 100K timestamps | 173.3x | 142.47ms | 4.91MB |
+| extract 1K timestamps | 1.0x | 0.75ms | 0.10MB |
+| extract 10K timestamps | 11.0x | 8.31ms | 1.03MB |
+| extract 100K timestamps | 188.3x | 142.01ms | 4.88MB |
 
 #### logParser Performance > parseAllHttpRequests
 
 | logParser Performance > parseAllHttpRequests | Scaling | Time (ms) | Memory (MB) |
 | --- | --- | --- | --- |
-| small (1K lines) | 1.0x | 2.11ms | 1.48MB |
-| medium (10K lines) | 11.0x | 23.16ms | 1.64MB |
-| large (100K lines) | 149.7x | 316.26ms | -67.47MB |
+| small (1K lines) | 1.0x | 2.08ms | 1.48MB |
+| medium (10K lines) | 11.5x | 23.83ms | 1.66MB |
+| large (100K lines) | 156.1x | 324.11ms | -67.48MB |
 
 #### logParser Performance > parseLogFile
 
 | logParser Performance > parseLogFile | Scaling | Time (ms) | Memory (MB) |
 | --- | --- | --- | --- |
-| small (1K lines) | 1.0x | 2.24ms | 1.50MB |
-| medium (10K lines) | 10.7x | 24.00ms | 2.47MB |
-| large (100K lines) | 145.4x | 325.56ms | 32.81MB |
+| small (1K lines) | 1.0x | 2.18ms | 1.49MB |
+| medium (10K lines) | 10.5x | 22.83ms | 2.35MB |
+| large (100K lines) | 149.9x | 326.10ms | 32.66MB |
 
 #### LogsView Performance > Time extraction only (time-critical path)
 
 | LogsView Performance > Time extraction only (time-critical path) | Scaling | Time (ms) | Memory (MB) |
 | --- | --- | --- | --- |
-| extract 1K times | 1.0x | 0.82ms | 0.10MB |
-| extract 10K times | 10.7x | 8.80ms | 0.96MB |
-| extract 100K times | 177.6x | 146.11ms | 9.56MB |
+| extract 1K times | 1.0x | 0.73ms | 0.10MB |
+| extract 10K times | 10.6x | 7.77ms | 0.96MB |
+| extract 100K times | 187.1x | 137.06ms | 3.07MB |
 
 #### LogsView Performance > Time range filtering
 
 | LogsView Performance > Time range filtering | Scaling | Time (ms) | Memory (MB) |
 | --- | --- | --- | --- |
-| small (1K lines) | 1.0x | 0.82ms | 0.13MB |
-| medium (10K lines) | 10.9x | 8.96ms | 1.26MB |
-| large (100K lines) | 178.9x | 147.15ms | 1.80MB |
+| small (1K lines) | 1.0x | 0.76ms | 0.13MB |
+| medium (10K lines) | 11.1x | 8.44ms | 1.26MB |
+| large (100K lines) | 192.0x | 145.81ms | 1.79MB |
 
 #### LogsView Performance > Timestamp conversion (isoToTime)
 
 | LogsView Performance > Timestamp conversion (isoToTime) | Scaling | Time (ms) | Memory (MB) |
 | --- | --- | --- | --- |
-| convert 1K timestamps | 1.0x | 0.80ms | 0.00MB |
-| convert 10K timestamps | 10.1x | 8.13ms | 0.00MB |
-| convert 100K timestamps | 191.0x | 153.05ms | 0.00MB |
+| convert 1K timestamps | 1.0x | 0.72ms | 0.00MB |
+| convert 10K timestamps | 10.4x | 7.47ms | 0.00MB |
+| convert 100K timestamps | 183.6x | 131.41ms | 0.00MB |
 
 
 Report generated successfully
