@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { HttpRequest, SyncRequest, ParsedLogLine } from '../types/log.types';
 import { calculateTimeRange } from '../utils/timeUtils';
 import { wrapError, type AppError } from '../utils/errorHandling';
+import { DEFAULT_MS_PER_PIXEL } from '../utils/timelineUtils';
 
 interface LogStore {
   // Sync-specific state
@@ -16,9 +17,16 @@ interface LogStore {
   filteredHttpRequests: HttpRequest[];
   hidePendingHttp: boolean;
   
+  // Status code filter (null = all enabled, Set = specific codes enabled)
+  // Special value 'Pending' represents requests without a status
+  statusCodeFilter: Set<string> | null;
+  
   // Global filters (shared across all views)
   startTime: string | null;
   endTime: string | null;
+  
+  // Timeline scale (shared across waterfall views)
+  timelineScale: number;
   
   // UI state
   expandedRows: Set<string>;
@@ -40,10 +48,12 @@ interface LogStore {
   // HTTP requests actions
   setHttpRequests: (requests: HttpRequest[], rawLines: ParsedLogLine[]) => void;
   setHidePendingHttp: (hide: boolean) => void;
+  setStatusCodeFilter: (filter: Set<string> | null) => void;
   filterHttpRequests: () => void;
   
   // Global actions
   setTimeFilter: (startTime: string | null, endTime: string | null) => void;
+  setTimelineScale: (scale: number) => void;
   toggleRowExpansion: (requestId: string) => void;
   setActiveRequest: (requestId: string) => void; // Opens one request, closes all others
   clearData: () => void;
@@ -77,9 +87,15 @@ export const useLogStore = create<LogStore>((set, get) => ({
   filteredHttpRequests: [],
   hidePendingHttp: true,
   
+  // Status code filter (null = all enabled)
+  statusCodeFilter: null,
+  
   // Global filters
   startTime: null,
   endTime: null,
+  
+  // Timeline scale
+  timelineScale: DEFAULT_MS_PER_PIXEL,
   
   // UI state
   expandedRows: new Set(),
@@ -128,12 +144,22 @@ export const useLogStore = create<LogStore>((set, get) => ({
     set({ hidePendingHttp: hide });
     get().filterHttpRequests();
   },
+  
+  setStatusCodeFilter: (filter) => {
+    set({ statusCodeFilter: filter });
+    get().filterHttpRequests();
+    get().filterRequests();
+  },
 
   setTimeFilter: (startTime, endTime) => {
     set({ startTime, endTime });
     // Re-filter both sync and HTTP requests when time filter changes
     get().filterRequests();
     get().filterHttpRequests();
+  },
+
+  setTimelineScale: (scale) => {
+    set({ timelineScale: scale });
   },
 
   toggleRowExpansion: (requestId) => {
@@ -154,7 +180,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   filterRequests: () => {
-    const { allRequests, rawLogLines, selectedConnId, hidePending, startTime, endTime } = get();
+    const { allRequests, rawLogLines, selectedConnId, hidePending, statusCodeFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set
     let timeRangeMs: { startMs: number; endMs: number } | null = null;
@@ -174,6 +200,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
       // Pending filter
       if (hidePending && !r.status) return false;
       
+      // Status code filter (null = all enabled)
+      if (statusCodeFilter !== null) {
+        const statusKey = r.status || 'Pending';
+        if (!statusCodeFilter.has(statusKey)) return false;
+      }
+      
       // Time filter
       if (timeRangeMs && r.responseLineNumber) {
         const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
@@ -190,7 +222,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   
   filterHttpRequests: () => {
-    const { allHttpRequests, rawLogLines, hidePendingHttp, startTime, endTime } = get();
+    const { allHttpRequests, rawLogLines, hidePendingHttp, statusCodeFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set
     let timeRangeMs: { startMs: number; endMs: number } | null = null;
@@ -206,6 +238,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
     const filtered = allHttpRequests.filter((r) => {
       // Pending filter
       if (hidePendingHttp && !r.status) return false;
+      
+      // Status code filter (null = all enabled)
+      if (statusCodeFilter !== null) {
+        const statusKey = r.status || 'Pending';
+        if (!statusCodeFilter.has(statusKey)) return false;
+      }
       
       // Time filter
       if (timeRangeMs && r.responseLineNumber) {
@@ -230,6 +268,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       selectedConnId: '',
       allHttpRequests: [],
       filteredHttpRequests: [],
+      statusCodeFilter: null,
       startTime: null,
       endTime: null,
       expandedRows: new Set(),

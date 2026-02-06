@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { getWaterfallPosition, DEFAULT_MS_PER_PIXEL } from '../utils/timelineUtils';
 
 interface WaterfallTimelineProps {
   minTime: number;
   maxTime: number;
   totalDuration: number;
   width?: number; // Optional fixed width in pixels
+  msPerPixel?: number; // Scaling factor for timeline
   minPixelsPerMs?: number; // Minimum pixels per millisecond to ensure visible bars
   cursorContainerRef?: React.RefObject<HTMLDivElement | null>;
   cursorOffsetLeft?: number;
@@ -16,6 +18,7 @@ export function WaterfallTimeline({
   maxTime,
   totalDuration,
   width,
+  msPerPixel = DEFAULT_MS_PER_PIXEL,
   cursorContainerRef,
   cursorOffsetLeft = 0,
 }: WaterfallTimelineProps) {
@@ -48,7 +51,7 @@ export function WaterfallTimeline({
   const firstTick = Math.ceil(minTime / tickInterval) * tickInterval;
   
   for (let time = firstTick; time <= maxTime; time += tickInterval) {
-    const position = ((time - minTime) / totalDuration) * calculatedWidth;
+    const position = getWaterfallPosition(time, minTime, totalDuration, calculatedWidth, msPerPixel);
     const label = formatTimestamp(time, tickInterval);
     ticks.push({ position, label, time });
   }

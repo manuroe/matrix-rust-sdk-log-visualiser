@@ -163,6 +163,9 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     rec.responseLineNumber = rec.responseLineNumber || 0;
   });
 
+  // Sort requests by start time (sendLineNumber) to ensure chronological order
+  allRequests.sort((a, b) => a.sendLineNumber - b.sendLineNumber);
+
   return {
     httpRequests: allRequests,
     rawLogLines,

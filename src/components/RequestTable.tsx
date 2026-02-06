@@ -4,11 +4,21 @@ import { useLogStore } from '../stores/logStore';
 import { WaterfallTimeline } from './WaterfallTimeline';
 import { BurgerMenu } from './BurgerMenu';
 import { TimeRangeSelector } from './TimeRangeSelector';
+import { StatusFilterDropdown } from './StatusFilterDropdown';
 import { getWaterfallPosition, getWaterfallBarWidth, calculateTimelineWidth } from '../utils/timelineUtils';
 import { LogDisplayView } from '../views/LogDisplayView';
 import { useScrollSync } from '../hooks/useScrollSync';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import type { HttpRequest } from '../types/log.types';
+
+// Available timeline scale options (ms per pixel)
+const TIMELINE_SCALE_OPTIONS = [
+  { value: 5, label: '1px = 5ms' },
+  { value: 10, label: '1px = 10ms' },
+  { value: 25, label: '1px = 25ms' },
+  { value: 50, label: '1px = 50ms' },
+  { value: 100, label: '1px = 100ms' },
+];
 
 /**
  * Column definition for the RequestTable component.
@@ -42,6 +52,10 @@ export interface RequestTableProps {
   hidePending: boolean;
   /** Callback when hide pending checkbox changes */
   onHidePendingChange: (value: boolean) => void;
+  /** Timeline scale (ms per pixel) */
+  msPerPixel: number;
+  /** Available status codes for filtering (including 'Pending' if applicable) */
+  availableStatusCodes: string[];
   /** Optional additional header controls before the checkbox (e.g., connection dropdown) */
   headerSlot?: ReactNode;
   /** Message to show when no requests are found */
@@ -64,9 +78,10 @@ export function RequestTable({
   totalCount,
   hidePending,
   onHidePendingChange,
+  msPerPixel,
+  availableStatusCodes,
   headerSlot,
   emptyMessage = 'No requests found',
-  rowSelector = '',
 }: RequestTableProps) {
   const {
     expandedRows,
@@ -75,44 +90,39 @@ export function RequestTable({
     toggleRowExpansion,
     closeLogViewer,
     setActiveRequest,
+    setTimelineScale,
   } = useLogStore();
 
   const waterfallContainerRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [columnWidths, setColumnWidths] = useState<number[]>([]);
 
   // Use shared scroll sync hook
   useScrollSync(leftPanelRef, waterfallContainerRef);
 
-  // Use shared URL auto-scroll hook
-  useUrlRequestAutoScroll(filteredRequests, leftPanelRef);
-
-  // Measure actual row column widths and sync to header
-  useEffect(() => {
-    const selector = rowSelector ? `${rowSelector} .request-row-sticky` : '.request-row-sticky';
-    const firstRow = document.querySelector(selector);
-    if (!firstRow) return;
-
-    const children = Array.from(firstRow.children) as HTMLElement[];
-    const widths = children.map(child => child.getBoundingClientRect().width);
-
-    if (widths.length > 0 && widths.some(w => w > 0)) {
-      setColumnWidths(widths);
-    }
-  }, [filteredRequests, rowSelector]);
-
   // Calculate timeline scale
-  const times = filteredRequests
+  // Find the maximum extent: the latest point where any request bar ends
+  const timeData = filteredRequests
     .map((r) => {
       const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
-      return sendLine?.timestampMs || 0;
+      const startTime = sendLine?.timestampMs || 0;
+      const endTime = startTime + (r.requestDurationMs || 0);
+      return { startTime, endTime };
     })
-    .filter((t) => t > 0);
-  const minTime = times.length > 0 ? Math.min(...times) : 0;
-  const maxTime = times.length > 0 ? Math.max(...times) : 0;
-  const totalDuration = Math.max(1, maxTime - minTime);
+    .filter((t) => t.startTime > 0);
+  
+  const minTime = timeData.length > 0 ? Math.min(...timeData.map(t => t.startTime)) : 0;
+  const maxTime = timeData.length > 0 ? Math.max(...timeData.map(t => t.startTime)) : 0;
+  // Use maxExtent to ensure the timeline is wide enough for all bars including their widths
+  // Add extra time (in ms) to account for the duration label displayed after the last bar (e.g., "12888ms")
+  // 80px worth of label space at the current scale
+  const labelPaddingMs = 80 * msPerPixel;
+  const maxExtent = timeData.length > 0 
+    ? Math.max(...timeData.map(t => t.endTime)) + labelPaddingMs 
+    : 0;
+  // totalDuration uses maxExtent so bar positions are correctly proportioned to timeline width
+  const totalDuration = Math.max(1, maxExtent - minTime);
 
   // Calculate timeline width using shared logic
   const visibleTimes = filteredRequests
@@ -127,7 +137,8 @@ export function RequestTable({
     containerWidth,
     visibleTimes,
     minTime,
-    maxTime
+    maxExtent,
+    msPerPixel
   );
 
   // Handle resize for layout measurements
@@ -186,6 +197,26 @@ export function RequestTable({
     leftRow?.classList.remove('row-hovered');
     rightRow?.classList.remove('row-hovered');
   };
+
+  /** Handle click on waterfall row - scroll to show request start time */
+  const handleWaterfallRowClick = useCallback((req: HttpRequest) => {
+    if (!waterfallContainerRef.current) return;
+
+    const container = waterfallContainerRef.current;
+    const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+    const reqTime = sendLine?.timestampMs || 0;
+    const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
+
+    // Scroll to show the start of the request bar, with some padding (20% of container width)
+    const containerClientWidth = container.clientWidth;
+    const targetScroll = barLeft - containerClientWidth * 0.2;
+
+    // Use direct scrollLeft assignment (scrollTo with smooth behavior doesn't work reliably)
+    container.scrollLeft = Math.max(0, targetScroll);
+  }, [rawLogLines, minTime, totalDuration, timelineWidth, msPerPixel]);
+
+  // Use shared URL auto-scroll hook (placed after handleWaterfallRowClick is defined)
+  useUrlRequestAutoScroll(filteredRequests, leftPanelRef, handleWaterfallRowClick);
 
   /** Render the expanded log viewer for a request */
   const renderExpandedLogViewer = () => {
@@ -259,6 +290,22 @@ export function RequestTable({
         </div>
 
         <div className="header-right">
+          <StatusFilterDropdown availableStatusCodes={availableStatusCodes} />
+          
+          <select
+            id="timeline-scale"
+            value={msPerPixel}
+            onChange={(e) => setTimelineScale(Number(e.target.value))}
+            className="select-compact"
+            title="Timeline scale"
+          >
+            {TIMELINE_SCALE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          
           <TimeRangeSelector />
         </div>
       </div>
@@ -266,11 +313,10 @@ export function RequestTable({
       <div className="timeline-container">
         <div className="timeline-header">
           <div className="timeline-header-sticky" ref={stickyHeaderRef}>
-            {columns.map((col, i) => (
+            {columns.map((col) => (
               <div
                 key={col.id}
                 className={`sticky-col ${col.className || ''}`}
-                style={columnWidths[i] ? { width: `${columnWidths[i]}px` } : {}}
               >
                 {col.label}
               </div>
@@ -282,6 +328,7 @@ export function RequestTable({
               maxTime={maxTime}
               totalDuration={totalDuration}
               width={timelineWidth}
+              msPerPixel={msPerPixel}
               cursorContainerRef={waterfallContainerRef}
               cursorOffsetLeft={0}
             />
@@ -301,9 +348,10 @@ export function RequestTable({
                       key={`sticky-${req.requestId}`}
                       data-row-id={`sticky-${req.requestId}`}
                       className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
-                      style={{ minHeight: '28px' }}
+                      style={{ minHeight: '28px', cursor: 'pointer' }}
                       onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                       onMouseLeave={() => handleRowMouseLeave(req.requestId)}
+                      onClick={() => handleWaterfallRowClick(req)}
                     >
                       <div className="request-row-sticky">
                         {columns.map((col, i) => {
@@ -343,12 +391,12 @@ export function RequestTable({
                     {filteredRequests.map((req) => {
                       const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
                       const reqTime = sendLine?.timestampMs || 0;
-                      const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth);
+                      const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
                       const barWidth = getWaterfallBarWidth(
                         req.requestDurationMs,
                         totalDuration,
                         timelineWidth,
-                        2
+                        msPerPixel
                       );
                       const status = req.status ? req.status : 'Pending';
                       const isPending = !req.status;
@@ -359,11 +407,12 @@ export function RequestTable({
                           key={`waterfall-${req.requestId}`}
                           data-row-id={`waterfall-${req.requestId}`}
                           className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
-                          style={{ minHeight: '28px' }}
+                          style={{ minHeight: '28px', cursor: 'pointer' }}
                           onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                           onMouseLeave={() => handleRowMouseLeave(req.requestId)}
+                          onClick={() => handleWaterfallRowClick(req)}
                         >
-                          <div style={{ flex: 1, overflow: 'visible', position: 'relative', minWidth: `${timelineWidth}px` }}>
+                          <div style={{ position: 'relative', overflow: 'visible' }}>
                             <div
                               className="waterfall-item"
                               style={{
@@ -378,7 +427,6 @@ export function RequestTable({
                                 className={`waterfall-bar ${statusClass}`}
                                 style={{
                                   width: `${barWidth}px`,
-                                  minWidth: '2px',
                                 }}
                                 title={statusClass === 'pending' ? 'Pending' : status}
                               />

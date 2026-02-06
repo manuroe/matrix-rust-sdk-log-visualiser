@@ -4,6 +4,7 @@ import { applyTimeRangeFilter } from '../utils/timeUtils';
 import { RequestTable } from '../components/RequestTable';
 import type { ColumnDef } from '../components/RequestTable';
 import { extractRelativeUri, findCommonUriPrefix, stripCommonPrefix } from '../utils/uriUtils';
+import { extractAvailableStatusCodes } from '../utils/statusCodeUtils';
 
 /**
  * HTTP Requests view - displays all HTTP requests in a timeline with waterfall visualization.
@@ -16,6 +17,7 @@ export function HttpRequestsView() {
     hidePendingHttp,
     startTime,
     endTime,
+    timelineScale,
     rawLogLines,
     getDisplayTime,
     setHidePendingHttp,
@@ -25,6 +27,12 @@ export function HttpRequestsView() {
   const totalCount = useMemo(() => 
     applyTimeRangeFilter(allHttpRequests, rawLogLines, startTime, endTime).length,
     [allHttpRequests, rawLogLines, startTime, endTime]
+  );
+
+  // Compute available status codes from all requests (including Pending)
+  const availableStatusCodes = useMemo(
+    () => extractAvailableStatusCodes(allHttpRequests),
+    [allHttpRequests]
   );
 
   // Find common URI prefix to strip from display
@@ -54,7 +62,7 @@ export function HttpRequestsView() {
     },
     {
       id: 'method',
-      label: 'Method',
+      label: '',
       className: 'method',
       getValue: (req) => req.method,
     },
@@ -80,6 +88,8 @@ export function HttpRequestsView() {
       totalCount={totalCount}
       hidePending={hidePendingHttp}
       onHidePendingChange={setHidePendingHttp}
+      msPerPixel={timelineScale}
+      availableStatusCodes={availableStatusCodes}
       emptyMessage="No HTTP requests found in log file"
     />
   );

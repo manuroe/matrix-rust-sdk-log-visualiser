@@ -3,6 +3,7 @@ import { useLogStore } from '../stores/logStore';
 import { applyTimeRangeFilter } from '../utils/timeUtils';
 import { RequestTable } from '../components/RequestTable';
 import type { ColumnDef } from '../components/RequestTable';
+import { extractAvailableStatusCodes } from '../utils/statusCodeUtils';
 
 /**
  * Sync Requests view - displays /sync requests in a timeline with waterfall visualization.
@@ -17,6 +18,7 @@ export function SyncView() {
     hidePending,
     startTime,
     endTime,
+    timelineScale,
     rawLogLines,
     getDisplayTime,
     setSelectedConnId,
@@ -30,6 +32,12 @@ export function SyncView() {
     );
     return applyTimeRangeFilter(connFilteredRequests, rawLogLines, startTime, endTime).length;
   }, [allRequests, selectedConnId, rawLogLines, startTime, endTime]);
+
+  // Compute available status codes from all requests (including Pending)
+  const availableStatusCodes = useMemo(
+    () => extractAvailableStatusCodes(allRequests),
+    [allRequests]
+  );
 
   // Define columns for sync requests view (fewer columns than HTTP)
   const columns: ColumnDef[] = useMemo(() => [
@@ -83,6 +91,8 @@ export function SyncView() {
       totalCount={totalCount}
       hidePending={hidePending}
       onHidePendingChange={setHidePending}
+      msPerPixel={timelineScale}
+      availableStatusCodes={availableStatusCodes}
       headerSlot={connectionSelector}
       emptyMessage="No sync requests found in log file"
       rowSelector=".sync-view"
