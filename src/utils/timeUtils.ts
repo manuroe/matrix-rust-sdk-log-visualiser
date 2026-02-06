@@ -39,12 +39,36 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Convert time string (HH:MM:SS.ffffff) to ISO datetime using epoch date
+ * Check if a string is a full ISO datetime (contains date portion)
+ * Examples: "2022-04-15T09:45:19.968Z", "2022-04-15T09:45:19Z"
+ */
+function isFullISODatetime(timeStr: string): boolean {
+  // Match YYYY-MM-DDTHH:MM:SS format (with optional fractional seconds and Z)
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(timeStr);
+}
+
+/**
+ * Convert time string to ISO datetime.
+ * - If input is already full ISO datetime with date (2022-04-15T09:45:19.968Z), preserve it
+ * - If input is time-only (HH:MM:SS.ffffff), prepend epoch date (1970-01-01T)
+ * - Otherwise return input unchanged (for shortcuts, keywords, etc.)
  */
 export function timeToISO(timeStr: string): string {
-  if (!timeStr || !timeStr.match(/^\d{2}:\d{2}:\d{2}/)) return timeStr;
-  // Use epoch date as placeholder since logs only contain time
-  return `1970-01-01T${timeStr}Z`;
+  if (!timeStr) return timeStr;
+  
+  // If already a full ISO datetime with date portion, preserve it unchanged
+  if (isFullISODatetime(timeStr)) {
+    return timeStr;
+  }
+  
+  // Check if it's a time-only string (HH:MM:SS format)
+  if (/^\d{2}:\d{2}:\d{2}/.test(timeStr)) {
+    // Use epoch date as placeholder since logs only contain time
+    return `1970-01-01T${timeStr}Z`;
+  }
+  
+  // Return other inputs unchanged (shortcuts, keywords, etc.)
+  return timeStr;
 }
 
 /**
@@ -86,15 +110,19 @@ export function urlToTimeFormat(urlValue: string | null): string | null {
   if (urlValue === 'start' || urlValue === 'end' || urlValue.startsWith('last')) {
     return urlValue;
   }
-  // Convert ISO datetime to time-only format
-  if (urlValue.includes('T')) {
+  // Convert ISO datetime with epoch date to time-only format (for backward compatibility)
+  if (urlValue.includes('T') && urlValue.startsWith('1970-01-01T')) {
     return isoToTime(urlValue);
+  }
+  // If it's a full ISO datetime with actual date portion, preserve it unchanged
+  if (urlValue.includes('T') && /^\d{4}-\d{2}-\d{2}T/.test(urlValue)) {
+    return urlValue;
   }
   return urlValue;
 }
 
 /**
- * Parse a time string which can be either a shortcut like "lastFiveMin"
+ * Parse a time string which can be either a shortcut like "last-5-min"
  * or an ISO time like "12:34:56.123456"
  */
 export function parseTimeInput(input: string): string | null {
@@ -102,13 +130,13 @@ export function parseTimeInput(input: string): string | null {
 
   const trimmed = input.trim();
 
-  // Handle shortcuts
+  // Handle shortcuts (hyphenated format)
   if (trimmed === 'start') return 'start';
-  if (trimmed === 'lastMin') return 'lastMin';
-  if (trimmed === 'lastFiveMin') return 'lastFiveMin';
-  if (trimmed === 'lastTenMin') return 'lastTenMin';
-  if (trimmed === 'lastHour') return 'lastHour';
-  if (trimmed === 'lastDay') return 'lastDay';
+  if (trimmed === 'last-min') return trimmed;
+  if (trimmed === 'last-5-min') return trimmed;
+  if (trimmed === 'last-10-min') return trimmed;
+  if (trimmed === 'last-hour') return trimmed;
+  if (trimmed === 'last-day') return trimmed;
   if (trimmed === 'end') return 'end';
 
   // Handle ISO time format (HH:MM:SS or HH:MM:SS.ffffff)
@@ -147,11 +175,16 @@ export function parseTimeInput(input: string): string | null {
  */
 export function shortcutToMs(shortcut: string): number {
   const shortcuts: Record<string, number> = {
-    lastMin: 60 * 1000,
-    lastFiveMin: 5 * 60 * 1000,
-    lastTenMin: 10 * 60 * 1000,
-    lastHour: 60 * 60 * 1000,
-    lastDay: 24 * 60 * 60 * 1000,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    'last-min': 60 * 1000,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    'last-5-min': 5 * 60 * 1000,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    'last-10-min': 10 * 60 * 1000,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    'last-hour': 60 * 60 * 1000,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    'last-day': 24 * 60 * 60 * 1000,
   };
   return shortcuts[shortcut] || 0;
 }
@@ -163,11 +196,11 @@ export function getTimeDisplayName(timeValue: string | null): string {
   if (!timeValue) return '';
   if (timeValue === 'start') return 'Start of log';
   if (timeValue === 'end') return 'End of log';
-  if (timeValue === 'lastMin') return 'Last min';
-  if (timeValue === 'lastFiveMin') return 'Last 5 min';
-  if (timeValue === 'lastTenMin') return 'Last 10 min';
-  if (timeValue === 'lastHour') return 'Last hour';
-  if (timeValue === 'lastDay') return 'Last day';
+  if (timeValue === 'last-min') return 'Last min';
+  if (timeValue === 'last-5-min') return 'Last 5 min';
+  if (timeValue === 'last-10-min') return 'Last 10 min';
+  if (timeValue === 'last-hour') return 'Last hour';
+  if (timeValue === 'last-day') return 'Last day';
   return timeValue;
 }
 
@@ -201,7 +234,7 @@ export function calculateTimeRange(
     if (startTime === 'start') {
       // Start of log
       startMs = 0;
-    } else if (startTime.startsWith('last')) {
+    } else if (startTime.startsWith('last-')) {
       // Shortcut: calculate offset from endTime
       const offsetMs = shortcutToMs(startTime);
       startMs = Math.max(0, endMs - offsetMs);

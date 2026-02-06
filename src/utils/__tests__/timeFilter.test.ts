@@ -6,15 +6,18 @@ import {
   calculateTimeRange,
   isInTimeRange,
   timeToMs,
+  timeToISO,
+  timeToURLFormat,
+  urlToTimeFormat,
 } from '../timeUtils';
 
 describe('Time Filter Utilities', () => {
   describe('parseTimeInput', () => {
     it('should parse shortcut strings', () => {
-      expect(parseTimeInput('lastFiveMin')).toBe('lastFiveMin');
-      expect(parseTimeInput('lastTenMin')).toBe('lastTenMin');
-      expect(parseTimeInput('lastHour')).toBe('lastHour');
-      expect(parseTimeInput('lastDay')).toBe('lastDay');
+      expect(parseTimeInput('last-5-min')).toBe('last-5-min');
+      expect(parseTimeInput('last-10-min')).toBe('last-10-min');
+      expect(parseTimeInput('last-hour')).toBe('last-hour');
+      expect(parseTimeInput('last-day')).toBe('last-day');
     });
 
     it('should parse ISO time format', () => {
@@ -30,17 +33,17 @@ describe('Time Filter Utilities', () => {
     });
 
     it('should handle whitespace', () => {
-      expect(parseTimeInput('  lastFiveMin  ')).toBe('lastFiveMin');
+      expect(parseTimeInput('  last-5-min  ')).toBe('last-5-min');
       expect(parseTimeInput('  12:34:56  ')).toBe('12:34:56');
     });
   });
 
   describe('shortcutToMs', () => {
     it('should convert shortcuts to milliseconds', () => {
-      expect(shortcutToMs('lastFiveMin')).toBe(5 * 60 * 1000);
-      expect(shortcutToMs('lastTenMin')).toBe(10 * 60 * 1000);
-      expect(shortcutToMs('lastHour')).toBe(60 * 60 * 1000);
-      expect(shortcutToMs('lastDay')).toBe(24 * 60 * 60 * 1000);
+      expect(shortcutToMs('last-5-min')).toBe(5 * 60 * 1000);
+      expect(shortcutToMs('last-10-min')).toBe(10 * 60 * 1000);
+      expect(shortcutToMs('last-hour')).toBe(60 * 60 * 1000);
+      expect(shortcutToMs('last-day')).toBe(24 * 60 * 60 * 1000);
     });
 
     it('should return 0 for unknown shortcut', () => {
@@ -50,10 +53,10 @@ describe('Time Filter Utilities', () => {
 
   describe('getTimeDisplayName', () => {
     it('should return display names for shortcuts', () => {
-      expect(getTimeDisplayName('lastFiveMin')).toBe('Last 5 min');
-      expect(getTimeDisplayName('lastTenMin')).toBe('Last 10 min');
-      expect(getTimeDisplayName('lastHour')).toBe('Last hour');
-      expect(getTimeDisplayName('lastDay')).toBe('Last day');
+      expect(getTimeDisplayName('last-5-min')).toBe('Last 5 min');
+      expect(getTimeDisplayName('last-10-min')).toBe('Last 10 min');
+      expect(getTimeDisplayName('last-hour')).toBe('Last hour');
+      expect(getTimeDisplayName('last-day')).toBe('Last day');
     });
 
     it('should return time string for ISO times', () => {
@@ -78,7 +81,7 @@ describe('Time Filter Utilities', () => {
 
     it('should handle shortcut as start time', () => {
       const maxMs = timeToMs('12:45:00'); // 45900000 ms
-      const result = calculateTimeRange('lastFiveMin', 'end', maxMs);
+      const result = calculateTimeRange('last-5-min', 'end', maxMs);
       expect(result.endMs).toBe(maxMs);
       expect(result.startMs).toBe(maxMs - 5 * 60 * 1000);
     });
@@ -92,7 +95,7 @@ describe('Time Filter Utilities', () => {
 
     it('should not allow start time before 0', () => {
       const maxMs = timeToMs('00:01:00'); // 60000 ms
-      const result = calculateTimeRange('lastHour', 'end', maxMs); // 3600000 ms offset
+      const result = calculateTimeRange('last-hour', 'end', maxMs); // 3600000 ms offset
       expect(result.startMs).toBeGreaterThanOrEqual(0);
       expect(result.startMs).toBe(0); // Clamped to 0
     });
@@ -129,6 +132,107 @@ describe('Time Filter Utilities', () => {
     it('should handle partial seconds', () => {
       expect(timeToMs('00:00:01.5')).toBe(1500);
       expect(timeToMs('00:00:00.123456')).toBe(123.456);
+    });
+  });
+
+  describe('timeToISO', () => {
+    it('should preserve full ISO datetime with actual date', () => {
+      expect(timeToISO('2022-04-15T09:45:19.968Z')).toBe('2022-04-15T09:45:19.968Z');
+      expect(timeToISO('2022-04-15T09:45:19Z')).toBe('2022-04-15T09:45:19Z');
+      expect(timeToISO('2025-12-31T23:59:59.999Z')).toBe('2025-12-31T23:59:59.999Z');
+    });
+
+    it('should add epoch date to time-only strings', () => {
+      expect(timeToISO('09:45:19')).toBe('1970-01-01T09:45:19Z');
+      expect(timeToISO('09:45:19.968')).toBe('1970-01-01T09:45:19.968Z');
+      expect(timeToISO('00:00:00')).toBe('1970-01-01T00:00:00Z');
+      expect(timeToISO('23:59:59.999999')).toBe('1970-01-01T23:59:59.999999Z');
+    });
+
+    it('should return invalid input unchanged', () => {
+      expect(timeToISO('invalid')).toBe('invalid');
+      expect(timeToISO('start')).toBe('start');
+      expect(timeToISO('last24h')).toBe('last24h');
+      expect(timeToISO('')).toBe('');
+    });
+  });
+
+  describe('timeToURLFormat', () => {
+    it('should preserve full ISO datetime with actual date', () => {
+      expect(timeToURLFormat('2022-04-15T09:45:19.968Z')).toBe('2022-04-15T09:45:19.968Z');
+      expect(timeToURLFormat('2025-12-31T23:59:59Z')).toBe('2025-12-31T23:59:59Z');
+    });
+
+    it('should convert time-only to ISO with epoch date', () => {
+      expect(timeToURLFormat('09:45:19.968')).toBe('1970-01-01T09:45:19.968Z');
+    });
+
+    it('should keep shortcuts unchanged', () => {
+      expect(timeToURLFormat('start')).toBe('start');
+      expect(timeToURLFormat('end')).toBe('end');
+      expect(timeToURLFormat('lastHour')).toBe('lastHour');
+      expect(timeToURLFormat('lastDay')).toBe('lastDay');
+    });
+
+    it('should return null for null input', () => {
+      expect(timeToURLFormat(null)).toBeNull();
+    });
+  });
+
+  describe('urlToTimeFormat', () => {
+    it('should preserve full ISO datetime with actual date', () => {
+      expect(urlToTimeFormat('2022-04-15T09:45:19.968Z')).toBe('2022-04-15T09:45:19.968Z');
+      expect(urlToTimeFormat('2025-12-31T23:59:59Z')).toBe('2025-12-31T23:59:59Z');
+    });
+
+    it('should convert epoch-based ISO to time-only for backward compatibility', () => {
+      expect(urlToTimeFormat('1970-01-01T09:45:19.968Z')).toBe('09:45:19.968');
+      expect(urlToTimeFormat('1970-01-01T00:00:00Z')).toBe('00:00:00');
+    });
+
+    it('should keep shortcuts unchanged', () => {
+      expect(urlToTimeFormat('start')).toBe('start');
+      expect(urlToTimeFormat('end')).toBe('end');
+      expect(urlToTimeFormat('lastHour')).toBe('lastHour');
+    });
+
+    it('should return null for null input', () => {
+      expect(urlToTimeFormat(null)).toBeNull();
+    });
+  });
+
+  describe('timeToURLFormat ↔ urlToTimeFormat round-trip', () => {
+    it('should preserve full ISO datetimes with real dates in both directions', () => {
+      const original = '2026-01-21T09:48:37.123456Z';
+      const toURL = timeToURLFormat(original);
+      const fromURL = urlToTimeFormat(toURL);
+      expect(fromURL).toBe(original);
+    });
+
+    it('should handle time-only strings converting to epoch ISO in URL', () => {
+      const original = '09:48:37.123456';
+      const toURL = timeToURLFormat(original); // -> 1970-01-01T09:48:37.123456Z
+      expect(toURL).toBe('1970-01-01T09:48:37.123456Z');
+      // When read back from URL, epoch dates are converted to time-only (without Z)
+      const fromURL = urlToTimeFormat(toURL);
+      expect(fromURL).toBe('09:48:37.123456');
+    });
+
+    it('should preserve shortcuts in both directions', () => {
+      const shortcuts = ['start', 'end', 'last-hour', 'last-day', 'last-5-min'];
+      shortcuts.forEach(shortcut => {
+        const toURL = timeToURLFormat(shortcut);
+        const fromURL = urlToTimeFormat(toURL);
+        expect(fromURL).toBe(shortcut);
+      });
+    });
+  });
+
+  describe('shortcut handling - hyphenated format', () => {
+    it('should handle all hyphenated shortcuts', () => {
+      expect(shortcutToMs('last-min')).toBe(60 * 1000);
+      expect(getTimeDisplayName('last-min')).toBe('Last min');
+      expect(parseTimeInput('last-min')).toBe('last-min');
     });
   });
 });

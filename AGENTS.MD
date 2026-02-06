@@ -44,7 +44,7 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Build: `npm run build`
 - Preview build: `npm run preview`
 - Lint: `npm run lint`
-- Unit tests: `npm test`
+- Unit tests: `npm test -- --run` (exits after completion; omit `-- --run` for watch mode)
 - Performance benchmarks: `npm run bench <output-path>`
   - Example: `npm run bench benchmark/local/report.json`
 - Build benchmark report: `npm run bench:report <json-path> [-- --output <md-path>] [-- --baseline <baseline-path>]`

@@ -56,21 +56,23 @@ export function SummaryView() {
   }, [localStartTime, localEndTime, rawLogLines, startTime, endTime]);
 
   const handleApplyGlobally = useCallback(() => {
-    if (localStartTime !== null && localEndTime !== null) {
-      // Check if the selection is the full log range
-      if (rawLogLines.length > 0) {
-        const times = rawLogLines.map((line) => line.timestampMs);
-        const fullMinTime = Math.min(...times);
-        const fullMaxTime = Math.max(...times);
-        
-        // If selection matches full range (within 1ms tolerance), clear the filter instead
-        if (Math.abs(localStartTime - fullMinTime) <= 1 && Math.abs(localEndTime - fullMaxTime) <= 1) {
-          setTimeFilter(null, null);
-        } else {
-          setTimeFilter(new Date(localStartTime).toISOString(), new Date(localEndTime).toISOString());
-        }
+    if (localStartTime !== null && localEndTime !== null && rawLogLines.length > 0) {
+      const times = rawLogLines.map((line) => line.timestampMs);
+      const fullMinTime = Math.min(...times);
+      const fullMaxTime = Math.max(...times);
+      
+      // If selection matches full range (within 1ms tolerance), clear the filter instead
+      if (Math.abs(localStartTime - fullMinTime) <= 1 && Math.abs(localEndTime - fullMaxTime) <= 1) {
+        setTimeFilter(null, null);
       } else {
-        setTimeFilter(new Date(localStartTime).toISOString(), new Date(localEndTime).toISOString());
+        // Find the closest log lines to the selected timestamps and use their original timestamp strings
+        const startLine = rawLogLines.reduce((closest, line) => 
+          Math.abs(line.timestampMs - localStartTime) < Math.abs(closest.timestampMs - localStartTime) ? line : closest
+        );
+        const endLine = rawLogLines.reduce((closest, line) => 
+          Math.abs(line.timestampMs - localEndTime) < Math.abs(closest.timestampMs - localEndTime) ? line : closest
+        );
+        setTimeFilter(startLine.timestamp, endLine.timestamp);
       }
       
       // Clear local selection state immediately
