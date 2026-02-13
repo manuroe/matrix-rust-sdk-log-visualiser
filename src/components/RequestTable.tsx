@@ -1,0 +1,453 @@
+import { useRef, useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
+import { useLogStore } from '../stores/logStore';
+import { WaterfallTimeline } from './WaterfallTimeline';
+import { BurgerMenu } from './BurgerMenu';
+import { TimeRangeSelector } from './TimeRangeSelector';
+import { StatusFilterDropdown } from './StatusFilterDropdown';
+import { getWaterfallPosition, getWaterfallBarWidth, calculateTimelineWidth } from '../utils/timelineUtils';
+import { LogDisplayView } from '../views/LogDisplayView';
+import { useScrollSync } from '../hooks/useScrollSync';
+import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
+import { microsToMs } from '../utils/timeUtils';
+import type { HttpRequest } from '../types/log.types';
+
+// Available timeline scale options (ms per pixel)
+const TIMELINE_SCALE_OPTIONS = [
+  { value: 5, label: '1px = 5ms' },
+  { value: 10, label: '1px = 10ms' },
+  { value: 25, label: '1px = 25ms' },
+  { value: 50, label: '1px = 50ms' },
+  { value: 100, label: '1px = 100ms' },
+];
+
+/**
+ * Column definition for the RequestTable component.
+ */
+export interface ColumnDef {
+  /** Unique column identifier */
+  id: string;
+  /** Column header label */
+  label: string;
+  /** Extract the display value from a request */
+  getValue: (req: HttpRequest) => string;
+  /** Optional CSS class name for the column */
+  className?: string;
+}
+
+/**
+ * Props for the RequestTable component.
+ */
+export interface RequestTableProps {
+  /** Title displayed in the header */
+  title: string;
+  /** Column definitions for the sticky left panel */
+  columns: ColumnDef[];
+  /** CSS class applied to the container for view-specific styling */
+  containerClassName?: string;
+  /** Filtered requests to display */
+  filteredRequests: HttpRequest[];
+  /** Total count to display (pre-calculated by the view) */
+  totalCount: number;
+  /** Whether to hide pending requests */
+  hidePending: boolean;
+  /** Callback when hide pending checkbox changes */
+  onHidePendingChange: (value: boolean) => void;
+  /** Timeline scale (ms per pixel) */
+  msPerPixel: number;
+  /** Available status codes for filtering (including 'Pending' if applicable) */
+  availableStatusCodes: string[];
+  /** Optional additional header controls before the checkbox (e.g., connection dropdown) */
+  headerSlot?: ReactNode;
+  /** Message to show when no requests are found */
+  emptyMessage?: string;
+  /** CSS selector prefix for row measurement (e.g., '.sync-view' or '') */
+  rowSelector?: string;
+}
+
+/**
+ * Reusable request timeline table component.
+ * Displays requests in a two-panel layout: sticky columns on the left, waterfall timeline on the right.
+ *
+ * Used by HttpRequestsView, SyncView, and other future request-type views.
+ */
+export function RequestTable({
+  title,
+  columns,
+  containerClassName = '',
+  filteredRequests,
+  totalCount,
+  hidePending,
+  onHidePendingChange,
+  msPerPixel,
+  availableStatusCodes,
+  headerSlot,
+  emptyMessage = 'No requests found',
+}: RequestTableProps) {
+  const {
+    expandedRows,
+    openLogViewerIds,
+    rawLogLines,
+    toggleRowExpansion,
+    closeLogViewer,
+    setActiveRequest,
+    setTimelineScale,
+  } = useLogStore();
+
+  const waterfallContainerRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Use shared scroll sync hook
+  useScrollSync(leftPanelRef, waterfallContainerRef);
+
+  // Calculate timeline scale
+  // Find the maximum extent: the latest point where any request bar ends
+  const timeData = filteredRequests
+    .map((r) => {
+      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      const startTime = microsToMs(sendLine?.timestampUs ?? 0);
+      const endTime = startTime + (r.requestDurationMs || 0);
+      return { startTime, endTime };
+    })
+    .filter((t) => t.startTime > 0);
+  
+  const minTime = timeData.length > 0 ? Math.min(...timeData.map(t => t.startTime)) : 0;
+  const maxTime = timeData.length > 0 ? Math.max(...timeData.map(t => t.startTime)) : 0;
+  // Use maxExtent to ensure the timeline is wide enough for all bars including their widths
+  // Add extra time (in ms) to account for the duration label displayed after the last bar (e.g., "12888ms")
+  // 80px worth of label space at the current scale
+  const labelPaddingMs = 80 * msPerPixel;
+  const maxExtent = timeData.length > 0 
+    ? Math.max(...timeData.map(t => t.endTime)) + labelPaddingMs 
+    : 0;
+  // totalDuration uses maxExtent so bar positions are correctly proportioned to timeline width
+  const totalDuration = Math.max(1, maxExtent - minTime);
+
+  // Calculate timeline width using shared logic
+  const visibleTimes = filteredRequests
+    .slice(0, 20)
+    .map((r) => {
+      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      return microsToMs(sendLine?.timestampUs ?? 0);
+    })
+    .filter((t) => t > 0);
+
+  const { timelineWidth } = calculateTimelineWidth(
+    containerWidth,
+    visibleTimes,
+    minTime,
+    maxExtent,
+    msPerPixel
+  );
+
+  // Handle resize for layout measurements
+  useEffect(() => {
+    const handleResize = () => {
+      if (!waterfallContainerRef.current) return;
+      setContainerWidth(waterfallContainerRef.current.clientWidth);
+    };
+
+    handleResize();
+    const observer = new ResizeObserver(() => handleResize());
+    if (waterfallContainerRef.current) {
+      observer.observe(waterfallContainerRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [timelineWidth]);
+
+  /** Handle click on request ID - toggle expansion or open log viewer */
+  const handleRequestClick = useCallback((requestId: string) => {
+    // Remove id parameter from URL if clicking a different request
+    const hash = window.location.hash;
+    const match = hash.match(/id=([^&]+)/);
+    if (match) {
+      const urlId = decodeURIComponent(match[1]);
+      if (urlId !== requestId) {
+        const newHash = hash.replace(/[?&]id=[^&]+/, '').replace(/\?&/, '?').replace(/\?$/, '');
+        window.location.hash = newHash;
+      }
+    }
+
+    // If clicking the same request that's already open, close it
+    if (openLogViewerIds.has(requestId) && expandedRows.has(requestId)) {
+      closeLogViewer(requestId);
+      toggleRowExpansion(requestId);
+      return;
+    }
+    // Open clicked request and close all others atomically
+    setActiveRequest(requestId);
+  }, [openLogViewerIds, expandedRows, closeLogViewer, toggleRowExpansion, setActiveRequest]);
+
+  /** Handle mouse enter on a row - highlight both panels */
+  const handleRowMouseEnter = (requestId: string) => {
+    const leftRow = document.querySelector(`[data-row-id="sticky-${requestId}"]`);
+    const rightRow = document.querySelector(`[data-row-id="waterfall-${requestId}"]`);
+    leftRow?.classList.add('row-hovered');
+    rightRow?.classList.add('row-hovered');
+  };
+
+  /** Handle mouse leave on a row - remove highlight */
+  const handleRowMouseLeave = (requestId: string) => {
+    const leftRow = document.querySelector(`[data-row-id="sticky-${requestId}"]`);
+    const rightRow = document.querySelector(`[data-row-id="waterfall-${requestId}"]`);
+    leftRow?.classList.remove('row-hovered');
+    rightRow?.classList.remove('row-hovered');
+  };
+
+  /** Handle click on waterfall row - scroll to show request start time */
+  const handleWaterfallRowClick = useCallback((req: HttpRequest) => {
+    if (!waterfallContainerRef.current) return;
+
+    const container = waterfallContainerRef.current;
+    const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+    const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
+    const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
+
+    // Scroll to show the start of the request bar, with some padding (20% of container width)
+    const containerClientWidth = container.clientWidth;
+    const targetScroll = barLeft - containerClientWidth * 0.2;
+
+    // Use direct scrollLeft assignment (scrollTo with smooth behavior doesn't work reliably)
+    container.scrollLeft = Math.max(0, targetScroll);
+  }, [rawLogLines, minTime, totalDuration, timelineWidth, msPerPixel]);
+
+  // Use shared URL auto-scroll hook (placed after handleWaterfallRowClick is defined)
+  useUrlRequestAutoScroll(filteredRequests, leftPanelRef, handleWaterfallRowClick);
+
+  /** Render the expanded log viewer for a request */
+  const renderExpandedLogViewer = () => {
+    const expandedRequestId = Array.from(openLogViewerIds).find(id => expandedRows.has(id));
+    if (!expandedRequestId) return null;
+
+    const req = filteredRequests.find(r => r.requestId === expandedRequestId);
+    if (!req) return null;
+
+    const reqIndex = filteredRequests.findIndex(r => r.requestId === expandedRequestId);
+    const prevRequest = reqIndex > 0 ? filteredRequests[reqIndex - 1] : null;
+    const nextRequest = reqIndex < filteredRequests.length - 1 ? filteredRequests[reqIndex + 1] : null;
+
+    const prevRequestLineRange = prevRequest ? {
+      start: prevRequest.sendLineNumber,
+      end: prevRequest.responseLineNumber || prevRequest.sendLineNumber
+    } : undefined;
+
+    const nextRequestLineRange = nextRequest ? {
+      start: nextRequest.sendLineNumber,
+      end: nextRequest.responseLineNumber || nextRequest.sendLineNumber
+    } : undefined;
+
+    return (
+      <div className="expanded-log-viewer">
+        <LogDisplayView
+          key={expandedRequestId}
+          requestFilter={`"${expandedRequestId}"`}
+          defaultShowOnlyMatching
+          defaultLineWrap
+          logLines={rawLogLines.map(line => ({
+            ...line,
+            timestamp: line.displayTime
+          }))}
+          prevRequestLineRange={prevRequestLineRange}
+          nextRequestLineRange={nextRequestLineRange}
+          onClose={() => {
+            closeLogViewer(expandedRequestId);
+            if (expandedRows.has(expandedRequestId)) {
+              toggleRowExpansion(expandedRequestId);
+            }
+          }}
+        />
+      </div>
+    );
+  };
+
+  return (
+    <div className={`app ${containerClassName}`.trim()}>
+      <div className="header-compact">
+        <div className="header-left">
+          <BurgerMenu />
+          <h1 className="header-title">{title}</h1>
+        </div>
+
+        <div className="header-center">
+          {headerSlot}
+
+          <label className="checkbox-compact">
+            <input
+              type="checkbox"
+              checked={hidePending}
+              onChange={(e) => onHidePendingChange(e.target.checked)}
+            />
+            Hide pending
+          </label>
+
+          <div className="stats-compact">
+            <span id="shown-count">{filteredRequests.length}</span> / <span id="total-count">{totalCount}</span>
+          </div>
+        </div>
+
+        <div className="header-right">
+          <StatusFilterDropdown availableStatusCodes={availableStatusCodes} />
+          
+          <select
+            id="timeline-scale"
+            value={msPerPixel}
+            onChange={(e) => setTimelineScale(Number(e.target.value))}
+            className="select-compact"
+            title="Timeline scale"
+          >
+            {TIMELINE_SCALE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          
+          <TimeRangeSelector />
+        </div>
+      </div>
+
+      <div className="timeline-container">
+        <div className="timeline-header">
+          <div className="timeline-header-sticky" ref={stickyHeaderRef}>
+            {columns.map((col) => (
+              <div
+                key={col.id}
+                className={`sticky-col ${col.className || ''}`}
+              >
+                {col.label}
+              </div>
+            ))}
+          </div>
+          <div className="timeline-header-waterfall">
+            <WaterfallTimeline
+              minTime={minTime}
+              maxTime={maxTime}
+              totalDuration={totalDuration}
+              width={timelineWidth}
+              msPerPixel={msPerPixel}
+              cursorContainerRef={waterfallContainerRef}
+              cursorOffsetLeft={0}
+            />
+          </div>
+        </div>
+
+        <div className="scroll-content">
+          <div id="timeline-content">
+            {filteredRequests.length === 0 ? (
+              <div className="no-data">{emptyMessage}</div>
+            ) : (
+              <div className="timeline-content-wrapper">
+                {/* Left panel - sticky columns */}
+                <div className="timeline-rows-left" ref={leftPanelRef}>
+                  {filteredRequests.map((req) => (
+                    <div
+                      key={`sticky-${req.requestId}`}
+                      data-row-id={`sticky-${req.requestId}`}
+                      className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
+                      style={{ minHeight: '28px', cursor: 'pointer' }}
+                      onMouseEnter={() => handleRowMouseEnter(req.requestId)}
+                      onMouseLeave={() => handleRowMouseLeave(req.requestId)}
+                      onClick={() => handleWaterfallRowClick(req)}
+                    >
+                      <div className="request-row-sticky">
+                        {columns.map((col, i) => {
+                          // First column is clickable request ID
+                          if (i === 0) {
+                            return (
+                              <div
+                                key={col.id}
+                                className={`request-id clickable sticky-col ${col.className || ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRequestClick(req.requestId);
+                                }}
+                              >
+                                {col.getValue(req)}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              key={col.id}
+                              className={`sticky-col ${col.className || ''}`}
+                              title={col.getValue(req)}
+                            >
+                              {col.getValue(req)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Right panel - waterfall */}
+                <div className="timeline-rows-right" ref={waterfallContainerRef}>
+                  <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
+                    {filteredRequests.map((req) => {
+                      const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+                      const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
+                      const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
+                      const barWidth = getWaterfallBarWidth(
+                        req.requestDurationMs,
+                        totalDuration,
+                        timelineWidth,
+                        msPerPixel
+                      );
+                      const status = req.status ? req.status : 'Pending';
+                      const isPending = !req.status;
+                      const statusClass = isPending ? 'pending' : req.status === '200' ? 'success' : 'error';
+
+                      return (
+                        <div
+                          key={`waterfall-${req.requestId}`}
+                          data-row-id={`waterfall-${req.requestId}`}
+                          className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
+                          style={{ minHeight: '28px', cursor: 'pointer' }}
+                          onMouseEnter={() => handleRowMouseEnter(req.requestId)}
+                          onMouseLeave={() => handleRowMouseLeave(req.requestId)}
+                          onClick={() => handleWaterfallRowClick(req)}
+                        >
+                          <div style={{ position: 'relative', overflow: 'visible' }}>
+                            <div
+                              className="waterfall-item"
+                              style={{
+                                left: `${barLeft}px`,
+                                position: 'absolute',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                              }}
+                            >
+                              <div
+                                className={`waterfall-bar ${statusClass}`}
+                                style={{
+                                  width: `${barWidth}px`,
+                                }}
+                                title={statusClass === 'pending' ? 'Pending' : status}
+                              />
+                              <span className="waterfall-duration" title={statusClass === 'pending' ? 'Pending' : status}>
+                                {isPending ? '...' : status === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {renderExpandedLogViewer()}
+      </div>
+    </div>
+  );
+}
