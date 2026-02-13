@@ -1,5 +1,6 @@
 import type { HttpRequest, SyncRequest, LogParserResult, ParsedLogLine, LogLevel } from '../types/log.types';
-import { timeToMs } from './timeUtils';
+import type { ISODateTimeString, TimestampMicros } from '../types/time.types';
+import { isoToMicros, extractTimeFromISO } from './timeUtils';
 import { ParsingError } from './errorHandling';
 
 // Regex patterns for parsing HTTP requests - generic (all URIs)
@@ -23,27 +24,34 @@ function stripMessagePrefix(message: string): string {
   return stripped.trim();
 }
 
-function formatDisplayTime(timestamp: string): string {
-  if (!timestamp) return '';
-  // If it's already in HH:MM:SS format, return as-is
-  if (timestamp.match(/^\d{2}:\d{2}:\d{2}/)) {
-    return timestamp;
-  }
-  // Extract time from ISO format
-  const match = timestamp.match(/T([\d:.]+)Z?$/);
-  return match ? match[1] : timestamp;
-}
-
-function extractTimestamp(line: string): string {
-  // Prefer full ISO timestamp if present
+/**
+ * Extract ISO timestamp from a log line.
+ * Returns the full ISO 8601 datetime string.
+ */
+function extractISOTimestamp(line: string): ISODateTimeString {
+  // Match full ISO timestamp: YYYY-MM-DDTHH:MM:SS[.fraction]Z?
   const isoMatch = line.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/);
   if (isoMatch) {
-    return isoMatch[0];
+    // Ensure it ends with Z for consistency
+    const timestamp = isoMatch[0];
+    return timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
   }
+  return '';
+}
 
-  // Fallback to time-only (HH:MM:SS.microseconds)
-  const timeMatch = line.slice(11).match(/(\d{2}:\d{2}:\d{2}\.\d+)Z?/);
-  return timeMatch ? timeMatch[1] : '';
+/**
+ * Format timestamp for display (time-only portion).
+ */
+function formatDisplayTime(isoTimestamp: ISODateTimeString): string {
+  if (!isoTimestamp) return '';
+  return extractTimeFromISO(isoTimestamp);
+}
+
+/**
+ * Parse ISO timestamp to microseconds.
+ */
+function parseTimestampMicros(isoTimestamp: ISODateTimeString): TimestampMicros {
+  return isoToMicros(isoTimestamp);
 }
 
 export interface AllHttpRequestsResult {
@@ -67,21 +75,21 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     
     // Parse every line for the raw log view
     if (line.trim()) {
-      const timestamp = extractTimestamp(line);
+      const isoTimestamp = extractISOTimestamp(line);
       const level = extractLogLevel(line);
-      const timestampMs = timeToMs(timestamp);
-      const displayTime = formatDisplayTime(timestamp);
+      const timestampUs = parseTimestampMicros(isoTimestamp);
+      const displayTime = formatDisplayTime(isoTimestamp);
       const strippedMessage = stripMessagePrefix(line);
       
-      if (timestamp) {
+      if (isoTimestamp) {
         linesWithTimestamps++;
       }
       
       rawLogLines.push({
         lineNumber: i + 1,
         rawText: line,
-        timestamp,
-        timestampMs,
+        isoTimestamp,
+        timestampUs,
         displayTime,
         level,
         message: line,

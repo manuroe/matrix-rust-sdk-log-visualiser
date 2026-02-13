@@ -11,10 +11,13 @@ import type { ParsedLogLine } from '../../types/log.types';
 function makeMockLine(index: number): ParsedLogLine {
   return {
     lineNumber: index,
-    rawText: `2024-01-01T00:00:00.000Z INFO Line ${index}`,
-    timestamp: '2024-01-01T00:00:00.000Z',
+    rawText: `2024-01-01T00:00:00.000000Z INFO Line ${index}`,
+    isoTimestamp: '2024-01-01T00:00:00.000000Z',
+    timestampUs: new Date('2024-01-01T00:00:00.000Z').getTime() * 1000,
+    displayTime: '00:00:00.000000',
     level: 'INFO',
     message: `Line ${index}`,
+    strippedMessage: `Line ${index}`,
   };
 }
 

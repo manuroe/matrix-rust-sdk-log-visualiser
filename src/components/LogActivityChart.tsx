@@ -6,11 +6,13 @@ import { Bar, Line } from '@visx/shape';
 import { useTooltip, TooltipWithBounds } from '@visx/tooltip';
 import { localPoint } from '@visx/event';
 import type { ParsedLogLine, LogLevel } from '../types/log.types';
-import { timeToMs } from '../utils/timeUtils';
+import type { TimestampMicros } from '../types/time.types';
+import { MICROS_PER_SECOND, MICROS_PER_MILLISECOND } from '../types/time.types';
 
 interface LogActivityChartProps {
   logLines: ParsedLogLine[];
-  onTimeRangeSelected?: (startMs: number, endMs: number) => void;
+  /** Callback when user selects a time range. Values are in microseconds. */
+  onTimeRangeSelected?: (startUs: TimestampMicros, endUs: TimestampMicros) => void;
   onResetZoom?: () => void;
 }
 
@@ -49,28 +51,28 @@ export function LogActivityChart({ logLines, onTimeRangeSelected, onResetZoom }:
   const [selectionStart, setSelectionStart] = useState<{ x: number; time: number } | undefined>();
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; time: number } | undefined>();
 
-  // Helper to format timestamp as HH:MM:SS in UTC
-  const formatTime = useCallback((timestampMs: number): string => {
-    const date = new Date(timestampMs);
+  // Helper to format timestamp as HH:MM:SS in UTC (converts from microseconds)
+  const formatTime = useCallback((timestampUs: TimestampMicros): string => {
+    const date = new Date(timestampUs / MICROS_PER_MILLISECOND);
     return date.toISOString().split('T')[1].split('.')[0]; // Gets HH:MM:SS in UTC
   }, []);
 
   const chartData = useMemo(() => {
     if (logLines.length === 0) {
-      return { buckets: [], maxCount: 0, minTime: 0, maxTime: 0 };
+      return { buckets: [], maxCount: 0, minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros };
     }
 
-    // Find time range
-    const timestamps = logLines.map((line) => timeToMs(line.timestamp));
-    const dataMinTime = Math.min(...timestamps);
-    const dataMaxTime = Math.max(...timestamps);
+    // Find time range (all in microseconds)
+    const timestamps = logLines.map((line) => line.timestampUs);
+    const dataMinTime = Math.min(...timestamps) as TimestampMicros;
+    const dataMaxTime = Math.max(...timestamps) as TimestampMicros;
     const timeRange = dataMaxTime - dataMinTime;
 
-    // Calculate bucket size to display ~100 bars
+    // Calculate bucket size to display ~100 bars (in microseconds)
     const targetBars = 100;
-    let bucketSize = 1000; // Start with 1 second
+    let bucketSize = MICROS_PER_SECOND; // Start with 1 second
     if (timeRange > 0) {
-      bucketSize = Math.max(1000, Math.ceil(timeRange / targetBars));
+      bucketSize = Math.max(MICROS_PER_SECOND, Math.ceil(timeRange / targetBars));
     }
 
     // Create buckets for the entire time range
@@ -98,7 +100,7 @@ export function LogActivityChart({ logLines, onTimeRangeSelected, onResetZoom }:
     
     // Fill buckets with log data
     logLines.forEach((line) => {
-      const time = timeToMs(line.timestamp);
+      const time = line.timestampUs;
       const bucketKey = Math.floor(time / bucketSize) * bucketSize;
       
       const bucket = bucketMap.get(bucketKey);
@@ -168,12 +170,12 @@ export function LogActivityChart({ logLines, onTimeRangeSelected, onResetZoom }:
         return;
       }
 
-      // Apply time filter
-      const startTime = Math.min(selectionStart.time, selectionEnd.time);
-      const endTime = Math.max(selectionStart.time, selectionEnd.time);
+      // Apply time filter (values are in microseconds)
+      const startTime = Math.min(selectionStart.time, selectionEnd.time) as TimestampMicros;
+      const endTime = Math.max(selectionStart.time, selectionEnd.time) as TimestampMicros;
       
-      // Only apply if there's a meaningful range (> 100ms)
-      if (endTime - startTime > 100 && onTimeRangeSelected) {
+      // Only apply if there's a meaningful range (> 100ms = 100,000 microseconds)
+      if (endTime - startTime > 100 * MICROS_PER_MILLISECOND && onTimeRangeSelected) {
         onTimeRangeSelected(startTime, endTime);
       }
 

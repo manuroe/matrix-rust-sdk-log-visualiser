@@ -34,9 +34,12 @@ describe('FileUpload navigation', () => {
         {
           lineNumber: 0,
           rawText: 'line 0',
-          timestamp: new Date(0).toISOString(),
+          isoTimestamp: '1970-01-01T00:00:00.000000Z',
+          timestampUs: 0,
+          displayTime: '00:00:00.000000',
           level: 'INFO',
           message: 'line 0',
+          strippedMessage: 'line 0',
         },
       ],
     });

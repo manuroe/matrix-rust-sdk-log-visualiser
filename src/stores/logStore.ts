@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { HttpRequest, SyncRequest, ParsedLogLine } from '../types/log.types';
-import { calculateTimeRange } from '../utils/timeUtils';
+import { calculateTimeRangeMicros } from '../utils/timeUtils';
 import { wrapError, type AppError } from '../utils/errorHandling';
 import { DEFAULT_MS_PER_PIXEL } from '../utils/timelineUtils';
 
@@ -182,15 +182,16 @@ export const useLogStore = create<LogStore>((set, get) => ({
   filterRequests: () => {
     const { allRequests, rawLogLines, selectedConnId, hidePending, statusCodeFilter, startTime, endTime } = get();
     
-    // Calculate time range if filters are set
-    let timeRangeMs: { startMs: number; endMs: number } | null = null;
+    // Calculate time range if filters are set (in microseconds)
+    let timeRangeUs: { startUs: number; endUs: number } | null = null;
     if (startTime || endTime) {
-      // Find max time from rawLogLines to use as reference (end of log)
-      const times = rawLogLines.map((l) => l.timestampMs).filter((t) => t > 0);
-      const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
+      // Find min/max time from rawLogLines
+      const times = rawLogLines.map((l) => l.timestampUs).filter((t) => t > 0);
+      const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
+      const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
       
-      // Calculate time range relative to the log's maximum time
-      timeRangeMs = calculateTimeRange(startTime, endTime, maxLogTimeMs);
+      // Calculate time range relative to the log's time boundaries
+      timeRangeUs = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
     }
     
     const filtered = allRequests.filter((r) => {
@@ -207,10 +208,10 @@ export const useLogStore = create<LogStore>((set, get) => ({
       }
       
       // Time filter
-      if (timeRangeMs && r.responseLineNumber) {
+      if (timeRangeUs && r.responseLineNumber) {
         const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
-        if (responseLine && responseLine.timestampMs) {
-          if (responseLine.timestampMs < timeRangeMs.startMs || responseLine.timestampMs > timeRangeMs.endMs) {
+        if (responseLine && responseLine.timestampUs) {
+          if (responseLine.timestampUs < timeRangeUs.startUs || responseLine.timestampUs > timeRangeUs.endUs) {
             return false;
           }
         }
@@ -224,15 +225,16 @@ export const useLogStore = create<LogStore>((set, get) => ({
   filterHttpRequests: () => {
     const { allHttpRequests, rawLogLines, hidePendingHttp, statusCodeFilter, startTime, endTime } = get();
     
-    // Calculate time range if filters are set
-    let timeRangeMs: { startMs: number; endMs: number } | null = null;
+    // Calculate time range if filters are set (in microseconds)
+    let timeRangeUs: { startUs: number; endUs: number } | null = null;
     if (startTime || endTime) {
-      // Find max time from rawLogLines to use as reference (end of log)
-      const times = rawLogLines.map((l) => l.timestampMs).filter((t) => t > 0);
-      const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
+      // Find min/max time from rawLogLines
+      const times = rawLogLines.map((l) => l.timestampUs).filter((t) => t > 0);
+      const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
+      const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
       
-      // Calculate time range relative to the log's maximum time
-      timeRangeMs = calculateTimeRange(startTime, endTime, maxLogTimeMs);
+      // Calculate time range relative to the log's time boundaries
+      timeRangeUs = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
     }
     
     const filtered = allHttpRequests.filter((r) => {
@@ -246,10 +248,10 @@ export const useLogStore = create<LogStore>((set, get) => ({
       }
       
       // Time filter
-      if (timeRangeMs && r.responseLineNumber) {
+      if (timeRangeUs && r.responseLineNumber) {
         const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
-        if (responseLine && responseLine.timestampMs) {
-          if (responseLine.timestampMs < timeRangeMs.startMs || responseLine.timestampMs > timeRangeMs.endMs) {
+        if (responseLine && responseLine.timestampUs) {
+          if (responseLine.timestampUs < timeRangeUs.startUs || responseLine.timestampUs > timeRangeUs.endUs) {
             return false;
           }
         }

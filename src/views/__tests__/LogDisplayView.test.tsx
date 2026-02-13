@@ -24,15 +24,16 @@ function makeLogs(total: number, matchIndices: number[]): ParsedLogLine[] {
   for (let i = 0; i < total; i++) {
     const isMatch = matchIndices.includes(i);
     const timestamp = new Date(0);
-    const isoTimestamp = timestamp.toISOString();
-    const timeStr = isoTimestamp.match(/T([\d:.]+)Z?$/)?.[1] || isoTimestamp;
+    const isoTimestamp = '1970-01-01T00:00:00.000000Z';
+    const displayTime = '00:00:00.000000';
+    const timestampUs = timestamp.getTime() * 1000;
     const message = isMatch ? `MATCH ${i}` : `line ${i}`;
     logs.push({
       lineNumber: i,
       rawText: `${isoTimestamp} INFO ${message}`,
-      timestamp: isoTimestamp,
-      timestampMs: timestamp.getTime(),
-      displayTime: timeStr,
+      isoTimestamp,
+      timestampUs,
+      displayTime,
       level: 'INFO',
       message,
       strippedMessage: message,
@@ -221,14 +222,14 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const textSpan = line3Container.querySelector('.log-line-text') as HTMLSpanElement;
     expect(textSpan).toBeTruthy();
     // With stripPrefix=true (default), message should not start with ISO timestamp
-    expect(textSpan.textContent?.trim().startsWith(new Date(0).toISOString())).toBe(false);
+    expect(textSpan.textContent?.trim().startsWith('1970-01-01T00:00:00.000000Z')).toBe(false);
 
     // Toggle stripPrefix off
     const stripCheckbox = screen.getByLabelText(/Strip prefix/i) as HTMLInputElement;
     await user.click(stripCheckbox);
 
     // Now the log-line-text should include the timestamp prefix in the rawText (due to no strip)
-    expect(textSpan.textContent?.includes(new Date(0).toISOString())).toBe(true);
+    expect(textSpan.textContent?.includes('1970-01-01T00:00:00.000000Z')).toBe(true);
   });
 
   it('lineWrap toggles wrap class on lines', async () => {
@@ -400,20 +401,20 @@ describe('LogDisplayView filter & search behaviors', () => {
     const logs: ParsedLogLine[] = [
       {
         lineNumber: 0,
-        rawText: '2024-01-01T00:00:00.000Z INFO uppercase TEXT',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
-        displayTime: '00:00:00.000',
+        rawText: '2024-01-01T00:00:00.000000Z INFO uppercase TEXT',
+        isoTimestamp: '2024-01-01T00:00:00.000000Z',
+        timestampUs: new Date('2024-01-01T00:00:00.000Z').getTime() * 1000,
+        displayTime: '00:00:00.000000',
         level: 'INFO',
         message: 'uppercase TEXT',
         strippedMessage: 'uppercase TEXT',
       },
       {
         lineNumber: 1,
-        rawText: '2024-01-01T00:00:00.000Z INFO lowercase text',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
-        displayTime: '00:00:00.000',
+        rawText: '2024-01-01T00:00:00.000000Z INFO lowercase text',
+        isoTimestamp: '2024-01-01T00:00:00.000000Z',
+        timestampUs: new Date('2024-01-01T00:00:00.000Z').getTime() * 1000,
+        displayTime: '00:00:00.000000',
         level: 'INFO',
         message: 'lowercase text',
         strippedMessage: 'lowercase text',
@@ -470,30 +471,30 @@ describe('LogDisplayView filter & search behaviors', () => {
     const logs: ParsedLogLine[] = [
       {
         lineNumber: 0,
-        rawText: '2024-01-01T00:00:00.000Z INFO request-001',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
-        displayTime: '00:00:00.000',
+        rawText: '2024-01-01T00:00:00.000000Z INFO request-001',
+        isoTimestamp: '2024-01-01T00:00:00.000000Z',
+        timestampUs: new Date('2024-01-01T00:00:00.000Z').getTime() * 1000,
+        displayTime: '00:00:00.000000',
         level: 'INFO',
         message: 'request-001',
         strippedMessage: 'request-001',
       },
       {
         lineNumber: 1,
-        rawText: '2024-01-01T00:00:00.000Z INFO response-data',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
-        displayTime: '00:00:00.000',
+        rawText: '2024-01-01T00:00:00.000000Z INFO response-data',
+        isoTimestamp: '2024-01-01T00:00:00.000000Z',
+        timestampUs: new Date('2024-01-01T00:00:00.000Z').getTime() * 1000,
+        displayTime: '00:00:00.000000',
         level: 'INFO',
         message: 'response-data',
         strippedMessage: 'response-data',
       },
       {
         lineNumber: 2,
-        rawText: '2024-01-01T00:00:00.000Z INFO request-002',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        timestampMs: new Date('2024-01-01T00:00:00.000Z').getTime(),
-        displayTime: '00:00:00.000',
+        rawText: '2024-01-01T00:00:00.000000Z INFO request-002',
+        isoTimestamp: '2024-01-01T00:00:00.000000Z',
+        timestampUs: new Date('2024-01-01T00:00:00.000Z').getTime() * 1000,
+        displayTime: '00:00:00.000000',
         level: 'INFO',
         message: 'request-002',
         strippedMessage: 'request-002',

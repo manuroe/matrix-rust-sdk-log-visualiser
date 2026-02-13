@@ -9,6 +9,7 @@ import { getWaterfallPosition, getWaterfallBarWidth, calculateTimelineWidth } fr
 import { LogDisplayView } from '../views/LogDisplayView';
 import { useScrollSync } from '../hooks/useScrollSync';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
+import { microsToMs } from '../utils/timeUtils';
 import type { HttpRequest } from '../types/log.types';
 
 // Available timeline scale options (ms per pixel)
@@ -106,7 +107,7 @@ export function RequestTable({
   const timeData = filteredRequests
     .map((r) => {
       const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
-      const startTime = sendLine?.timestampMs || 0;
+      const startTime = microsToMs(sendLine?.timestampUs ?? 0);
       const endTime = startTime + (r.requestDurationMs || 0);
       return { startTime, endTime };
     })
@@ -129,7 +130,7 @@ export function RequestTable({
     .slice(0, 20)
     .map((r) => {
       const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
-      return sendLine?.timestampMs || 0;
+      return microsToMs(sendLine?.timestampUs ?? 0);
     })
     .filter((t) => t > 0);
 
@@ -204,7 +205,7 @@ export function RequestTable({
 
     const container = waterfallContainerRef.current;
     const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
-    const reqTime = sendLine?.timestampMs || 0;
+    const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
     const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
 
     // Scroll to show the start of the request bar, with some padding (20% of container width)
@@ -390,7 +391,7 @@ export function RequestTable({
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
                     {filteredRequests.map((req) => {
                       const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
-                      const reqTime = sendLine?.timestampMs || 0;
+                      const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
                       const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
                       const barWidth = getWaterfallBarWidth(
                         req.requestDurationMs,

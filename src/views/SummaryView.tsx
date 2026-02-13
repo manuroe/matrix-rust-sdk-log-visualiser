@@ -4,8 +4,9 @@ import { useLogStore } from '../stores/logStore';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
-import { calculateTimeRange } from '../utils/timeUtils';
+import { calculateTimeRangeMicros } from '../utils/timeUtils';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
+import type { TimestampMicros } from '../types/time.types';
 
 export function SummaryView() {
   const navigate = useNavigate();
@@ -19,9 +20,9 @@ export function SummaryView() {
     setTimeFilter,
   } = useLogStore();
 
-  // Local zoom state
-  const [localStartTime, setLocalStartTime] = useState<number | null>(null);
-  const [localEndTime, setLocalEndTime] = useState<number | null>(null);
+  // Local zoom state (in microseconds)
+  const [localStartTime, setLocalStartTime] = useState<TimestampMicros | null>(null);
+  const [localEndTime, setLocalEndTime] = useState<TimestampMicros | null>(null);
 
   // Clear local zoom when global filters change
   useEffect(() => {
@@ -29,9 +30,9 @@ export function SummaryView() {
     setLocalEndTime(null);
   }, [startTime, endTime]);
 
-  const handleTimeRangeSelected = useCallback((startMs: number, endMs: number) => {
-    setLocalStartTime(startMs);
-    setLocalEndTime(endMs);
+  const handleTimeRangeSelected = useCallback((startUs: TimestampMicros, endUs: TimestampMicros) => {
+    setLocalStartTime(startUs);
+    setLocalEndTime(endUs);
   }, []);
 
   const handleResetZoom = useCallback(() => {
@@ -41,13 +42,13 @@ export function SummaryView() {
       setLocalEndTime(null);
     } else if (rawLogLines.length > 0 && startTime && endTime) {
       // No local selection - check if we can zoom out to full range
-      const times = rawLogLines.map((line) => line.timestampMs);
+      const times = rawLogLines.map((line) => line.timestampUs);
       const fullMinTime = Math.min(...times);
       const fullMaxTime = Math.max(...times);
-      const { startMs: currentStartMs, endMs: currentEndMs } = calculateTimeRange(startTime, endTime, fullMaxTime);
+      const { startUs: currentStartUs, endUs: currentEndUs } = calculateTimeRangeMicros(startTime, endTime, fullMinTime, fullMaxTime);
       
-      // Only zoom out if current range is narrower than full range (with 1ms tolerance)
-      if (currentStartMs > fullMinTime + 1 || currentEndMs < fullMaxTime - 1) {
+      // Only zoom out if current range is narrower than full range (with 1000us = 1ms tolerance)
+      if (currentStartUs > fullMinTime + 1000 || currentEndUs < fullMaxTime - 1000) {
         // Set as local selection so Apply button appears
         setLocalStartTime(fullMinTime);
         setLocalEndTime(fullMaxTime);
@@ -57,22 +58,22 @@ export function SummaryView() {
 
   const handleApplyGlobally = useCallback(() => {
     if (localStartTime !== null && localEndTime !== null && rawLogLines.length > 0) {
-      const times = rawLogLines.map((line) => line.timestampMs);
+      const times = rawLogLines.map((line) => line.timestampUs);
       const fullMinTime = Math.min(...times);
       const fullMaxTime = Math.max(...times);
       
-      // If selection matches full range (within 1ms tolerance), clear the filter instead
-      if (Math.abs(localStartTime - fullMinTime) <= 1 && Math.abs(localEndTime - fullMaxTime) <= 1) {
+      // If selection matches full range (within 1000us = 1ms tolerance), clear the filter instead
+      if (Math.abs(localStartTime - fullMinTime) <= 1000 && Math.abs(localEndTime - fullMaxTime) <= 1000) {
         setTimeFilter(null, null);
       } else {
         // Find the closest log lines to the selected timestamps and use their original timestamp strings
         const startLine = rawLogLines.reduce((closest, line) => 
-          Math.abs(line.timestampMs - localStartTime) < Math.abs(closest.timestampMs - localStartTime) ? line : closest
+          Math.abs(line.timestampUs - localStartTime) < Math.abs(closest.timestampUs - localStartTime) ? line : closest
         );
         const endLine = rawLogLines.reduce((closest, line) => 
-          Math.abs(line.timestampMs - localEndTime) < Math.abs(closest.timestampMs - localEndTime) ? line : closest
+          Math.abs(line.timestampUs - localEndTime) < Math.abs(closest.timestampUs - localEndTime) ? line : closest
         );
-        setTimeFilter(startLine.timestamp, endLine.timestamp);
+        setTimeFilter(startLine.isoTimestamp, endLine.isoTimestamp);
       }
       
       // Clear local selection state immediately
@@ -88,12 +89,13 @@ export function SummaryView() {
     // If no global filter, always show apply button
     if (!startTime || !endTime) return true;
     
-    const times = rawLogLines.map((line) => line.timestampMs);
-    const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
-    const { startMs: globalStartMs, endMs: globalEndMs } = calculateTimeRange(startTime, endTime, maxLogTimeMs);
+    const times = rawLogLines.map((line) => line.timestampUs);
+    const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
+    const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
+    const { startUs: globalStartUs, endUs: globalEndUs } = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
     
-    // Show if selection differs from global filter (with 1ms tolerance)
-    return Math.abs(localStartTime - globalStartMs) > 1 || Math.abs(localEndTime - globalEndMs) > 1;
+    // Show if selection differs from global filter (with 1000us = 1ms tolerance)
+    return Math.abs(localStartTime - globalStartUs) > 1000 || Math.abs(localEndTime - globalEndUs) > 1000;
   }, [localStartTime, localEndTime, startTime, endTime, rawLogLines]);
 
   // Calculate log statistics
@@ -119,44 +121,45 @@ export function SummaryView() {
       };
     }
 
-    // Calculate time range if filters are set
-    let timeRangeMs: { startMs: number; endMs: number } | null = null;
+    // Calculate time range if filters are set (in microseconds)
+    let timeRangeUs: { startUs: TimestampMicros; endUs: TimestampMicros } | null = null;
     if (startTime || endTime) {
-      const times = rawLogLines.map((line) => line.timestampMs).filter((t) => t > 0);
-      const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
-      timeRangeMs = calculateTimeRange(startTime, endTime, maxLogTimeMs);
+      const times = rawLogLines.map((line) => line.timestampUs).filter((t) => t > 0);
+      const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
+      const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
+      timeRangeUs = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
     }
 
     // Apply local zoom if set
     if (localStartTime !== null && localEndTime !== null) {
-      timeRangeMs = {
-        startMs: localStartTime,
-        endMs: localEndTime,
+      timeRangeUs = {
+        startUs: localStartTime,
+        endUs: localEndTime,
       };
     }
 
     // Filter log lines by time range
     const filteredLogLines = rawLogLines.filter((line) => {
-      if (!timeRangeMs) return true;
-      return line.timestampMs >= timeRangeMs.startMs && line.timestampMs <= timeRangeMs.endMs;
+      if (!timeRangeUs) return true;
+      return line.timestampUs >= timeRangeUs.startUs && line.timestampUs <= timeRangeUs.endUs;
     });
 
     // Filter HTTP requests by time range
     const filteredHttpRequests = allHttpRequests.filter((req) => {
-      if (!timeRangeMs) return true;
+      if (!timeRangeUs) return true;
       if (!req.responseLineNumber) return false;
       const responseLine = rawLogLines.find(l => l.lineNumber === req.responseLineNumber);
-      if (!responseLine || !responseLine.timestampMs) return false;
-      return responseLine.timestampMs >= timeRangeMs.startMs && responseLine.timestampMs <= timeRangeMs.endMs;
+      if (!responseLine || !responseLine.timestampUs) return false;
+      return responseLine.timestampUs >= timeRangeUs.startUs && responseLine.timestampUs <= timeRangeUs.endUs;
     });
 
     // Filter sync requests by time range
     const filteredSyncRequests = allRequests.filter((req) => {
-      if (!timeRangeMs) return true;
+      if (!timeRangeUs) return true;
       if (!req.responseLineNumber) return false;
       const responseLine = rawLogLines.find(l => l.lineNumber === req.responseLineNumber);
-      if (!responseLine || !responseLine.timestampMs) return false;
-      return responseLine.timestampMs >= timeRangeMs.startMs && responseLine.timestampMs <= timeRangeMs.endMs;
+      if (!responseLine || !responseLine.timestampUs) return false;
+      return responseLine.timestampUs >= timeRangeUs.startUs && responseLine.timestampUs <= timeRangeUs.endUs;
     });
 
     // Time span (from filtered logs)

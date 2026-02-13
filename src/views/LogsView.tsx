@@ -4,7 +4,7 @@ import { useLogStore } from '../stores/logStore';
 import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import { calculateTimeRange } from '../utils/timeUtils';
+import { calculateTimeRangeMicros } from '../utils/timeUtils';
 
 export function LogsView() {
   const [searchParams] = useSearchParams();
@@ -17,17 +17,18 @@ export function LogsView() {
   const filteredLines = useMemo(() => {
     if (rawLogLines.length === 0) return [];
 
-    // Calculate time range with max log time as reference
+    // Calculate time range with min/max log time as reference
     const times = rawLogLines
-      .map((line) => line.timestampMs)
+      .map((line) => line.timestampUs)
       .filter((t) => t > 0);
-    const maxLogTimeMs = times.length > 0 ? Math.max(...times) : 0;
+    const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
+    const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
 
-    const { startMs, endMs } = calculateTimeRange(startTime, endTime, maxLogTimeMs);
+    const { startUs, endUs } = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
 
     return rawLogLines.filter((line) => {
       // Time range filter only
-      return line.timestampMs >= startMs && line.timestampMs <= endMs;
+      return line.timestampUs >= startUs && line.timestampUs <= endUs;
     });
   }, [rawLogLines, startTime, endTime]);
 

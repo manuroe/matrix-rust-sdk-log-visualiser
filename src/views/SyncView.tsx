@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLogStore } from '../stores/logStore';
-import { applyTimeRangeFilter } from '../utils/timeUtils';
+import { applyTimeRangeFilterMicros } from '../utils/timeUtils';
 import { RequestTable } from '../components/RequestTable';
 import type { ColumnDef } from '../components/RequestTable';
 import { extractAvailableStatusCodes } from '../utils/statusCodeUtils';
@@ -30,7 +30,7 @@ export function SyncView() {
     const connFilteredRequests = allRequests.filter(
       (r) => !selectedConnId || r.connId === selectedConnId
     );
-    return applyTimeRangeFilter(connFilteredRequests, rawLogLines, startTime, endTime).length;
+    return applyTimeRangeFilterMicros(connFilteredRequests, rawLogLines, startTime, endTime).length;
   }, [allRequests, selectedConnId, rawLogLines, startTime, endTime]);
 
   // Compute available status codes from all requests (including Pending)

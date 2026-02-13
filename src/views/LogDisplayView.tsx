@@ -406,7 +406,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 )}
                 {gapBelow && !gapBelow.isLast && <div className="log-gap-divider log-gap-divider-below" />}
                 <span className="log-line-number">{line.lineNumber}</span>
-                <span className="log-line-timestamp">{line.timestamp}</span>
+                <span className="log-line-timestamp">{line.displayTime}</span>
                 <span className="log-line-level">{line.level}</span>
                 <span className="log-line-text">
                   {highlightText(line, index)}

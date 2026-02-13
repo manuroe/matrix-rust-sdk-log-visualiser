@@ -1,4 +1,4 @@
-import { calculateTimeRange } from '../utils/timeUtils';
+import { calculateTimeRangeMicros, microsToMs } from '../utils/timeUtils';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
 
 type LogLines = ParsedLogLine[];
@@ -8,8 +8,8 @@ export function computeChartData(logLines: LogLines) {
     return { buckets: [], maxCount: 0, minTime: 0, maxTime: 0 };
   }
 
-  // Use precomputed timestampMs instead of converting timestamps
-  const timestamps = logLines.map((line) => line.timestampMs);
+  // Use precomputed timestampUs and convert to milliseconds for bucketing
+  const timestamps = logLines.map((line) => microsToMs(line.timestampUs));
   const dataMinTime = Math.min(...timestamps);
   const dataMaxTime = Math.max(...timestamps);
   const timeRange = dataMaxTime - dataMinTime;
@@ -53,8 +53,8 @@ export function computeChartData(logLines: LogLines) {
   }
 
   logLines.forEach((line) => {
-    // Use precomputed timestampMs
-    const time = line.timestampMs;
+    // Use precomputed timestampUs converted to ms for bucketing
+    const time = microsToMs(line.timestampUs);
     const bucketKey = Math.floor(time / bucketSize) * bucketSize;
 
     const bucket = bucketMap.get(bucketKey);
@@ -73,10 +73,10 @@ export function computeChartData(logLines: LogLines) {
 }
 
 export function extractTimes(logLines: LogLines) {
-  // Use precomputed timestampMs instead of converting
-  const times = logLines.map((line) => line.timestampMs).filter((t) => t > 0);
-  const maxTime = times.length > 0 ? Math.max(...times) : 0;
-  return { times, maxTime };
+  // Use precomputed timestampUs
+  const timesUs = logLines.map((line) => line.timestampUs).filter((t) => t > 0);
+  const maxTimeUs = timesUs.length > 0 ? Math.max(...timesUs) : 0;
+  return { timesUs, maxTimeUs };
 }
 
 export function computeFilteredLines(
@@ -86,12 +86,13 @@ export function computeFilteredLines(
 ) {
   if (logLines.length === 0) return [];
 
-  const { maxTime } = extractTimes(logLines);
-  const { startMs, endMs } = calculateTimeRange(startTime, endTime, maxTime);
+  const { timesUs, maxTimeUs } = extractTimes(logLines);
+  const minTimeUs = timesUs.length > 0 ? Math.min(...timesUs) : 0;
+  const { startUs, endUs } = calculateTimeRangeMicros(startTime, endTime, minTimeUs, maxTimeUs);
 
-  // Use precomputed timestampMs for filtering
+  // Use precomputed timestampUs for filtering
   const filtered = logLines.filter((line) => {
-    return line.timestampMs >= startMs && line.timestampMs <= endMs;
+    return line.timestampUs >= startUs && line.timestampUs <= endUs;
   });
 
   // Use precomputed displayTime instead of converting

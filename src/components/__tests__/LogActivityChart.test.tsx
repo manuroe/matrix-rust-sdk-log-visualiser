@@ -11,13 +11,18 @@ function createLogLines(count: number, timeOffsetMs: number = 0): ParsedLogLine[
   for (let i = 0; i < count; i++) {
     const time = new Date(baseTime + i * 1000 + timeOffsetMs);
     const level = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'][i % 5] as any;
+    const isoTimestamp = time.toISOString().replace(/\.\d{3}Z$/, '.000000Z');
+    const displayTime = isoTimestamp.match(/T([\d:.]+)Z$/)?.[1] || '';
 
     logs.push({
       lineNumber: i,
-      rawText: `${time.toISOString()} ${level} message ${i}`,
-      timestamp: time.toISOString(),
+      rawText: `${isoTimestamp} ${level} message ${i}`,
+      isoTimestamp,
+      timestampUs: time.getTime() * 1000,
+      displayTime,
       level,
       message: `message ${i}`,
+      strippedMessage: `message ${i}`,
     });
   }
 
@@ -166,12 +171,17 @@ describe('LogActivityChart', () => {
     // Add logs at specific intervals with gaps
     for (let i = 0; i < 10; i++) {
       const time = new Date(baseTime + i * 10000); // 10 second intervals
+      const isoTimestamp = time.toISOString().replace(/\.\d{3}Z$/, '.000000Z');
+      const displayTime = isoTimestamp.match(/T([\d:.]+)Z$/)?.[1] || '';
       logs.push({
         lineNumber: i,
-        rawText: `${time.toISOString()} INFO message`,
-        timestamp: time.toISOString(),
+        rawText: `${isoTimestamp} INFO message`,
+        isoTimestamp,
+        timestampUs: time.getTime() * 1000,
+        displayTime,
         level: 'INFO',
         message: 'message',
+        strippedMessage: 'message',
       });
     }
 
@@ -420,13 +430,17 @@ describe('LogActivityChart', () => {
 
   it('maintains correct time representation in UTC format', () => {
     const baseTime = new Date('2025-01-15T14:30:45.123Z');
+    const isoTimestamp = '2025-01-15T14:30:45.123000Z';
     const logs: ParsedLogLine[] = [
       {
         lineNumber: 0,
-        rawText: `${baseTime.toISOString()} INFO message 0`,
-        timestamp: baseTime.toISOString(),
+        rawText: `${isoTimestamp} INFO message 0`,
+        isoTimestamp,
+        timestampUs: baseTime.getTime() * 1000,
+        displayTime: '14:30:45.123000',
         level: 'INFO',
         message: 'message 0',
+        strippedMessage: 'message 0',
       },
     ];
 

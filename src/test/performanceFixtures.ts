@@ -4,6 +4,7 @@
  * rendering, and filtering operations.
  */
 import type { ParsedLogLine, HttpRequest, SyncRequest, LogLevel } from '../types/log.types';
+import { MICROS_PER_MILLISECOND } from '../types/time.types';
 
 const LOG_LEVELS: LogLevel[] = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'];
 const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
@@ -27,8 +28,9 @@ function createLogLine(
   offsetMs: number = 0,
 ): ParsedLogLine {
   const timestampMs = baseTimeMs + offsetMs + lineNumber * 100; // 100ms apart
+  const timestampUs = timestampMs * MICROS_PER_MILLISECOND;
   const date = new Date(timestampMs);
-  const isoTimestamp = date.toISOString();
+  const isoTimestamp = date.toISOString().replace(/\.\d{3}Z$/, '.000000Z'); // Pad to microseconds
   const level = LOG_LEVELS[lineNumber % LOG_LEVELS.length];
   const timeStr = isoTimestamp.match(/T([\d:.]+)Z?$/)?.[1] || isoTimestamp;
   const message = `message ${lineNumber}: processing event`;
@@ -36,8 +38,8 @@ function createLogLine(
   return {
     lineNumber,
     rawText: `${isoTimestamp} ${level} [matrix-rust-sdk] ${message}`,
-    timestamp: isoTimestamp,
-    timestampMs,
+    isoTimestamp,
+    timestampUs,
     displayTime: timeStr,
     level,
     message,

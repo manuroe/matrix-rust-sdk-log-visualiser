@@ -37,17 +37,18 @@ vi.mock('../../components/TimeRangeSelector', () => ({
   TimeRangeSelector: () => <div data-testid="time-range-selector">Selector</div>,
 }));
 
-function makeLogs(count: number, startTime: Date = new Date(0)): ParsedLogLine[] {
+function makeLogs(count: number, startTime: Date = new Date('2024-01-01T00:00:00Z')): ParsedLogLine[] {
   const logs: ParsedLogLine[] = [];
   for (let i = 0; i < count; i++) {
     const timestamp = new Date(startTime.getTime() + i * 1000);
-    const isoTimestamp = timestamp.toISOString();
+    const isoTimestamp = timestamp.toISOString().replace(/\.\d{3}Z$/, '.000000Z');
     const timeStr = isoTimestamp.match(/T([\d:.]+)Z?$/)?.[1] || isoTimestamp;
+    const timestampUs = timestamp.getTime() * 1000; // Convert ms to microseconds
     logs.push({
       lineNumber: i,
       rawText: `${isoTimestamp} INFO line ${i}`,
-      timestamp: isoTimestamp,
-      timestampMs: timestamp.getTime(),
+      isoTimestamp,
+      timestampUs,
       displayTime: timeStr,
       level: 'INFO',
       message: `line ${i}`,
