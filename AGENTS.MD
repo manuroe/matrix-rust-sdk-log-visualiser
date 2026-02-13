@@ -10,6 +10,7 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Vite + React + TypeScript
 - React Router (hash-based)
 - Zustand state management
+- CSS Modules with Design Tokens ([src/styles/foundation.css](src/styles/foundation.css))
 - Virtualized rendering for large datasets
 - ESLint enforcing camelCase naming
 
@@ -17,6 +18,7 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Entry + routing: [src/main.tsx](src/main.tsx), [src/App.tsx](src/App.tsx)
 - Views: [src/views](src/views)
 - Components: [src/components](src/components)
+- Styles: [src/styles](src/styles) (foundation tokens), shared modules in [src/components](src/components) (Button, Card, Table, Form, Dropdown)
 - State: [src/stores](src/stores)
 - Domain utilities: [src/utils](src/utils)
 - Types: [src/types](src/types)

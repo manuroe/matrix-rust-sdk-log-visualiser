@@ -5,6 +5,7 @@ import { useLogStore } from '../../stores/logStore';
 import { LogsView } from '../LogsView';
 import { createParsedLogLines } from '../../test/fixtures';
 import * as TimeUtils from '../../utils/timeUtils';
+import logDisplayStyles from '../LogDisplayView.module.css';
 
 // Mock react-router-dom for useSearchParams
 vi.mock('react-router-dom', () => ({
@@ -120,7 +121,7 @@ describe('LogsView', () => {
     expect(logsContainer).toBeInTheDocument();
 
     // The LogDisplayView should be present (contains log lines)
-    const logLines = container.querySelectorAll('.log-line');
+    const logLines = container.querySelectorAll(`.${logDisplayStyles.logLine}`);
     expect(logLines.length).toBeGreaterThan(0);
   });
 
@@ -136,7 +137,7 @@ describe('LogsView', () => {
     expect(logsContainer).toBeInTheDocument();
     
     // Verify LogDisplayView rendered (has at least one log line)
-    const logLines = container.querySelectorAll('.log-line');
+    const logLines = container.querySelectorAll(`.${logDisplayStyles.logLine}`);
     expect(logLines.length).toBeGreaterThan(0);
   });
 

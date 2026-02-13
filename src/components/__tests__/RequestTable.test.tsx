@@ -115,8 +115,8 @@ describe('RequestTable', () => {
     it('renders timeline scale selector', () => {
       render(<RequestTable {...createProps({ msPerPixel: 25 })} />);
 
-      const select = screen.getByRole('combobox');
-      expect(select).toHaveValue('25');
+      const scaleButton = screen.getByTitle('Timeline scale');
+      expect(scaleButton).toHaveTextContent('1px = 25ms');
     });
   });
 
@@ -137,8 +137,13 @@ describe('RequestTable', () => {
     it('updates timeline scale when selector changes', () => {
       render(<RequestTable {...createProps({ msPerPixel: 10 })} />);
 
-      const select = screen.getByRole('combobox');
-      fireEvent.change(select, { target: { value: '50' } });
+      // Open the dropdown
+      const scaleButton = screen.getByTitle('Timeline scale');
+      fireEvent.click(scaleButton);
+
+      // Click the 50ms option
+      const option = screen.getByText('1px = 50ms');
+      fireEvent.click(option);
 
       expect(useLogStore.getState().timelineScale).toBe(50);
     });

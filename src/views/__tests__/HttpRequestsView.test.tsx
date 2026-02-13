@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, screen } from '@testing-library/react';
 import { HttpRequestsView } from '../HttpRequestsView';
 import { useLogStore } from '../../stores/logStore';
 import { createHttpRequests, createHttpRequest } from '../../test/fixtures';
@@ -229,7 +229,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
     await new Promise(resolve => setTimeout(resolve, 1600));
 
     // Click on a different request
-    const requestIdElement = container.querySelector('[data-row-id="sticky-REQ-4"] .request-id') as HTMLElement;
+    const requestIdElement = screen.getByTestId('request-id-REQ-4');
     expect(requestIdElement).toBeTruthy();
     requestIdElement.click();
 
@@ -265,7 +265,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
     const originalHash = window.location.hash;
 
     // Click on the same request (should close it)
-    const requestIdElement = container.querySelector('[data-row-id="sticky-REQ-3"] .request-id') as HTMLElement;
+    const requestIdElement = screen.getByTestId('request-id-REQ-3');
     expect(requestIdElement).toBeTruthy();
     requestIdElement.click();
 

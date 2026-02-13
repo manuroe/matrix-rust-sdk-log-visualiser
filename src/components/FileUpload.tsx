@@ -10,6 +10,7 @@ import {
 } from '../utils/fileValidator';
 import { wrapError, FileError, type AppError } from '../utils/errorHandling';
 import ErrorDisplay from './ErrorDisplay';
+import styles from './FileUpload.module.css';
 
 export function FileUpload() {
   const navigate = useNavigate();
@@ -121,7 +122,7 @@ export function FileUpload() {
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      e.currentTarget.classList.remove('dragover');
+      e.currentTarget.classList.remove(styles.dragover);
 
       const files = e.dataTransfer.files;
       if (files.length > 0) {
@@ -133,11 +134,11 @@ export function FileUpload() {
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.currentTarget.classList.add('dragover');
+    e.currentTarget.classList.add(styles.dragover);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.currentTarget.classList.remove('dragover');
+    e.currentTarget.classList.remove(styles.dragover);
   }, []);
 
   const handleFileInput = useCallback(
@@ -157,14 +158,14 @@ export function FileUpload() {
   return (
     <div
       id="drop-zone"
-      className="drop-zone"
+      className={styles.dropZone}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onClick={handleClick}
     >
-      <div className="drop-zone-content">
-        <svg className="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <div className={styles.dropZoneContent}>
+        <svg className={styles.dropIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
           <polyline points="17 8 12 3 7 8"></polyline>
           <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -178,7 +179,7 @@ export function FileUpload() {
           <ErrorDisplay
             error={validationError}
             onDismiss={() => setValidationError(null)}
-            className="drop-zone-error"
+            className={styles.dropZoneError}
           />
         )}
         {validationWarnings.length > 0 && !validationError && (

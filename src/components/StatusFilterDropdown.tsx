@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useLogStore } from '../stores/logStore';
 import { PENDING_STATUS_KEY } from '../utils/statusCodeUtils';
+import styles from './StatusFilterDropdown.module.css';
 
 interface StatusFilterDropdownProps {
   /** Available status codes to show in the dropdown */
@@ -69,10 +70,10 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
 
   /** Get CSS class for status code coloring */
   const getStatusClass = (code: string) => {
-    if (code === PENDING_STATUS_KEY) return 'pending';
+    if (code === PENDING_STATUS_KEY) return styles.pending;
     const numCode = parseInt(code, 10);
-    if (!isNaN(numCode) && numCode < 400) return 'success';
-    return 'error';
+    if (!isNaN(numCode) && numCode < 400) return styles.success;
+    return styles.error;
   };
 
   /** Get label for the dropdown button */
@@ -83,32 +84,31 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
       : `${statusCodeFilter.size} selected`;
 
   return (
-    <div className="status-filter-container" ref={dropdownRef}>
+    <div className={styles.container} ref={dropdownRef}>
       <button
-        className="status-filter-button"
+        className={styles.button}
         onClick={() => setIsOpen(!isOpen)}
         title="Filter by status code"
       >
         {buttonLabel}
-        <span className="dropdown-arrow">▾</span>
       </button>
       {isOpen && (
-        <div className="status-filter-dropdown">
+        <div className={styles.dropdown}>
           <button
-            className="status-filter-select-all"
+            className={styles.selectAll}
             onClick={selectAll}
           >
             Select All
           </button>
-          <div className="status-filter-divider" />
+          <div className={styles.divider} />
           {availableStatusCodes.map((code) => (
-            <label key={code} className="status-filter-option">
+            <label key={code} className={styles.option}>
               <input
                 type="checkbox"
                 checked={isEnabled(code)}
                 onChange={() => toggleStatusCode(code)}
               />
-              <span className={`status-code-label ${getStatusClass(code)}`}>
+              <span className={`${styles.statusCodeLabel} ${getStatusClass(code)}`}>
                 {code}
               </span>
             </label>

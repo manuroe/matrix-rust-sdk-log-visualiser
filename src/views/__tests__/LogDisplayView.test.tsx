@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { useLogStore } from '../../stores/logStore';
 import { LogDisplayView } from '../LogDisplayView';
 import { createLogsWithMatches } from '../../test/fixtures';
+import styles from '../LogDisplayView.module.css';
 
 // Mock react-virtual to simplify rendering in tests
 vi.mock('@tanstack/react-virtual', () => {
@@ -21,9 +22,9 @@ vi.mock('@tanstack/react-virtual', () => {
 
 function getLineContainer(lineNumber: number): HTMLElement {
   const candidates = screen.getAllByText(String(lineNumber));
-  const lineNumSpan = candidates.find((el: Element) => el.classList.contains('log-line-number')) as HTMLElement;
+  const lineNumSpan = candidates.find((el: Element) => el.classList.contains(styles.logLineNumber)) as HTMLElement;
   if (!lineNumSpan) throw new Error(`Line number span not found for ${lineNumber}`);
-  return lineNumSpan.closest('.log-line') as HTMLElement;
+  return lineNumSpan.closest(`.${styles.logLine}`) as HTMLElement;
 }
 
 describe('LogDisplayView gap arrows & expansion', () => {
@@ -192,7 +193,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     render(<LogDisplayView requestFilter="MATCH" />);
 
     const line3Container = getLineContainer(3);
-    const textSpan = line3Container.querySelector('.log-line-text') as HTMLSpanElement;
+    const textSpan = line3Container.querySelector(`.${styles.logLineText}`) as HTMLSpanElement;
     expect(textSpan).toBeTruthy();
     
     // With stripPrefix=true (default), message should not start with ISO timestamp
@@ -217,8 +218,8 @@ describe('LogDisplayView gap arrows & expansion', () => {
 
     let line2Container = getLineContainer(2);
     // Default is nowrap
-    expect(line2Container.classList.contains('nowrap')).toBe(true);
-    expect(line2Container.classList.contains('wrap')).toBe(false);
+    expect(line2Container.classList.contains(styles.nowrap)).toBe(true);
+    expect(line2Container.classList.contains(styles.wrap)).toBe(false);
 
     // Toggle line wrap
     const wrapCheckbox = screen.getByLabelText(/Line wrap/i) as HTMLInputElement;
@@ -226,8 +227,8 @@ describe('LogDisplayView gap arrows & expansion', () => {
 
     // Re-query after state change to avoid stale node
     line2Container = getLineContainer(2);
-    expect(line2Container.classList.contains('wrap')).toBe(true);
-    expect(line2Container.classList.contains('nowrap')).toBe(false);
+    expect(line2Container.classList.contains(styles.wrap)).toBe(true);
+    expect(line2Container.classList.contains(styles.nowrap)).toBe(false);
   });
 
   it('contextLines shows surrounding lines when enabled', async () => {

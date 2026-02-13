@@ -3,6 +3,7 @@ import { useLogStore } from '../stores/logStore';
 import { getTimeDisplayName, parseTimeInput } from '../utils/timeUtils';
 import { ValidationError } from '../utils/errorHandling';
 import ErrorDisplay from './ErrorDisplay';
+import styles from './TimeFilter.module.css';
 
 const SHORTCUTS = [
   { value: 'last-min', label: 'Last min' },
@@ -74,39 +75,39 @@ export function TimeFilter() {
   };
 
   return (
-    <div className="time-filter">
-      <div className="time-filter-display">
+    <div className={styles.timeFilter}>
+      <div className={styles.timeFilterDisplay}>
         <label>Time Range:</label>
-        <span className="time-filter-text">{getDisplayText()}</span>
+        <span className={styles.timeFilterText}>{getDisplayText()}</span>
       </div>
 
-      <div className="time-filter-shortcuts">
+      <div className={styles.timeFilterShortcuts}>
         {SHORTCUTS.map((shortcut) => (
           <button
             key={shortcut.value}
-            className={`btn-shortcut ${startTime === shortcut.value ? 'active' : ''}`}
+            className={`${styles.btnShortcut} ${startTime === shortcut.value ? styles.active : ''}`}
             onClick={() => handleShortcut(shortcut.value)}
           >
             {shortcut.label}
           </button>
         ))}
         <button
-          className={`btn-shortcut ${showCustom ? 'active' : ''}`}
+          className={`${styles.btnShortcut} ${showCustom ? styles.active : ''}`}
           onClick={() => setShowCustom(!showCustom)}
         >
           Custom
         </button>
         {(startTime || endTime) && (
-          <button className="btn-shortcut btn-clear" onClick={handleClear}>
+          <button className={`${styles.btnShortcut} ${styles.btnClear}`} onClick={handleClear}>
             Clear
           </button>
         )}
       </div>
 
       {showCustom && (
-        <div className="time-filter-custom">
-          <div className="custom-inputs">
-            <div className="input-group">
+        <div className={styles.timeFilterCustom}>
+          <div className={styles.customInputs}>
+            <div className={styles.inputGroup}>
               <label htmlFor="custom-start">From:</label>
               <input
                 id="custom-start"
@@ -122,7 +123,7 @@ export function TimeFilter() {
                 }}
               />
             </div>
-            <div className="input-group">
+            <div className={styles.inputGroup}>
               <label htmlFor="custom-end">To:</label>
               <input
                 id="custom-end"
@@ -143,7 +144,7 @@ export function TimeFilter() {
             </button>
           </div>
           <ErrorDisplay error={error} onDismiss={() => setError(null)} />
-          <div className="custom-help">
+          <div className={styles.customHelp}>
             Examples: <code>12:34:56</code> or <code>12:34:56.123456</code> for absolute times,{' '}
             <code>last-5-min</code>, <code>last-10-min</code>, <code>last-hour</code>,{' '}
             <code>last-day</code> for shortcuts (relative to log end), <code>start</code> / <code>end</code> for log boundaries

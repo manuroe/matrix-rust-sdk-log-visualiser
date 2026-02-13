@@ -1,0 +1,85 @@
+/* FileUpload Component Styles */
+.dropZone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-dropdown);
+}
+
+.dropZoneContent {
+    text-align: center;
+    padding: 60px;
+    border: 3px dashed var(--border-medium);
+    border-radius: var(--radius-2xl);
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all var(--transition-slow) ease;
+}
+
+.dropZoneContent:hover,
+.dragover .dropZoneContent {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.dropIcon {
+    width: 64px;
+    height: 64px;
+    color: var(--text-placeholder);
+    margin: 0 auto 20px;
+}
+
+.dropZoneContent h2 {
+    font-size: var(--font-size-4xl);
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.dropZoneContent p {
+    font-size: var(--font-size-lg);
+    color: var(--text-tertiary);
+    margin-bottom: 20px;
+}
+
+.fileInput {
+    display: none;
+}
+
+.dropZoneFooter {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--font-size-base);
+    color: var(--text-placeholder);
+    z-index: calc(var(--z-dropdown) + 1);
+}
+
+.dropZoneFooter a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.dropZoneFooter a:hover {
+    text-decoration: underline;
+}
+
+.dropZoneError {
+    position: fixed;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-error);
+    color: var(--text-inverse);
+    padding: 12px 24px;
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    z-index: calc(var(--z-dropdown) + 1);
+    box-shadow: var(--shadow-md);
+}

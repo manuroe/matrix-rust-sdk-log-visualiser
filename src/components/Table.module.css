@@ -1,0 +1,96 @@
+/* Shared Table Component Styles */
+
+/* Base table */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+/* Table header */
+.tableHead {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.tableHeadCell {
+    padding: 4px 8px;
+    text-align: left;
+    font-weight: 500;
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Table body cells */
+.tableCell {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+
+/* Hover effect on rows */
+.tableRowHover:hover {
+    background: var(--bg-hover);
+}
+
+/* Alignment helpers */
+.alignRight {
+    text-align: right;
+}
+
+.alignCenter {
+    text-align: center;
+}
+
+/* Mono-spaced cell (URIs, code, etc.) */
+.monoCell {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Badge styles for table cells */
+.badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    font-family: var(--font-mono);
+}
+
+.badgeInfo {
+    background: var(--color-info-bg);
+    color: var(--color-info-text);
+}
+
+.badgeSuccess {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+}
+
+.badgeError {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+}
+
+/* Action link in tables */
+.actionLink {
+    background: none;
+    border: none;
+    color: var(--color-info);
+    cursor: pointer;
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    padding: 0;
+}
+
+.actionLink:hover {
+    text-decoration: underline;
+    color: var(--color-primary-hover);
+}

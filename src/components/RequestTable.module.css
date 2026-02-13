@@ -1,0 +1,321 @@
+/* RequestTable Component Styles */
+
+/* Layout containers */
+.scrollContent {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.timelineContent {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.timelineContentWrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.timelineRowsLeft {
+    flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-right: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+}
+
+.timelineRowsRight {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: scroll;
+    position: relative;
+    scrollbar-width: none;
+}
+
+.timelineRowsRight::-webkit-scrollbar {
+    display: none;
+}
+
+/* Timeline container */
+.timelineContainer {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 0;
+    width: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+/* Sticky column */
+.stickyCol {
+    padding: 2px 6px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.timelineHeader .stickyCol {
+    background-color: var(--bg-primary);
+    padding: 2px 6px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.requestRow .stickyCol {
+    background-color: var(--row-bg, transparent);
+    min-width: 0;
+}
+
+/* Timeline header */
+.timelineHeader {
+    display: flex;
+    gap: 0;
+    background: var(--bg-primary);
+    padding: 0;
+    border-radius: 0;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    border-bottom: 2px solid var(--border-default);
+}
+
+.timelineHeaderWaterfall {
+    flex: 1;
+    padding: 4px 16px;
+    overflow: hidden;
+}
+
+.timelineHeaderSticky {
+    display: grid;
+    grid-template-columns: 70px 400px 115px 45px 45px 45px;
+    gap: 8px;
+    padding: 4px 16px;
+    background: var(--bg-primary);
+    flex-shrink: 0;
+    align-items: center;
+    border-right: 1px solid var(--border-default);
+}
+
+/* SyncView has different columns */
+.syncView .timelineHeaderSticky {
+    grid-template-columns: 70px 115px 45px 45px;
+    gap: 6px;
+    padding: 3px 12px;
+}
+
+/* Request row */
+.requestRow {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+    min-height: 28px;
+    --row-bg: var(--row-bg-even);
+    background-color: var(--row-bg);
+}
+
+.requestRowSticky {
+    display: grid;
+    grid-template-columns: 70px 400px 115px 45px 45px 45px;
+    gap: 8px;
+    padding: 4px 16px;
+    background-color: var(--row-bg);
+    flex-shrink: 0;
+    align-items: center;
+    border-right: 1px solid var(--border-default);
+    border-bottom: 1px solid var(--border-light);
+}
+
+/* SyncView has different columns */
+.syncView .requestRowSticky {
+    grid-template-columns: 70px 115px 45px 45px;
+    gap: 6px;
+    padding: 3px 12px;
+}
+
+/* Zebra striping */
+.requestRow:nth-child(odd) {
+    --row-bg: var(--row-bg-odd);
+}
+
+.requestRow:nth-child(even) {
+    --row-bg: var(--row-bg-even);
+}
+
+.requestRow:hover {
+    --row-bg: var(--row-bg-hover);
+}
+
+.rowHovered {
+    --row-bg: var(--row-bg-hover);
+}
+
+.expanded {
+    --row-bg: var(--row-bg-expanded);
+}
+
+.pending {
+    opacity: 0.6;
+}
+
+/* Cell styles */
+.requestId {
+    font-weight: 500;
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.time {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+}
+
+.status {
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
+
+.statusSuccess {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+}
+
+.statusPending {
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+}
+
+.statusError {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+}
+
+.size {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    text-align: left;
+    color: var(--text-tertiary);
+}
+
+.duration {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    text-align: left;
+    color: var(--text-tertiary);
+}
+
+.method {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: normal;
+    color: var(--text-tertiary);
+    text-align: left;
+    cursor: default;
+}
+
+.uri {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Waterfall */
+.waterfall {
+    position: relative;
+    height: 20px;
+    background: transparent;
+    border-radius: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    min-width: 400px;
+}
+
+.waterfall::-webkit-scrollbar {
+    height: 6px;
+}
+
+.waterfall::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.waterfall::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: var(--radius-sm);
+}
+
+.waterfall::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+.waterfallItem {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+}
+
+.waterfallBar {
+    height: 14px;
+    background: var(--waterfall-default);
+    border-radius: var(--radius-sm);
+    position: relative;
+}
+
+.waterfallBarSuccess {
+    background: var(--waterfall-success);
+}
+
+.waterfallBarPending {
+    background: var(--waterfall-pending);
+}
+
+.waterfallBarError {
+    background: var(--waterfall-error);
+}
+
+.waterfallDuration {
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    font-family: var(--font-mono);
+}
+
+/* Empty state */
+.noData {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-placeholder);
+}

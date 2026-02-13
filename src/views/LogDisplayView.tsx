@@ -7,6 +7,7 @@ import { buildDisplayItems, calculateGapExpansion, type ForcedRange } from '../u
 import { findMatchingIndices, expandWithContext, highlightText as highlightTextUtil } from '../utils/textMatching';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useMatchNavigation } from '../hooks/useMatchNavigation';
+import styles from './LogDisplayView.module.css';
 
 interface LogDisplayViewProps {
   requestFilter?: string;
@@ -149,13 +150,22 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
       query: searchQuery,
       caseSensitive,
       keyPrefix: `line-${originalIndex}`,
-      highlightClassName: 'search-highlight',
+      highlightClassName: styles.searchHighlight,
     });
 
     return <>{parts}</>;
   };
 
-  const getLogLevelClass = (level: string) => `log-level-${level.toLowerCase()}`;
+  const getLogLevelClass = (level: string) => {
+    const levelMap: Record<string, string> = {
+      trace: styles.levelTrace,
+      debug: styles.levelDebug,
+      info: styles.levelInfo,
+      warn: styles.levelWarn,
+      error: styles.levelError,
+    };
+    return levelMap[level.toLowerCase()] || styles.levelUnknown;
+  };
 
   const getDisplayText = (line: ParsedLogLine): string => {
     if (!stripPrefix) {
@@ -216,12 +226,12 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
   }, [contextMenu]);
 
   return (
-    <div className="log-display-view">
-      <div className="log-toolbar">
-        <div className="log-toolbar-left">
+    <div className={styles.logDisplayView}>
+      <div className={styles.logToolbar}>
+        <div className={styles.logToolbarLeft}>
           <input
             type="text"
-            className="log-search-input"
+            className={styles.logSearchInput}
             placeholder="Search logs..."
             value={searchQueryInput}
             onChange={(e) => setSearchQueryInput(e.target.value)}
@@ -237,7 +247,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             }}
             title="Search and highlight in filtered results"
           />
-          <label className="log-toolbar-option">
+          <label className={styles.logToolbarOption}>
             <input
               type="checkbox"
               checked={caseSensitive}
@@ -247,20 +257,20 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
           </label>
           {searchMatchesArray.length > 0 && (
             <>
-              <div className="search-navigation">
+              <div className={styles.searchNavigation}>
                 <button
-                  className="btn-toolbar btn-icon"
+                  className={`${styles.btnToolbar} ${styles.btnIcon}`}
                   onClick={goToPreviousMatch}
                   title="Previous match (Shift+Enter)"
                   disabled={searchMatchesArray.length === 0}
                 >
                   ↑
                 </button>
-                <span className="search-results-count">
+                <span className={styles.searchResultsCount}>
                   {currentSearchMatchIndex + 1} / {searchMatchesArray.length}
                 </span>
                 <button
-                  className="btn-toolbar btn-icon"
+                  className={`${styles.btnToolbar} ${styles.btnIcon}`}
                   onClick={goToNextMatch}
                   title="Next match (Enter)"
                   disabled={searchMatchesArray.length === 0}
@@ -271,8 +281,8 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             </>
           )}
         </div>
-        <div className="log-toolbar-right">
-          <label className="log-toolbar-option">
+        <div className={styles.logToolbarRight}>
+          <label className={styles.logToolbarOption}>
             <input
               type="checkbox"
               checked={lineWrap}
@@ -280,7 +290,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             />
             Line wrap
           </label>
-          <label className="log-toolbar-option">
+          <label className={styles.logToolbarOption}>
             <input
               type="checkbox"
               checked={stripPrefix}
@@ -290,15 +300,15 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
           </label>
           <input
             type="text"
-            className="log-search-input"
+            className={styles.logSearchInput}
             placeholder="Filter logs..."
             value={filterQueryInput}
             onChange={(e) => setFilterQueryInput(e.target.value)}
             title="Filter to show only matching lines"
           />
-          <div className="log-toolbar-context-group">
+          <div className={styles.logToolbarContextGroup}>
             <button
-              className={`btn-toolbar btn-context-toggle ${contextLines > 0 ? 'active' : ''}`}
+              className={`${styles.btnToolbar} ${styles.btnContextToggle} ${contextLines > 0 ? 'active' : ''}`}
               onClick={() => {
                 if (contextLines > 0) {
                   setContextLines(0);
@@ -320,14 +330,14 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 const val = parseInt(e.target.value) || 0;
                 setContextLines(val);
               }}
-              className="log-context-input"
+              className={styles.logContextInput}
               title="Context lines (0 = disabled)"
               disabled={!filterQuery.trim()}
             />
           </div>
           {onClose && (
             <button
-              className="btn-toolbar btn-icon close-icon"
+              className={`${styles.btnToolbar} ${styles.btnIcon} ${styles.closeIcon}`}
               onClick={onClose}
               aria-label="Close log viewer"
               title="Close"
@@ -338,9 +348,9 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
         </div>
       </div>
 
-      <div ref={parentRef} className="log-content-wrapper">
+      <div ref={parentRef} className={styles.logContentWrapper}>
         <div
-          className="log-content"
+          className={styles.logContent}
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
             position: 'relative',
@@ -364,7 +374,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 ref={(el) => {
                   if (el) rowVirtualizer.measureElement(el);
                 }}
-                className={`log-line ${getLogLevelClass(line.level)} ${isMatch ? 'match-line' : ''} ${isCurrentSearchMatch ? 'current-match' : ''} ${lineWrap ? 'wrap' : 'nowrap'}`}
+                className={`${styles.logLine} ${getLogLevelClass(line.level)} ${isMatch ? styles.matchLine : ''} ${isCurrentSearchMatch ? styles.currentMatch : ''} ${lineWrap ? styles.wrap : styles.nowrap}`}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -375,10 +385,10 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 }}
               >
                 {(gapAbove || gapBelow) && (
-                  <div className="log-gap-controls">
+                  <div className={styles.logGapControls}>
                     {gapAbove && (
                       <button
-                        className="log-gap-arrow log-gap-up"
+                        className={styles.logGapArrow}
                         onClick={() => handleGapClick(gapAbove.gapId)}
                         onContextMenu={(e) => handleGapContextMenu(e, gapAbove.gapId, 'up', gapAbove.isFirst ?? false, false)}
                         title={`${gapAbove.remainingGap} hidden lines above\nClick: +10 | Right-click: More options`}
@@ -391,7 +401,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                     )}
                     {gapBelow && (
                       <button
-                        className="log-gap-arrow log-gap-down"
+                        className={styles.logGapArrow}
                         onClick={() => handleGapClick(gapBelow.gapId)}
                         onContextMenu={(e) => handleGapContextMenu(e, gapBelow.gapId, 'down', false, gapBelow.isLast ?? false)}
                         title={`${gapBelow.remainingGap} hidden lines below\nClick: +10 | Right-click: More options`}
@@ -404,11 +414,11 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                     )}
                   </div>
                 )}
-                {gapBelow && !gapBelow.isLast && <div className="log-gap-divider log-gap-divider-below" />}
-                <span className="log-line-number">{line.lineNumber}</span>
-                <span className="log-line-timestamp">{line.displayTime}</span>
-                <span className="log-line-level">{line.level}</span>
-                <span className="log-line-text">
+                {gapBelow && !gapBelow.isLast && <div className={`${styles.logGapDivider} ${styles.logGapDividerBelow}`} />}
+                <span className={styles.logLineNumber}>{line.lineNumber}</span>
+                <span className={styles.logLineTimestamp}>{line.displayTime}</span>
+                <span className={styles.logLineLevel}>{line.level}</span>
+                <span className={styles.logLineText}>
                   {highlightText(line, index)}
                 </span>
               </div>
@@ -418,26 +428,26 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
       </div>
 
       {displayItems.length === 0 && filteredLines.length > 0 && (
-        <div className="log-empty-state">
+        <div className={styles.logEmptyState}>
           No matching lines found for "{searchQuery}"
         </div>
       )}
 
       {filteredLines.length === 0 && filterQuery && (
-        <div className="log-empty-state">
+        <div className={styles.logEmptyState}>
           No lines match filter "{filterQuery}"
         </div>
       )}
 
       {displayLogLines.length === 0 && (
-        <div className="log-empty-state">
+        <div className={styles.logEmptyState}>
           No log data available. Please upload a log file.
         </div>
       )}
 
       {contextMenu && (
         <div
-          className="log-gap-context-menu"
+          className={styles.logGapContextMenu}
           style={{
             position: 'fixed',
             left: `${contextMenu.x}px`,
@@ -446,7 +456,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
           }}
         >
           <button
-            className="context-menu-item"
+            className={styles.contextMenuItem}
             onClick={() => {
               expandGap(contextMenu.gapId, 10);
               setContextMenu(null);
@@ -456,7 +466,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
           </button>
           {contextMenu.direction === 'down' && nextRequestLineRange && (
             <button
-              className="context-menu-item"
+              className={styles.contextMenuItem}
               onClick={() => {
                 expandGap(contextMenu.gapId, 'next-match');
                 setContextMenu(null);
@@ -467,7 +477,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
           )}
           {contextMenu.direction === 'up' && prevRequestLineRange && (
             <button
-              className="context-menu-item"
+              className={styles.contextMenuItem}
               onClick={() => {
                 expandGap(contextMenu.gapId, 'prev-match');
                 setContextMenu(null);
@@ -479,7 +489,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
           {((contextMenu.direction === 'up' && contextMenu.isFirst) ||
             (contextMenu.direction === 'down' && contextMenu.isLast)) && (
             <button
-              className="context-menu-item"
+              className={styles.contextMenuItem}
               onClick={() => {
                 expandGap(contextMenu.gapId, 'all');
                 setContextMenu(null);

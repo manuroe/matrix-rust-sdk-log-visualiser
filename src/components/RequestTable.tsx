@@ -4,6 +4,7 @@ import { useLogStore } from '../stores/logStore';
 import { WaterfallTimeline } from './WaterfallTimeline';
 import { BurgerMenu } from './BurgerMenu';
 import { TimeRangeSelector } from './TimeRangeSelector';
+import { TimelineScaleSelector } from './TimelineScaleSelector';
 import { StatusFilterDropdown } from './StatusFilterDropdown';
 import { getWaterfallPosition, getWaterfallBarWidth, calculateTimelineWidth } from '../utils/timelineUtils';
 import { LogDisplayView } from '../views/LogDisplayView';
@@ -11,15 +12,9 @@ import { useScrollSync } from '../hooks/useScrollSync';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
 import type { HttpRequest } from '../types/log.types';
+import styles from './RequestTable.module.css';
 
-// Available timeline scale options (ms per pixel)
-const TIMELINE_SCALE_OPTIONS = [
-  { value: 5, label: '1px = 5ms' },
-  { value: 10, label: '1px = 10ms' },
-  { value: 25, label: '1px = 25ms' },
-  { value: 50, label: '1px = 50ms' },
-  { value: 100, label: '1px = 100ms' },
-];
+
 
 /**
  * Column definition for the RequestTable component.
@@ -91,7 +86,6 @@ export function RequestTable({
     toggleRowExpansion,
     closeLogViewer,
     setActiveRequest,
-    setTimelineScale,
   } = useLogStore();
 
   const waterfallContainerRef = useRef<HTMLDivElement>(null);
@@ -292,38 +286,24 @@ export function RequestTable({
 
         <div className="header-right">
           <StatusFilterDropdown availableStatusCodes={availableStatusCodes} />
-          
-          <select
-            id="timeline-scale"
-            value={msPerPixel}
-            onChange={(e) => setTimelineScale(Number(e.target.value))}
-            className="select-compact"
-            title="Timeline scale"
-          >
-            {TIMELINE_SCALE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          
+          <TimelineScaleSelector msPerPixel={msPerPixel} />
           <TimeRangeSelector />
         </div>
       </div>
 
-      <div className="timeline-container">
-        <div className="timeline-header">
-          <div className="timeline-header-sticky" ref={stickyHeaderRef}>
+      <div className={styles.timelineContainer}>
+        <div className={styles.timelineHeader}>
+          <div className={styles.timelineHeaderSticky} ref={stickyHeaderRef}>
             {columns.map((col) => (
               <div
                 key={col.id}
-                className={`sticky-col ${col.className || ''}`}
+                className={`${styles.stickyCol} ${col.className || ''}`}
               >
                 {col.label}
               </div>
             ))}
           </div>
-          <div className="timeline-header-waterfall">
+          <div className={styles.timelineHeaderWaterfall}>
             <WaterfallTimeline
               minTime={minTime}
               maxTime={maxTime}
@@ -336,32 +316,33 @@ export function RequestTable({
           </div>
         </div>
 
-        <div className="scroll-content">
-          <div id="timeline-content">
+        <div className={styles.scrollContent}>
+          <div className={styles.timelineContent}>
             {filteredRequests.length === 0 ? (
-              <div className="no-data">{emptyMessage}</div>
+              <div className={styles.noData}>{emptyMessage}</div>
             ) : (
-              <div className="timeline-content-wrapper">
+              <div className={styles.timelineContentWrapper}>
                 {/* Left panel - sticky columns */}
-                <div className="timeline-rows-left" ref={leftPanelRef}>
+                <div className={styles.timelineRowsLeft} ref={leftPanelRef}>
                   {filteredRequests.map((req) => (
                     <div
                       key={`sticky-${req.requestId}`}
                       data-row-id={`sticky-${req.requestId}`}
-                      className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${!req.status ? 'pending' : ''}`}
+                      className={`${styles.requestRow} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${!req.status ? styles.pending : ''}`}
                       style={{ minHeight: '28px', cursor: 'pointer' }}
                       onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                       onMouseLeave={() => handleRowMouseLeave(req.requestId)}
                       onClick={() => handleWaterfallRowClick(req)}
                     >
-                      <div className="request-row-sticky">
+                      <div className={styles.requestRowSticky}>
                         {columns.map((col, i) => {
                           // First column is clickable request ID
                           if (i === 0) {
                             return (
                               <div
                                 key={col.id}
-                                className={`request-id clickable sticky-col ${col.className || ''}`}
+                                className={`${styles.requestId} ${styles.clickable} ${styles.stickyCol} ${col.className || ''}`}
+                                data-testid={`request-id-${req.requestId}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleRequestClick(req.requestId);
@@ -374,7 +355,7 @@ export function RequestTable({
                           return (
                             <div
                               key={col.id}
-                              className={`sticky-col ${col.className || ''}`}
+                              className={`${styles.stickyCol} ${col.className || ''}`}
                               title={col.getValue(req)}
                             >
                               {col.getValue(req)}
@@ -387,7 +368,7 @@ export function RequestTable({
                 </div>
 
                 {/* Right panel - waterfall */}
-                <div className="timeline-rows-right" ref={waterfallContainerRef}>
+                <div className={styles.timelineRowsRight} ref={waterfallContainerRef}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
                     {filteredRequests.map((req) => {
                       const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
@@ -407,7 +388,7 @@ export function RequestTable({
                         <div
                           key={`waterfall-${req.requestId}`}
                           data-row-id={`waterfall-${req.requestId}`}
-                          className={`request-row ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? 'expanded' : ''} ${isPending ? 'pending' : ''}`}
+                          className={`${styles.requestRow} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${isPending ? styles.pending : ''}`}
                           style={{ minHeight: '28px', cursor: 'pointer' }}
                           onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                           onMouseLeave={() => handleRowMouseLeave(req.requestId)}
@@ -415,7 +396,7 @@ export function RequestTable({
                         >
                           <div style={{ position: 'relative', overflow: 'visible' }}>
                             <div
-                              className="waterfall-item"
+                              className={styles.waterfallItem}
                               style={{
                                 left: `${barLeft}px`,
                                 position: 'absolute',
@@ -425,13 +406,13 @@ export function RequestTable({
                               }}
                             >
                               <div
-                                className={`waterfall-bar ${statusClass}`}
+                                className={`${styles.waterfallBar} ${statusClass === 'success' ? styles.waterfallBarSuccess : statusClass === 'pending' ? styles.waterfallBarPending : styles.waterfallBarError}`}
                                 style={{
                                   width: `${barWidth}px`,
                                 }}
                                 title={statusClass === 'pending' ? 'Pending' : status}
                               />
-                              <span className="waterfall-duration" title={statusClass === 'pending' ? 'Pending' : status}>
+                              <span className={styles.waterfallDuration} title={statusClass === 'pending' ? 'Pending' : status}>
                                 {isPending ? '...' : status === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
                               </span>
                             </div>

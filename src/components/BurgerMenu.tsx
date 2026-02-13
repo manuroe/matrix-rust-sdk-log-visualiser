@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
+import { useThemeStore } from '../stores/themeStore';
+import styles from './BurgerMenu.module.css';
 
 export function BurgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -8,6 +10,7 @@ export function BurgerMenu() {
   const navigate = useNavigate();
   const location = useLocation();
   const { clearData, clearLastRoute } = useLogStore();
+  const { theme, setTheme } = useThemeStore();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -38,9 +41,9 @@ export function BurgerMenu() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="burger-menu" ref={menuRef}>
+    <div className={styles.burgerMenu} ref={menuRef}>
       <button
-        className="burger-button"
+        className={styles.burgerButton}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Menu"
         aria-expanded={isOpen}
@@ -48,36 +51,60 @@ export function BurgerMenu() {
         ☰
       </button>
       {isOpen && (
-        <div className="burger-dropdown">
-          <button className="burger-item" onClick={handleNewSession}>
+        <div className={styles.burgerDropdown}>
+          <button className={styles.burgerItem} onClick={handleNewSession}>
             New Session
           </button>
-          <div className="burger-divider" />
-          <div className="burger-section-title">Views</div>
+          <div className={styles.burgerDivider} />
+          <div className={styles.burgerSectionTitle}>Views</div>
           <button 
-            className={`burger-item ${isActive('/summary') ? 'active' : ''}`}
+            className={`${styles.burgerItem} ${isActive('/summary') ? styles.active : ''}`}
             onClick={() => handleNavigate('/summary')}
           >
             Summary
           </button>
           <button 
-            className={`burger-item ${isActive('/logs') ? 'active' : ''}`}
+            className={`${styles.burgerItem} ${isActive('/logs') ? styles.active : ''}`}
             onClick={() => handleNavigate('/logs')}
           >
             All Logs
           </button>
           <button 
-            className={`burger-item ${isActive('/http_requests') ? 'active' : ''}`}
+            className={`${styles.burgerItem} ${isActive('/http_requests') ? styles.active : ''}`}
             onClick={() => handleNavigate('/http_requests')}
           >
             HTTP Requests
           </button>
           <button 
-            className={`burger-item ${isActive('/http_requests/sync') ? 'active' : ''}`}
+            className={`${styles.burgerItem} ${isActive('/http_requests/sync') ? styles.active : ''}`}
             onClick={() => handleNavigate('/http_requests/sync')}
           >
             Sync Requests
           </button>
+          <div className={styles.burgerDivider} />
+          <div className={styles.themeButtons}>
+            <button 
+              className={`${styles.themeButton} ${theme === 'system' ? styles.active : ''}`}
+              onClick={() => setTheme('system')}
+              data-tooltip="System"
+            >
+              ◐
+            </button>
+            <button 
+              className={`${styles.themeButton} ${theme === 'light' ? styles.active : ''}`}
+              onClick={() => setTheme('light')}
+              data-tooltip="Light"
+            >
+              ☀
+            </button>
+            <button 
+              className={`${styles.themeButton} ${theme === 'dark' ? styles.active : ''}`}
+              onClick={() => setTheme('dark')}
+              data-tooltip="Dark"
+            >
+              ☾
+            </button>
+          </div>
         </div>
       )}
     </div>

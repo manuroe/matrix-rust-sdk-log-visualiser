@@ -3,6 +3,7 @@ import { useLogStore } from '../stores/logStore';
 import { getTimeDisplayName, parseTimeInput } from '../utils/timeUtils';
 import { ValidationError } from '../utils/errorHandling';
 import ErrorDisplay from './ErrorDisplay';
+import styles from './TimeRangeSelector.module.css';
 
 const SHORTCUTS = [
   { value: 'last-min', label: 'Last min' },
@@ -100,25 +101,24 @@ export function TimeRangeSelector() {
   };
 
   return (
-    <div className="time-range-selector" ref={dropdownRef}>
+    <div className={styles.timeRangeSelector} ref={dropdownRef}>
       <button
-        className="time-range-button"
+        className={styles.timeRangeButton}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Select time range"
         aria-expanded={isOpen}
       >
-        <span className="time-range-icon">⏱</span>
-        <span className="time-range-text">{getDisplayText()}</span>
-        <span className="time-range-arrow">{isOpen ? '▴' : '▾'}</span>
+        <span className={styles.timeRangeIcon}>⏱</span>
+        <span className={styles.timeRangeText}>{getDisplayText()}</span>
       </button>
 
       {isOpen && (
-        <div className="time-range-dropdown">
-          <div className="time-range-shortcuts">
+        <div className={styles.timeRangeDropdown}>
+          <div className={styles.timeRangeShortcuts}>
             {SHORTCUTS.map((shortcut) => (
               <button
                 key={shortcut.value}
-                className={`time-range-item ${startTime === shortcut.value ? 'active' : ''}`}
+                className={`${styles.timeRangeItem} ${startTime === shortcut.value ? styles.active : ''}`}
                 onClick={() => handleShortcut(shortcut.value)}
               >
                 {shortcut.label}
@@ -126,19 +126,19 @@ export function TimeRangeSelector() {
             ))}
           </div>
 
-          <div className="time-range-divider" />
+          <div className={styles.timeRangeDivider} />
 
           {!showCustom ? (
             <>
               <button
-                className="time-range-item"
+                className={styles.timeRangeItem}
                 onClick={() => setShowCustom(true)}
               >
                 Custom range...
               </button>
               {(startTime || endTime) && (
                 <button
-                  className="time-range-item time-range-clear"
+                  className={`${styles.timeRangeItem} ${styles.timeRangeClear}`}
                   onClick={handleClear}
                 >
                   Clear filter
@@ -146,8 +146,8 @@ export function TimeRangeSelector() {
               )}
             </>
           ) : (
-            <div className="time-range-custom">
-              <div className="custom-input-group">
+            <div className={styles.timeRangeCustom}>
+              <div className={styles.customInputGroup}>
                 <label>From:</label>
                 <input
                   type="text"
@@ -163,7 +163,7 @@ export function TimeRangeSelector() {
                   autoFocus
                 />
               </div>
-              <div className="custom-input-group">
+              <div className={styles.customInputGroup}>
                 <label>To:</label>
                 <input
                   type="text"
@@ -179,7 +179,7 @@ export function TimeRangeSelector() {
                 />
               </div>
               <ErrorDisplay error={error} onDismiss={() => setError(null)} />
-              <div className="custom-actions">
+              <div className={styles.customActions}>
                 <button className="btn-secondary btn-sm" onClick={() => setShowCustom(false)}>
                   Cancel
                 </button>

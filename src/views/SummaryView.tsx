@@ -7,6 +7,7 @@ import { LogActivityChart } from '../components/LogActivityChart';
 import { calculateTimeRangeMicros } from '../utils/timeUtils';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
+import styles from './SummaryView.module.css';
 
 export function SummaryView() {
   const navigate = useNavigate();
@@ -312,11 +313,11 @@ export function SummaryView() {
 
       <div className="content">
         {/* Log Overview */}
-        <section className="summary-section">
+        <section className={styles.summarySection}>
           <h2>Logs Over Time: {stats.totalLogLines} lines</h2>
           
           {/* Activity Chart */}
-          <div className="activity-chart-container">
+          <div className={styles.activityChartContainer}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', height: '24px' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', visibility: shouldShowApplyButton ? 'visible' : 'hidden', opacity: shouldShowApplyButton ? 1 : 0, transition: 'opacity 0.15s ease-in-out' }}>
                 {shouldShowApplyButton && localStartTime !== null && localEndTime !== null && (
@@ -351,26 +352,26 @@ export function SummaryView() {
         </section>
 
         {/* Errors & Warnings Section */}
-        <div className="errors-warnings-grid">
+        <div className={styles.errorsWarningsGrid}>
           {/* Errors Section */}
           {stats.errors > 0 && (
-            <section className="summary-section">
+            <section className={styles.summarySection}>
               {stats.errorsByType.length > 0 && (
-                <div className="summary-table-container">
-                  <table className="summary-table">
+                <div className={styles.summaryTableContainer}>
+                  <table className={styles.summaryTable}>
                     <thead>
                       <tr>
                         <th>
                           Top Errors (
                           <span
-                            className="clickable-heading"
+                            className={styles.clickableHeading}
                             onClick={() => navigate('/logs?filter=ERROR')}
                           >
                             {stats.errors}
                           </span>
                           )
                         </th>
-                        <th className="align-right">Count</th>
+                        <th className={styles.alignRight}>Count</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -378,7 +379,7 @@ export function SummaryView() {
                         <tr key={idx}>
                           <td>
                             <button
-                              className="action-link"
+                              className={styles.actionLink}
                               title={error.type}
                               onClick={() =>
                                 navigate(
@@ -392,7 +393,7 @@ export function SummaryView() {
                               {error.type.substring(0, 100)}
                             </button>
                           </td>
-                          <td className="align-right">{error.count}</td>
+                          <td className={styles.alignRight}>{error.count}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -404,23 +405,23 @@ export function SummaryView() {
 
           {/* Warnings Section */}
           {stats.warnings > 0 && (
-            <section className="summary-section">
+            <section className={styles.summarySection}>
               {stats.warningsByType.length > 0 && (
-                <div className="summary-table-container">
-                  <table className="summary-table">
+                <div className={styles.summaryTableContainer}>
+                  <table className={styles.summaryTable}>
                     <thead>
                       <tr>
                         <th>
                           Top Warnings (
                           <span
-                            className="clickable-heading"
+                            className={styles.clickableHeading}
                             onClick={() => navigate('/logs?filter=WARN')}
                           >
                             {stats.warnings}
                           </span>
                           )
                         </th>
-                        <th className="align-right">Count</th>
+                        <th className={styles.alignRight}>Count</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -428,7 +429,7 @@ export function SummaryView() {
                         <tr key={idx}>
                           <td>
                             <button
-                              className="action-link"
+                              className={styles.actionLink}
                               title={warning.type}
                               onClick={() =>
                                 navigate(
@@ -442,7 +443,7 @@ export function SummaryView() {
                               {warning.type.substring(0, 100)}
                             </button>
                           </td>
-                          <td className="align-right">{warning.count}</td>
+                          <td className={styles.alignRight}>{warning.count}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -455,25 +456,25 @@ export function SummaryView() {
 
         {/* HTTP Errors Section */}
         {stats.httpErrorsByStatus.length > 0 && (
-          <section className="summary-section">
+          <section className={styles.summarySection}>
             <h2>HTTP Errors</h2>
-            <div className="summary-table-container">
-              <table className="summary-table">
+            <div className={styles.summaryTableContainer}>
+              <table className={styles.summaryTable}>
                 <thead>
                   <tr>
                     <th>Status Code</th>
-                    <th className="align-right">Count</th>
-                    <th className="align-right">Action</th>
+                    <th className={styles.alignRight}>Count</th>
+                    <th className={styles.alignRight}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.httpErrorsByStatus.map((error, idx) => (
                     <tr key={idx}>
                       <td>{error.status}</td>
-                      <td className="align-right">{error.count}</td>
-                      <td className="align-right">
+                      <td className={styles.alignRight}>{error.count}</td>
+                      <td className={styles.alignRight}>
                         <button
-                          className="action-link"
+                          className={styles.actionLink}
                           onClick={() =>
                             navigate(`/http_requests?status=${error.status}`)
                           }
@@ -491,10 +492,10 @@ export function SummaryView() {
 
         {/* Slowest HTTP Requests Section */}
         {stats.slowestHttpRequests.length > 0 && (
-          <section className="summary-section">
+          <section className={styles.summarySection}>
             <h2>Slowest HTTP Requests</h2>
-            <div className="summary-table-container">
-              <table className="summary-table">
+            <div className={styles.summaryTableContainer}>
+              <table className={styles.summaryTable}>
                 <thead>
                   <tr>
                     <th>Duration</th>
@@ -522,10 +523,13 @@ export function SummaryView() {
                       return prefix.replace(/\/$/, '');
                     }
                     const commonPrefix = getCommonPrefix(uris);
-                    return filtered.map((req) => (
+                    return filtered.map((req) => {
+                      const statusCode = parseInt(req.status, 10);
+                      const statusClass = statusCode >= 400 ? styles.statusError : styles.statusSuccess;
+                      return (
                       <tr key={req.id}>
                         <td>
-                          <span className="duration-badge">
+                          <span className={styles.durationBadge}>
                             {formatDuration(req.duration)}
                           </span>
                         </td>
@@ -533,25 +537,26 @@ export function SummaryView() {
                         <td style={{ fontFamily: 'monospace', fontSize: '13px', color: '#007acc' }}>
                           <a
                             href={`#/http_requests?id=${req.id}`}
-                            className="action-link"
+                            className={styles.actionLink}
                             title={req.id}
                             style={{ textDecoration: 'underline', color: '#007acc' }}
                           >
                             {req.id}
                           </a>
                         </td>
-                        <td className="uri-cell">
+                        <td className={styles.uriCell}>
                           {commonPrefix && req.uri !== commonPrefix
                             ? '/' + req.uri.replace(commonPrefix, '').replace(/^\//, '')
                             : req.uri}
                         </td>
                         <td>
-                          <span className={`status-badge status-${req.status}`}>
+                          <span className={`${styles.statusBadge} ${statusClass}`}>
                             {req.status || 'pending'}
                           </span>
                         </td>
                       </tr>
-                    ));
+                    );
+                    });
                   })()}
                 </tbody>
               </table>
@@ -561,25 +566,25 @@ export function SummaryView() {
 
         {/* Sync Requests by Connection Section */}
         {stats.syncRequestsByConnection.length > 0 && (
-          <section className="summary-section">
+          <section className={styles.summarySection}>
             <h2>Sync Requests by Connection</h2>
-            <div className="summary-table-container">
-              <table className="summary-table">
+            <div className={styles.summaryTableContainer}>
+              <table className={styles.summaryTable}>
                 <thead>
                   <tr>
                     <th>Connection ID</th>
-                    <th className="align-right">Request Count</th>
-                    <th className="align-right">Action</th>
+                    <th className={styles.alignRight}>Request Count</th>
+                    <th className={styles.alignRight}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.syncRequestsByConnection.map((item) => (
                     <tr key={item.connId}>
                       <td>{item.connId}</td>
-                      <td className="align-right">{item.count}</td>
-                      <td className="align-right">
+                      <td className={styles.alignRight}>{item.count}</td>
+                      <td className={styles.alignRight}>
                         <button
-                          className="action-link"
+                          className={styles.actionLink}
                           onClick={() =>
                             navigate(`/http_requests/sync?conn=${item.connId}`)
                           }
