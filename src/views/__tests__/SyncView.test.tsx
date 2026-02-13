@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { SyncView } from '../SyncView';
 import { useLogStore } from '../../stores/logStore';
+import { createSyncRequests, createSyncRequest } from '../../test/fixtures';
 import type { SyncRequest } from '../../types/log.types';
 
 // Mock dependencies
@@ -10,28 +11,11 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-function createMockSyncRequest(id: string, index: number): SyncRequest {
-  const url = `https://matrix.example.org/_matrix/client/v3/sync?timeout=30000&request=${index}`;
-  return {
-    requestId: id,
-    connId: 'conn-1',
-    method: 'POST',
-    uri: url,
-    requestDurationMs: 500,
-    status: '200',
-    requestSize: '0',
-    responseSize: '0',
-    sendLineNumber: index * 2,
-    responseLineNumber: index * 2 + 1,
-  };
-}
-
 describe('SyncView - ID Parameter Deep Linking', () => {
   let mockScrollTo: ReturnType<typeof vi.fn>;
   let originalHash: string;
   
   beforeEach(() => {
-    useLogStore.getState().clearData();
     mockScrollTo = vi.fn();
     originalHash = window.location.hash;
     
@@ -41,14 +25,10 @@ describe('SyncView - ID Parameter Deep Linking', () => {
 
   afterEach(() => {
     window.location.hash = originalHash;
-    vi.clearAllMocks();
   });
 
   it('opens LogDisplayView when id parameter is present', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(10);
     
     useLogStore.setState({
       allRequests: requests,
@@ -66,10 +46,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('expands row when id parameter is present', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(10);
     
     useLogStore.setState({
       allRequests: requests,
@@ -87,10 +64,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('scrolls to center the request row in viewport', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 100; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(100);
     
     useLogStore.setState({
       allRequests: requests,
@@ -108,10 +82,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('does not scroll multiple times for same ID', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(10);
     
     useLogStore.setState({
       allRequests: requests,
@@ -142,10 +113,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('retries scroll if initial scroll does not reach target', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 50; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(50);
     
     useLogStore.setState({
       allRequests: requests,
@@ -179,10 +147,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('does not open LogDisplayView if ID not in filtered requests', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(10);
     
     useLogStore.setState({
       allRequests: requests,
@@ -204,9 +169,9 @@ describe('SyncView - ID Parameter Deep Linking', () => {
 
   it('handles URL-encoded request IDs', async () => {
     const requests: SyncRequest[] = [
-      createMockSyncRequest('SYNC-123', 0),
-      createMockSyncRequest('SYNC:SPECIAL/CHARS', 1),
-      createMockSyncRequest('SYNC-456', 2),
+      createSyncRequest({ requestId: 'SYNC-123', sendLineNumber: 0 }),
+      createSyncRequest({ requestId: 'SYNC:SPECIAL/CHARS', sendLineNumber: 2 }),
+      createSyncRequest({ requestId: 'SYNC-456', sendLineNumber: 4 }),
     ];
     
     useLogStore.setState({
@@ -226,10 +191,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('clamps scroll target to maxScroll bounds', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(10);
     
     useLogStore.setState({
       allRequests: requests,
@@ -246,10 +208,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('removes id parameter from URL when clicking different request', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 5; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(5);
     
     useLogStore.setState({
       allRequests: requests,
@@ -286,10 +245,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
   });
 
   it('keeps id parameter when clicking the same request', async () => {
-    const requests: SyncRequest[] = [];
-    for (let i = 0; i < 5; i++) {
-      requests.push(createMockSyncRequest(`SYNC-${i}`, i));
-    }
+    const requests = createSyncRequests(5);
     
     useLogStore.setState({
       allRequests: requests,

@@ -194,10 +194,6 @@ describe('WaterfallTimeline', () => {
   });
 
   describe('Helper Functions', () => {
-    it('exports getWaterfallPosition function', () => {
-      expect(typeof getWaterfallPosition).toBe('function');
-    });
-
     it('getWaterfallPosition calculates correct position', () => {
       const position = getWaterfallPosition(1005000, 1000000, 10000, 800);
       // Calculated: (1005000 - 1000000) / 10000 * 800 = 5000 / 10000 * 800 = 400px
@@ -213,10 +209,6 @@ describe('WaterfallTimeline', () => {
       // Dynamic min: 100ms / 10 = 10px
       // Result: max(100, 10) = 100px
       expect(position).toBe(100);
-    });
-
-    it('exports getWaterfallBarWidth function', () => {
-      expect(typeof getWaterfallBarWidth).toBe('function');
     });
 
     it('getWaterfallBarWidth calculates correct width', () => {
@@ -272,14 +264,6 @@ describe('WaterfallTimeline', () => {
       // Dynamic min: max(1, 10/10) = 1px
       const width10ms = getWaterfallBarWidth(10, 1000000, 10000);
       expect(width10ms).toBe(1);
-    });
-  });
-
-  describe('Accessibility', () => {
-    it('cursor configuration ensures non-interference', () => {
-      // Cursor has pointer-events none in implementation
-      // Validated via visual/integration testing
-      expect(true).toBe(true);
     });
   });
 });

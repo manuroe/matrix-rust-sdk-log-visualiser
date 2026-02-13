@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { screen, fireEvent } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { useLogStore } from '../../stores/logStore';
 import { LogDisplayView } from '../LogDisplayView';
-import type { ParsedLogLine } from '../../types/log.types';
+import { createLogsWithMatches } from '../../test/fixtures';
 
 // Mock react-virtual to simplify rendering in tests
 vi.mock('@tanstack/react-virtual', () => {
@@ -19,29 +19,6 @@ vi.mock('@tanstack/react-virtual', () => {
   };
 });
 
-function makeLogs(total: number, matchIndices: number[]): ParsedLogLine[] {
-  const logs: ParsedLogLine[] = [];
-  for (let i = 0; i < total; i++) {
-    const isMatch = matchIndices.includes(i);
-    const timestamp = new Date(0);
-    const isoTimestamp = '1970-01-01T00:00:00.000000Z';
-    const displayTime = '00:00:00.000000';
-    const timestampUs = timestamp.getTime() * 1000;
-    const message = isMatch ? `MATCH ${i}` : `line ${i}`;
-    logs.push({
-      lineNumber: i,
-      rawText: `${isoTimestamp} INFO ${message}`,
-      isoTimestamp,
-      timestampUs,
-      displayTime,
-      level: 'INFO',
-      message,
-      strippedMessage: message,
-    });
-  }
-  return logs;
-}
-
 function getLineContainer(lineNumber: number): HTMLElement {
   const candidates = screen.getAllByText(String(lineNumber));
   const lineNumSpan = candidates.find((el: Element) => el.classList.contains('log-line-number')) as HTMLElement;
@@ -50,16 +27,11 @@ function getLineContainer(lineNumber: number): HTMLElement {
 }
 
 describe('LogDisplayView gap arrows & expansion', () => {
-  beforeEach(() => {
-    // Reset store
-    useLogStore.getState().clearData();
-  });
-
   it('shows arrows and expands down on newly displayed lines', async () => {
     const user = userEvent.setup();
     const total = 200;
     const matchIndices = [76, 157];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" />);
 
@@ -91,7 +63,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const user = userEvent.setup();
     const total = 200;
     const matchIndices = [76, 157];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" />);
 
@@ -122,7 +94,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const user = userEvent.setup();
     const total = 200;
     const matchIndices = [76, 157];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" nextRequestLineRange={{ start: 157, end: 160 }} />);
 
@@ -145,7 +117,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const user = userEvent.setup();
     const total = 200;
     const matchIndices = [76, 157];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" prevRequestLineRange={{ start: 70, end: 76 }} />);
 
@@ -168,7 +140,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const user = userEvent.setup();
     const total = 200;
     const matchIndices = [76, 157];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" />);
 
@@ -191,7 +163,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const user = userEvent.setup();
     const total = 200;
     const matchIndices = [76, 157];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" />);
 
@@ -214,29 +186,32 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const user = userEvent.setup();
     const total = 10;
     const matchIndices = [3, 7];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    const logs = createLogsWithMatches(total, matchIndices);
+    useLogStore.setState({ rawLogLines: logs });
 
     render(<LogDisplayView requestFilter="MATCH" />);
 
     const line3Container = getLineContainer(3);
     const textSpan = line3Container.querySelector('.log-line-text') as HTMLSpanElement;
     expect(textSpan).toBeTruthy();
+    
     // With stripPrefix=true (default), message should not start with ISO timestamp
-    expect(textSpan.textContent?.trim().startsWith('1970-01-01T00:00:00.000000Z')).toBe(false);
+    const isoTimestamp = logs[3].isoTimestamp;
+    expect(textSpan.textContent?.trim().startsWith(isoTimestamp)).toBe(false);
 
     // Toggle stripPrefix off
     const stripCheckbox = screen.getByLabelText(/Strip prefix/i) as HTMLInputElement;
     await user.click(stripCheckbox);
 
     // Now the log-line-text should include the timestamp prefix in the rawText (due to no strip)
-    expect(textSpan.textContent?.includes('1970-01-01T00:00:00.000000Z')).toBe(true);
+    expect(textSpan.textContent?.includes(isoTimestamp)).toBe(true);
   });
 
   it('lineWrap toggles wrap class on lines', async () => {
     const user = userEvent.setup();
     const total = 5;
     const matchIndices = [2, 4];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" />);
 
@@ -259,7 +234,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const user = userEvent.setup();
     const total = 30;
     const matchIndices = [15];
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
 
@@ -283,7 +258,7 @@ describe('LogDisplayView gap arrows & expansion', () => {
   it('removes arrows when gap fully expanded to next anchor', async () => {
     const total = 200;
     const matchIndices = [76, 77]; // Adjacent so no gap below 76
-    useLogStore.setState({ rawLogLines: makeLogs(total, matchIndices) });
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
 
     render(<LogDisplayView requestFilter="MATCH" defaultShowOnlyMatching={true} />);
 
@@ -306,7 +281,7 @@ describe('LogDisplayView filter & search behaviors', () => {
   it('filter narrows visible lines to only matching ones', async () => {
     const total = 20;
     useLogStore.setState({
-      rawLogLines: makeLogs(total, []),
+      rawLogLines: createLogsWithMatches(total, []),
     });
 
     const { rerender } = render(<LogDisplayView />);
@@ -330,7 +305,7 @@ describe('LogDisplayView filter & search behaviors', () => {
   it('search highlights matching text within filtered results', async () => {
     const total = 10;
     useLogStore.setState({
-      rawLogLines: makeLogs(total, [2, 5, 8]),
+      rawLogLines: createLogsWithMatches(total, [2, 5, 8]),
     });
 
     render(<LogDisplayView requestFilter="MATCH" />);
@@ -359,7 +334,7 @@ describe('LogDisplayView filter & search behaviors', () => {
     const total = 20;
     const matchIndices = Array.from({ length: 20 }, (_, i) => i); // All have "MATCH"
     useLogStore.setState({
-      rawLogLines: makeLogs(total, matchIndices),
+      rawLogLines: createLogsWithMatches(total, matchIndices),
     });
 
     render(<LogDisplayView />);
@@ -380,7 +355,7 @@ describe('LogDisplayView filter & search behaviors', () => {
     const total = 10;
     const matchIndices = Array.from({ length: 10 }, (_, i) => i); // All have "MATCH"
     useLogStore.setState({
-      rawLogLines: makeLogs(total, matchIndices),
+      rawLogLines: createLogsWithMatches(total, matchIndices),
     });
 
     render(<LogDisplayView requestFilter="MATCH" />);
@@ -447,7 +422,7 @@ describe('LogDisplayView filter & search behaviors', () => {
 
   it('filter input initializes from requestFilter prop', () => {
     useLogStore.setState({
-      rawLogLines: makeLogs(10, [2, 5]),
+      rawLogLines: createLogsWithMatches(10, [2, 5]),
     });
 
     render(<LogDisplayView requestFilter="MATCH" />);
@@ -458,7 +433,7 @@ describe('LogDisplayView filter & search behaviors', () => {
 
   it('search input starts empty regardless of requestFilter', () => {
     useLogStore.setState({
-      rawLogLines: makeLogs(10, [2, 5]),
+      rawLogLines: createLogsWithMatches(10, [2, 5]),
     });
 
     render(<LogDisplayView requestFilter="MATCH" />);
@@ -524,7 +499,7 @@ describe('LogDisplayView filter & search behaviors', () => {
   it('context lines work with filter', async () => {
     const total = 20;
     useLogStore.setState({
-      rawLogLines: makeLogs(total, [10]), // Only line 10 matches
+      rawLogLines: createLogsWithMatches(total, [10]), // Only line 10 matches
     });
 
     render(<LogDisplayView requestFilter="MATCH" />);

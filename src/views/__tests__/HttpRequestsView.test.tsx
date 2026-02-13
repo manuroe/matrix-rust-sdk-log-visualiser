@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { HttpRequestsView } from '../HttpRequestsView';
 import { useLogStore } from '../../stores/logStore';
+import { createHttpRequests, createHttpRequest } from '../../test/fixtures';
 import type { HttpRequest } from '../../types/log.types';
 
 // Mock dependencies
@@ -10,27 +11,11 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-function createMockHttpRequest(id: string, index: number): HttpRequest {
-  const url = `https://matrix.example.org/_matrix/client/v3/sync?timeout=30000&request=${index}`;
-  return {
-    requestId: id,
-    method: 'POST',
-    uri: url,
-    requestDurationMs: 500,
-    status: '200',
-    requestSize: '0',
-    responseSize: '0',
-    sendLineNumber: index * 2,
-    responseLineNumber: index * 2 + 1,
-  };
-}
-
 describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   let mockScrollTo: ReturnType<typeof vi.fn>;
   let originalHash: string;
   
   beforeEach(() => {
-    useLogStore.getState().clearData();
     mockScrollTo = vi.fn();
     originalHash = window.location.hash;
     
@@ -40,14 +25,10 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
 
   afterEach(() => {
     window.location.hash = originalHash;
-    vi.clearAllMocks();
   });
 
   it('opens LogDisplayView when id parameter is present', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(10);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -65,10 +46,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('expands row when id parameter is present', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(10);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -86,10 +64,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('scrolls to center the request row in viewport', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 100; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(100);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -107,10 +82,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('does not scroll multiple times for same ID', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(10);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -141,10 +113,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('retries scroll if initial scroll does not reach target', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 50; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(50);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -178,10 +147,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('does not open LogDisplayView if ID not in filtered requests', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(10);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -203,9 +169,9 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
 
   it('handles URL-encoded request IDs', async () => {
     const requests: HttpRequest[] = [
-      createMockHttpRequest('REQ-123', 0),
-      createMockHttpRequest('REQ:SPECIAL/CHARS', 1),
-      createMockHttpRequest('REQ-456', 2),
+      createHttpRequest({ requestId: 'REQ-123', sendLineNumber: 0 }),
+      createHttpRequest({ requestId: 'REQ:SPECIAL/CHARS', sendLineNumber: 2 }),
+      createHttpRequest({ requestId: 'REQ-456', sendLineNumber: 4 }),
     ];
     
     useLogStore.setState({
@@ -225,10 +191,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('clamps scroll target to maxScroll bounds', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 10; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(10);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -245,10 +208,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('removes id parameter from URL when clicking different request', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 5; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(5);
     
     useLogStore.setState({
       allHttpRequests: requests,
@@ -285,10 +245,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   });
 
   it('keeps id parameter when clicking the same request', async () => {
-    const requests: HttpRequest[] = [];
-    for (let i = 0; i < 5; i++) {
-      requests.push(createMockHttpRequest(`REQ-${i}`, i));
-    }
+    const requests = createHttpRequests(5);
     
     useLogStore.setState({
       allHttpRequests: requests,

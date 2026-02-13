@@ -1,5 +1,13 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { vi, afterEach } from 'vitest';
+
+// Auto-reset logStore after each test to ensure test isolation
+afterEach(async () => {
+  // Dynamic import to avoid circular dependencies during setup
+  const { useLogStore } = await import('../stores/logStore');
+  useLogStore.getState().clearData();
+  vi.clearAllMocks();
+});
 
 // Optional: mock matchMedia if used
 Object.defineProperty(window, 'matchMedia', {

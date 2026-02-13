@@ -2,36 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { screen, fireEvent } from '@testing-library/dom';
 import { LogActivityChart } from '../LogActivityChart';
-import type { ParsedLogLine } from '../../types/log.types';
-
-function createLogLines(count: number, timeOffsetMs: number = 0): ParsedLogLine[] {
-  const logs: ParsedLogLine[] = [];
-  const baseTime = new Date('2025-01-15T10:00:00Z').getTime();
-
-  for (let i = 0; i < count; i++) {
-    const time = new Date(baseTime + i * 1000 + timeOffsetMs);
-    const level = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'][i % 5] as any;
-    const isoTimestamp = time.toISOString().replace(/\.\d{3}Z$/, '.000000Z');
-    const displayTime = isoTimestamp.match(/T([\d:.]+)Z$/)?.[1] || '';
-
-    logs.push({
-      lineNumber: i,
-      rawText: `${isoTimestamp} ${level} message ${i}`,
-      isoTimestamp,
-      timestampUs: time.getTime() * 1000,
-      displayTime,
-      level,
-      message: `message ${i}`,
-      strippedMessage: `message ${i}`,
-    });
-  }
-
-  return logs;
-}
+import { createParsedLogLines } from '../../test/fixtures';
 
 describe('LogActivityChart', () => {
   it('renders the chart with stacked bars', () => {
-    const logs = createLogLines(50);
+    const logs = createParsedLogLines(50);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     // Check that SVG is rendered
@@ -49,7 +24,7 @@ describe('LogActivityChart', () => {
   });
 
   it('displays cursor line on mouse move', () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -67,7 +42,7 @@ describe('LogActivityChart', () => {
   });
 
   it('hides cursor line on mouse leave', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -86,7 +61,7 @@ describe('LogActivityChart', () => {
   });
 
   it('displays time label at cursor position', () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -107,7 +82,7 @@ describe('LogActivityChart', () => {
   });
 
   it('displays tooltip with log level counts on mouse move', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
 
@@ -121,7 +96,7 @@ describe('LogActivityChart', () => {
   });
 
   it('shows total count in tooltip', async () => {
-    const logs = createLogLines(50);
+    const logs = createParsedLogLines(50);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -136,7 +111,7 @@ describe('LogActivityChart', () => {
   });
 
   it('renders bars for all log levels', () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     // Check that bars are rendered with correct colors
@@ -151,7 +126,7 @@ describe('LogActivityChart', () => {
   it('calculates correct bucket size for large time ranges', () => {
     // Create logs spanning a long time period (1 hour)
     const hourInMs = 60 * 60 * 1000;
-    const logs = createLogLines(100, hourInMs);
+    const logs = createParsedLogLines(100, hourInMs);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     // Verify SVG renders without errors
@@ -197,7 +172,7 @@ describe('LogActivityChart', () => {
   });
 
   it('cursor position updates on successive mouse moves', () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -218,7 +193,7 @@ describe('LogActivityChart', () => {
   });
 
   it('does not display cursor when mouse is outside chart bounds', () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -237,7 +212,7 @@ describe('LogActivityChart', () => {
   });
 
   it('calls onTimeRangeSelected callback when selection exceeds minimum range', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const onTimeRangeSelected = vi.fn();
     const { container } = render(
       <LogActivityChart logLines={logs} onTimeRangeSelected={onTimeRangeSelected} />
@@ -266,7 +241,7 @@ describe('LogActivityChart', () => {
   });
 
   it('does not call onTimeRangeSelected for selection smaller than 100ms', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const onTimeRangeSelected = vi.fn();
     const { container } = render(
       <LogActivityChart logLines={logs} onTimeRangeSelected={onTimeRangeSelected} />
@@ -287,7 +262,7 @@ describe('LogActivityChart', () => {
   });
 
   it('calls onResetZoom callback on double-click', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const onResetZoom = vi.fn();
     const { container } = render(
       <LogActivityChart logLines={logs} onResetZoom={onResetZoom} />
@@ -305,7 +280,7 @@ describe('LogActivityChart', () => {
   });
 
   it('displays start and end time labels on x-axis', () => {
-    const logs = createLogLines(50);
+    const logs = createParsedLogLines(50);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     // Find all text elements
@@ -326,7 +301,7 @@ describe('LogActivityChart', () => {
   });
 
   it('renders axes with correct structure', () => {
-    const logs = createLogLines(50);
+    const logs = createParsedLogLines(50);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     // Check that we have line elements for axes (from Visx AxisBottom and AxisLeft)
@@ -341,7 +316,7 @@ describe('LogActivityChart', () => {
   });
 
   it('displays dual cursor lines during selection', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -364,7 +339,7 @@ describe('LogActivityChart', () => {
   });
 
   it('displays time labels on selection cursors', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -387,7 +362,7 @@ describe('LogActivityChart', () => {
   });
 
   it('hides cursor tooltip during selection mode', async () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
@@ -416,7 +391,7 @@ describe('LogActivityChart', () => {
   });
 
   it('renders correct number of bars based on time range and bucketing', () => {
-    const logs = createLogLines(100);
+    const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
 
     const bars = container.querySelectorAll('rect[opacity="0.9"]');

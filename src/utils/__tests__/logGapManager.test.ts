@@ -6,27 +6,15 @@ import {
   type FilteredLine,
   type ForcedRange,
 } from '../logGapManager';
+import { createParsedLogLine, createParsedLogLines } from '../../test/fixtures';
 import type { ParsedLogLine } from '../../types/log.types';
 
-function makeMockLine(index: number): ParsedLogLine {
-  return {
-    lineNumber: index,
-    rawText: `2024-01-01T00:00:00.000000Z INFO Line ${index}`,
-    isoTimestamp: '2024-01-01T00:00:00.000000Z',
-    timestampUs: new Date('2024-01-01T00:00:00.000Z').getTime() * 1000,
-    displayTime: '00:00:00.000000',
-    level: 'INFO',
-    message: `Line ${index}`,
-    strippedMessage: `Line ${index}`,
-  };
-}
-
 function makeFilteredLines(indices: number[]): FilteredLine[] {
-  return indices.map((idx) => ({ line: makeMockLine(idx), index: idx }));
+  return indices.map((idx) => ({ line: createParsedLogLine({ lineNumber: idx }), index: idx }));
 }
 
 function makeRawLines(count: number): ParsedLogLine[] {
-  return Array.from({ length: count }, (_, i) => makeMockLine(i));
+  return createParsedLogLines(count);
 }
 
 describe('logGapManager', () => {

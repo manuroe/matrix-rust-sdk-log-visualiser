@@ -1,13 +1,9 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { screen, within, waitFor } from '@testing-library/dom';
 import { useLogStore } from '../../stores/logStore';
 import { LogsView } from '../LogsView';
-import type { ParsedLogLine } from '../../types/log.types';
-import * as TimeUtils from '../../utils/timeUtils';
-import { useLogStore } from '../../stores/logStore';
-import { LogsView } from '../LogsView';
-import type { ParsedLogLine } from '../../types/log.types';
+import { createParsedLogLines } from '../../test/fixtures';
 import * as TimeUtils from '../../utils/timeUtils';
 
 // Mock react-router-dom for useSearchParams
@@ -37,39 +33,13 @@ vi.mock('../../components/TimeRangeSelector', () => ({
   TimeRangeSelector: () => <div data-testid="time-range-selector">Selector</div>,
 }));
 
-function makeLogs(count: number, startTime: Date = new Date('2024-01-01T00:00:00Z')): ParsedLogLine[] {
-  const logs: ParsedLogLine[] = [];
-  for (let i = 0; i < count; i++) {
-    const timestamp = new Date(startTime.getTime() + i * 1000);
-    const isoTimestamp = timestamp.toISOString().replace(/\.\d{3}Z$/, '.000000Z');
-    const timeStr = isoTimestamp.match(/T([\d:.]+)Z?$/)?.[1] || isoTimestamp;
-    const timestampUs = timestamp.getTime() * 1000; // Convert ms to microseconds
-    logs.push({
-      lineNumber: i,
-      rawText: `${isoTimestamp} INFO line ${i}`,
-      isoTimestamp,
-      timestampUs,
-      displayTime: timeStr,
-      level: 'INFO',
-      message: `line ${i}`,
-      strippedMessage: `line ${i}`,
-    });
-  }
-  return logs;
-}
-
 describe('LogsView', () => {
-  beforeEach(() => {
-    useLogStore.getState().clearData();
-    vi.clearAllMocks();
-  });
-
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('renders header with title and stats', () => {
-    const logs = makeLogs(10);
+    const logs = createParsedLogLines(10);
     useLogStore.setState({ rawLogLines: logs });
 
     render(<LogsView />);
@@ -80,7 +50,7 @@ describe('LogsView', () => {
   });
 
   it('displays correct log count and total', () => {
-    const logs = makeLogs(20);
+    const logs = createParsedLogLines(20);
     useLogStore.setState({ rawLogLines: logs });
 
     render(<LogsView />);
@@ -94,7 +64,7 @@ describe('LogsView', () => {
 
   it('filters logs by time range', () => {
     const baseTime = new Date('2026-02-02T12:00:00Z');
-    const logs = makeLogs(100, baseTime);
+    const logs = createParsedLogLines(100, { baseTime });
     
     // Set time range to filter logs (25% to 75% of duration)
     useLogStore.setState({ 
@@ -117,7 +87,7 @@ describe('LogsView', () => {
 
   it('shows total count as all raw logs regardless of filter', () => {
     const baseTime = new Date('2026-02-02T12:00:00Z');
-    const logs = makeLogs(50, baseTime);
+    const logs = createParsedLogLines(50, { baseTime });
     useLogStore.setState({ 
       rawLogLines: logs,
       startTime: '2026-02-02T12:00:10Z', // Partial time range
@@ -140,7 +110,7 @@ describe('LogsView', () => {
   });
 
   it('passes LogDisplayView the correct props', () => {
-    const logs = makeLogs(20);
+    const logs = createParsedLogLines(20);
     useLogStore.setState({ rawLogLines: logs });
 
     const { container } = render(<LogsView />);
@@ -155,7 +125,7 @@ describe('LogsView', () => {
   });
 
   it('provides prevRequestLineRange and nextRequestLineRange props to LogDisplayView', () => {
-    const logs = makeLogs(10);
+    const logs = createParsedLogLines(10);
     useLogStore.setState({ rawLogLines: logs });
 
     // Since LogDisplayView doesn't expose these props in the DOM, we verify indirectly
@@ -170,27 +140,6 @@ describe('LogsView', () => {
     expect(logLines.length).toBeGreaterThan(0);
   });
 
-  it('computes prevRequestLineRange as start of log file', () => {
-    const logs = makeLogs(5);
-    useLogStore.setState({ rawLogLines: logs });
-
-    // prevRequestLineRange should point to line 0 (start of file)
-    // We can't directly inspect this from DOM, but we verify LogDisplayView renders
-    const { container } = render(<LogsView />);
-    
-    expect(container.querySelector('.logs-view-container')).toBeInTheDocument();
-  });
-
-  it('computes nextRequestLineRange as end of log file', () => {
-    const logs = makeLogs(5);
-    useLogStore.setState({ rawLogLines: logs });
-
-    // nextRequestLineRange should point to last line
-    const { container } = render(<LogsView />);
-    
-    expect(container.querySelector('.logs-view-container')).toBeInTheDocument();
-  });
-
   it('returns undefined range props when no logs exist', () => {
     useLogStore.setState({ rawLogLines: [] });
 
@@ -203,10 +152,8 @@ describe('LogsView', () => {
 
   it('updates display when time range changes', async () => {
     const baseTime = new Date('2026-02-02T12:00:00Z');
-    const logs = makeLogs(50, baseTime);
-    const store = useLogStore.getState();
+    const logs = createParsedLogLines(50, { baseTime });
     
-    store.clearData();
     useLogStore.setState({ rawLogLines: logs });
 
     const { rerender } = render(<LogsView />);
@@ -240,7 +187,7 @@ describe('LogsView', () => {
 
   it('does not filter by request filter - only time range', () => {
     // LogsView should NOT apply request filtering, only time range
-    const logs = makeLogs(10);
+    const logs = createParsedLogLines(10);
     useLogStore.setState({ rawLogLines: logs });
 
     const { container } = render(<LogsView />);
