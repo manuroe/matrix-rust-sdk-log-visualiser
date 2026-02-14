@@ -175,6 +175,9 @@ export function FileUpload() {
         <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
           Supports .log or .log.gz files
         </p>
+        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+          All log data is processed locally in your browser. No server interaction
+        </p>
         {validationError && (
           <ErrorDisplay
             error={validationError}
