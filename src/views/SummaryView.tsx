@@ -595,7 +595,6 @@ export function SummaryView() {
                 <thead>
                   <tr>
                     <th>Duration</th>
-                    <th>Method</th>
                     <th>Request</th>
                     <th>URI</th>
                     <th>Status</th>
@@ -629,7 +628,6 @@ export function SummaryView() {
                             {formatDuration(req.duration)}
                           </span>
                         </td>
-                        <td>{req.method}</td>
                         <td style={{ fontFamily: 'monospace', fontSize: '13px', color: '#007acc' }}>
                           <a
                             href={`#/http_requests?id=${req.id}`}
