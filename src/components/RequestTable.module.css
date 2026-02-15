@@ -165,12 +165,22 @@
     --row-bg: var(--row-bg-hover);
 }
 
-.rowHovered {
-    --row-bg: var(--row-bg-hover);
+:global(.row-hovered) {
+    --row-bg: var(--row-bg-hover) !important;
+    background-color: var(--row-bg-hover) !important;
+}
+
+:global(.row-hovered) > * {
+    background-color: var(--row-bg-hover) !important;
 }
 
 .expanded {
     --row-bg: var(--row-bg-expanded);
+}
+
+.selected {
+    --row-bg: #d0e5f5;
+    font-weight: 600;
 }
 
 .pending {

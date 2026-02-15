@@ -147,6 +147,76 @@ describe('RequestTable', () => {
 
       expect(useLogStore.getState().timelineScale).toBe(50);
     });
+
+    it('highlights both left and right panels on row hover', () => {
+      const requests = createRequests(2);
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: 1700000000000000 }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: 1700000001000000 }),
+        createParsedLogLine({ lineNumber: 2, timestampUs: 1700000002000000 }),
+        createParsedLogLine({ lineNumber: 3, timestampUs: 1700000003000000 }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, rawLines);
+
+      const { container } = render(<RequestTable {...createProps({ 
+        filteredRequests: requests, 
+        totalCount: 2 
+      })} />);
+
+      // Get the first row in the left panel
+      const leftRow = container.querySelector('[data-row-id="sticky-REQ-0"]');
+      const rightRow = container.querySelector('[data-row-id="waterfall-REQ-0"]');
+
+      expect(leftRow).toBeInTheDocument();
+      expect(rightRow).toBeInTheDocument();
+
+      // Simulate hover on left panel row
+      fireEvent.mouseEnter(leftRow!);
+
+      // Both rows should have the row-hovered class
+      expect(leftRow?.classList.contains('row-hovered')).toBe(true);
+      expect(rightRow?.classList.contains('row-hovered')).toBe(true);
+
+      // Simulate mouse leave
+      fireEvent.mouseLeave(leftRow!);
+
+      // Both rows should not have the row-hovered class
+      expect(leftRow?.classList.contains('row-hovered')).toBe(false);
+      expect(rightRow?.classList.contains('row-hovered')).toBe(false);
+    });
+
+    it('highlights both panels when hovering waterfall row', () => {
+      const requests = createRequests(2);
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: 1700000000000000 }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: 1700000001000000 }),
+        createParsedLogLine({ lineNumber: 2, timestampUs: 1700000002000000 }),
+        createParsedLogLine({ lineNumber: 3, timestampUs: 1700000003000000 }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, rawLines);
+
+      const { container } = render(<RequestTable {...createProps({ 
+        filteredRequests: requests, 
+        totalCount: 2 
+      })} />);
+
+      const leftRow = container.querySelector('[data-row-id="sticky-REQ-1"]');
+      const rightRow = container.querySelector('[data-row-id="waterfall-REQ-1"]');
+
+      // Simulate hover on waterfall row
+      fireEvent.mouseEnter(rightRow!);
+
+      // Both rows should be highlighted
+      expect(leftRow?.classList.contains('row-hovered')).toBe(true);
+      expect(rightRow?.classList.contains('row-hovered')).toBe(true);
+
+      // Simulate mouse leave on waterfall row
+      fireEvent.mouseLeave(rightRow!);
+
+      // Both rows should lose highlight
+      expect(leftRow?.classList.contains('row-hovered')).toBe(false);
+      expect(rightRow?.classList.contains('row-hovered')).toBe(false);
+    });
   });
 
   describe('request row rendering', () => {

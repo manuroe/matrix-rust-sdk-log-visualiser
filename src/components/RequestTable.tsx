@@ -155,7 +155,7 @@ export function RequestTable({
   }, [timelineWidth]);
 
   /** Handle click on request ID - toggle expansion or open log viewer */
-  const handleRequestClick = useCallback((requestId: string) => {
+  const handleRequestClick = useCallback((requestId: string, req?: HttpRequest) => {
     // Remove id parameter from URL if clicking a different request
     const hash = window.location.hash;
     const match = hash.match(/id=([^&]+)/);
@@ -175,7 +175,22 @@ export function RequestTable({
     }
     // Open clicked request and close all others atomically
     setActiveRequest(requestId);
-  }, [openLogViewerIds, expandedRows, closeLogViewer, toggleRowExpansion, setActiveRequest]);
+    
+    // Scroll waterfall to show the request if we have the request object
+    if (req && waterfallContainerRef.current) {
+      setTimeout(() => {
+        const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+        const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
+        const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
+        const container = waterfallContainerRef.current;
+        if (container) {
+          const containerClientWidth = container.clientWidth;
+          const targetScroll = barLeft - containerClientWidth * 0.2;
+          container.scrollLeft = Math.max(0, targetScroll);
+        }
+      }, 0);
+    }
+  }, [openLogViewerIds, expandedRows, closeLogViewer, toggleRowExpansion, setActiveRequest, rawLogLines, minTime, totalDuration, timelineWidth, msPerPixel]);
 
   /** Handle mouse enter on a row - highlight both panels */
   const handleRowMouseEnter = (requestId: string) => {
@@ -328,7 +343,7 @@ export function RequestTable({
                     <div
                       key={`sticky-${req.requestId}`}
                       data-row-id={`sticky-${req.requestId}`}
-                      className={`${styles.requestRow} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${!req.status ? styles.pending : ''}`}
+                      className={`${styles.requestRow} ${openLogViewerIds.has(req.requestId) ? styles.selected : ''} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${!req.status ? styles.pending : ''}`}
                       style={{ minHeight: '28px', cursor: 'pointer' }}
                       onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                       onMouseLeave={() => handleRowMouseLeave(req.requestId)}
@@ -345,7 +360,7 @@ export function RequestTable({
                                 data-testid={`request-id-${req.requestId}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleRequestClick(req.requestId);
+                                  handleRequestClick(req.requestId, req);
                                 }}
                               >
                                 {col.getValue(req)}
@@ -388,7 +403,7 @@ export function RequestTable({
                         <div
                           key={`waterfall-${req.requestId}`}
                           data-row-id={`waterfall-${req.requestId}`}
-                          className={`${styles.requestRow} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${isPending ? styles.pending : ''}`}
+                          className={`${styles.requestRow} ${openLogViewerIds.has(req.requestId) ? styles.selected : ''} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${isPending ? styles.pending : ''}`}
                           style={{ minHeight: '28px', cursor: 'pointer' }}
                           onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                           onMouseLeave={() => handleRowMouseLeave(req.requestId)}
