@@ -111,6 +111,7 @@ export function SummaryView() {
         errorsByType: [] as Array<{ type: string; count: number }>,
         warningsByType: [] as Array<{ type: string; count: number }>,
         httpErrorsByStatus: [] as Array<{ status: string; count: number }>,
+        topFailedUrls: [] as Array<{ uri: string; count: number; statuses: string[] }>,
         slowestHttpRequests: [] as Array<{
           id: string;
           duration: number;
@@ -233,6 +234,26 @@ export function SummaryView() {
       .map(([status, count]) => ({ status, count }))
       .sort((a, b) => b.count - a.count);
 
+    // Failed URLs (4xx, 5xx) grouped by URI with status codes
+    const failedUrlData: Record<string, { count: number; statuses: Set<string> }> = {};
+    filteredHttpRequests.forEach((req) => {
+      if (req.status) {
+        const statusCode = parseInt(req.status, 10);
+        if (statusCode >= 400) {
+          if (!failedUrlData[req.uri]) {
+            failedUrlData[req.uri] = { count: 0, statuses: new Set() };
+          }
+          failedUrlData[req.uri].count += 1;
+          failedUrlData[req.uri].statuses.add(req.status.split(' ')[0]);
+        }
+      }
+    });
+
+    const topFailedUrls = Object.entries(failedUrlData)
+      .map(([uri, data]) => ({ uri, count: data.count, statuses: Array.from(data.statuses) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
     // Slowest HTTP requests (from filtered requests)
     const slowestHttpRequests = filteredHttpRequests
       .filter(req => !/\/sync(\?|$)/i.test(req.uri))
@@ -272,6 +293,7 @@ export function SummaryView() {
       errorsByType,
       warningsByType,
       httpErrorsByStatus,
+      topFailedUrls,
       slowestHttpRequests,
       syncRequestsByConnection,
     };
@@ -371,7 +393,7 @@ export function SummaryView() {
                           </span>
                           )
                         </th>
-                        <th className={styles.alignRight}>Count</th>
+                        <th style={{ textAlign: 'right' }}>Count</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -421,7 +443,7 @@ export function SummaryView() {
                           </span>
                           )
                         </th>
-                        <th className={styles.alignRight}>Count</th>
+                        <th style={{ textAlign: 'right' }}>Count</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -454,46 +476,120 @@ export function SummaryView() {
           )}
         </div>
 
-        {/* HTTP Errors Section */}
-        {stats.httpErrorsByStatus.length > 0 && (
-          <section className={styles.summarySection}>
-            <h2>HTTP Errors</h2>
-            <div className={styles.summaryTableContainer}>
-              <table className={styles.summaryTable}>
-                <thead>
-                  <tr>
-                    <th>Status Code</th>
-                    <th className={styles.alignRight}>Count</th>
-                    <th className={styles.alignRight}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.httpErrorsByStatus.map((error, idx) => (
-                    <tr key={idx}>
-                      <td>{error.status}</td>
-                      <td className={styles.alignRight}>{error.count}</td>
-                      <td className={styles.alignRight}>
-                        <button
-                          className={styles.actionLink}
-                          onClick={() =>
-                            navigate(`/http_requests?status=${error.status}`)
+        {/* HTTP Errors Grid */}
+        <div className={styles.errorsWarningsGrid}>
+          {/* TOP HTTP Errors Section */}
+          {stats.topFailedUrls.length > 0 && (
+            <section className={styles.summarySection}>
+              {stats.topFailedUrls.length > 0 && (
+                <div className={styles.summaryTableContainer}>
+                  <table className={styles.summaryTable}>
+                    <thead>
+                      <tr>
+                        <th>
+                          Top Failed URLs (
+                          <span
+                            className={styles.clickableHeading}
+                            onClick={() => {
+                              const statuses = stats.httpErrorsByStatus.map(e => e.status).join(',');
+                              navigate(`/http_requests?status=${encodeURIComponent(statuses)}`);
+                            }}
+                          >
+                            {stats.topFailedUrls.reduce((sum, e) => sum + e.count, 0)}
+                          </span>
+                          )
+                        </th>
+                        <th>Status</th>
+                        <th className={styles.alignRight}>Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        // Find the common prefix for all URIs
+                        const uris = stats.topFailedUrls.map(item => item.uri);
+                        function getCommonPrefix(arr: string[]): string {
+                          if (!arr.length) return '';
+                          let prefix = arr[0];
+                          for (let i = 1; i < arr.length; i++) {
+                            while (arr[i].indexOf(prefix) !== 0) {
+                              prefix = prefix.slice(0, -1);
+                              if (!prefix) return '';
+                            }
                           }
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+                          // Remove trailing slash for cleaner display
+                          return prefix.replace(/\/$/, '');
+                        }
+                        const commonPrefix = getCommonPrefix(uris);
+                        return stats.topFailedUrls.map((item, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <button
+                                className={styles.actionLink}
+                                title={item.uri}
+                                onClick={() =>
+                                  navigate(`/http_requests?uri=${encodeURIComponent(item.uri)}`)
+                                }
+                                style={{ textAlign: 'left', whiteSpace: 'normal' }}
+                              >
+                                {commonPrefix && item.uri !== commonPrefix
+                                  ? '/' + item.uri.replace(commonPrefix, '').replace(/^\//, '')
+                                  : item.uri}
+                              </button>
+                            </td>
+                            <td>
+                              <span className={`${styles.statusBadge} ${styles.statusError}`}>
+                                {item.statuses.join(', ')}
+                              </span>
+                            </td>
+                            <td className={styles.alignRight}>{item.count}</td>
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
 
-        {/* Slowest HTTP Requests Section */}
+          {/* HTTP Errors Section */}
+          {stats.httpErrorsByStatus.length > 0 && (
+            <section className={styles.summarySection}>
+              <div className={styles.summaryTableContainer}>
+                <table className={styles.summaryTable}>
+                  <thead>
+                    <tr>
+                      <th>HTTP Error Codes</th>
+                      <th style={{ textAlign: 'right' }}>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.httpErrorsByStatus.map((error, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <button
+                            className={styles.actionLink}
+                            onClick={() =>
+                              navigate(`/http_requests?status=${error.status}`)
+                            }
+                          >
+                            {error.status}
+                          </button>
+                        </td>
+                        <td className={styles.alignRight}>{error.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+        </div>
+
+        {/* Slowest URLs Section */}
         {stats.slowestHttpRequests.length > 0 && (
           <section className={styles.summarySection}>
-            <h2>Slowest HTTP Requests</h2>
+            <h2>Slowest URLs</h2>
             <div className={styles.summaryTableContainer}>
               <table className={styles.summaryTable}>
                 <thead>
