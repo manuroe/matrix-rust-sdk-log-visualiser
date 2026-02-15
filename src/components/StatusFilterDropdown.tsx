@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useLogStore } from '../stores/logStore';
 import { PENDING_STATUS_KEY } from '../utils/statusCodeUtils';
+import { getHttpStatusColor } from '../utils/httpStatusColors';
 import styles from './StatusFilterDropdown.module.css';
 
 interface StatusFilterDropdownProps {
@@ -68,12 +69,9 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
     return statusCodeFilter === null || statusCodeFilter.has(code);
   };
 
-  /** Get CSS class for status code coloring */
-  const getStatusClass = (code: string) => {
-    if (code === PENDING_STATUS_KEY) return styles.pending;
-    const numCode = parseInt(code, 10);
-    if (!isNaN(numCode) && numCode < 400) return styles.success;
-    return styles.error;
+  /** Get color for status code */
+  const getStatusColor = (code: string) => {
+    return getHttpStatusColor(code === PENDING_STATUS_KEY ? 'pending' : code);
   };
 
   /** Get label for the dropdown button */
@@ -108,7 +106,7 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
                 checked={isEnabled(code)}
                 onChange={() => toggleStatusCode(code)}
               />
-              <span className={`${styles.statusCodeLabel} ${getStatusClass(code)}`}>
+              <span className={styles.statusCodeLabel} style={{ color: getStatusColor(code) }}>
                 {code}
               </span>
             </label>

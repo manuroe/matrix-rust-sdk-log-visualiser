@@ -49,15 +49,3 @@
     font-family: var(--font-mono);
     font-weight: 500;
 }
-
-.success {
-    color: var(--color-success);
-}
-
-.error {
-    color: var(--color-error);
-}
-
-.pending {
-    color: var(--color-warning);
-}

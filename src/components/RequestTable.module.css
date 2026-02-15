@@ -298,21 +298,8 @@
 
 .waterfallBar {
     height: 14px;
-    background: var(--waterfall-default);
     border-radius: var(--radius-sm);
     position: relative;
-}
-
-.waterfallBarSuccess {
-    background: var(--waterfall-success);
-}
-
-.waterfallBarPending {
-    background: var(--waterfall-pending);
-}
-
-.waterfallBarError {
-    background: var(--waterfall-error);
 }
 
 .waterfallDuration {

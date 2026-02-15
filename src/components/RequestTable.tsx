@@ -13,6 +13,7 @@ import { LogDisplayView } from '../views/LogDisplayView';
 import { useScrollSync } from '../hooks/useScrollSync';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
+import { getHttpStatusColor } from '../utils/httpStatusColors';
 import type { HttpRequest } from '../types/log.types';
 import styles from './RequestTable.module.css';
 
@@ -439,7 +440,8 @@ export function RequestTable({
                       );
                       const status = req.status ? req.status : 'Pending';
                       const isPending = !req.status;
-                      const statusClass = isPending ? 'pending' : req.status === '200' ? 'success' : 'error';
+                      const statusCode = req.status ? req.status.split(' ')[0] : '';
+                      const barColor = isPending ? 'var(--http-pending)' : getHttpStatusColor(statusCode);
 
                       return (
                         <div
@@ -463,14 +465,15 @@ export function RequestTable({
                               }}
                             >
                               <div
-                                className={`${styles.waterfallBar} ${statusClass === 'success' ? styles.waterfallBarSuccess : statusClass === 'pending' ? styles.waterfallBarPending : styles.waterfallBarError}`}
+                                className={styles.waterfallBar}
                                 style={{
                                   width: `${barWidth}px`,
+                                  background: barColor,
                                 }}
-                                title={statusClass === 'pending' ? 'Pending' : status}
+                                title={isPending ? 'Pending' : status}
                               />
-                              <span className={styles.waterfallDuration} title={statusClass === 'pending' ? 'Pending' : status}>
-                                {isPending ? '...' : status === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
+                              <span className={styles.waterfallDuration} title={isPending ? 'Pending' : status}>
+                                {isPending ? '...' : statusCode === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
                               </span>
                             </div>
                           </div>

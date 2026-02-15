@@ -4,10 +4,13 @@ import { useLogStore } from '../stores/logStore';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
+import { HttpActivityChart, type HttpRequestWithTimestamp } from '../components/HttpActivityChart';
 import { calculateTimeRangeMicros } from '../utils/timeUtils';
+import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
 import styles from './SummaryView.module.css';
+import tableStyles from '../components/Table.module.css';
 
 export function SummaryView() {
   const navigate = useNavigate();
@@ -120,6 +123,8 @@ export function SummaryView() {
           status: string;
         }>,
         syncRequestsByConnection: [] as Array<{ connId: string; count: number }>,
+        httpRequestsWithTimestamps: [] as HttpRequestWithTimestamp[],
+        chartTimeRange: { minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros },
       };
     }
 
@@ -146,23 +151,49 @@ export function SummaryView() {
       return line.timestampUs >= timeRangeUs.startUs && line.timestampUs <= timeRangeUs.endUs;
     });
 
-    // Filter HTTP requests by time range
+    // Build a map from line number to timestamp for efficient lookup
+    const lineNumberToTimestamp = new Map<number, TimestampMicros>();
+    rawLogLines.forEach(line => {
+      if (line.timestampUs) {
+        lineNumberToTimestamp.set(line.lineNumber, line.timestampUs);
+      }
+    });
+
+    // Filter HTTP requests by time range and resolve timestamps
     const filteredHttpRequests = allHttpRequests.filter((req) => {
       if (!timeRangeUs) return true;
       if (!req.responseLineNumber) return false;
-      const responseLine = rawLogLines.find(l => l.lineNumber === req.responseLineNumber);
-      if (!responseLine || !responseLine.timestampUs) return false;
-      return responseLine.timestampUs >= timeRangeUs.startUs && responseLine.timestampUs <= timeRangeUs.endUs;
+      const timestampUs = lineNumberToTimestamp.get(req.responseLineNumber);
+      if (!timestampUs) return false;
+      return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
     });
+
+    // Create HTTP requests with resolved timestamps for the chart
+    const httpRequestsWithTimestamps: HttpRequestWithTimestamp[] = filteredHttpRequests
+      .filter(req => req.responseLineNumber)
+      .map(req => {
+        const timestampUs = lineNumberToTimestamp.get(req.responseLineNumber) ?? (0 as TimestampMicros);
+        return {
+          requestId: req.requestId,
+          status: req.status,
+          timestampUs,
+        };
+      })
+      .filter(req => req.timestampUs > 0);
 
     // Filter sync requests by time range
     const filteredSyncRequests = allRequests.filter((req) => {
       if (!timeRangeUs) return true;
       if (!req.responseLineNumber) return false;
-      const responseLine = rawLogLines.find(l => l.lineNumber === req.responseLineNumber);
-      if (!responseLine || !responseLine.timestampUs) return false;
-      return responseLine.timestampUs >= timeRangeUs.startUs && responseLine.timestampUs <= timeRangeUs.endUs;
+      const timestampUs = lineNumberToTimestamp.get(req.responseLineNumber);
+      if (!timestampUs) return false;
+      return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
     });
+
+    // Calculate chart time range from filtered log lines (for alignment with LogActivityChart)
+    const filteredTimestamps = filteredLogLines.map(line => line.timestampUs);
+    const chartMinTime = filteredTimestamps.length > 0 ? Math.min(...filteredTimestamps) as TimestampMicros : 0 as TimestampMicros;
+    const chartMaxTime = filteredTimestamps.length > 0 ? Math.max(...filteredTimestamps) as TimestampMicros : 0 as TimestampMicros;
 
     // Time span (from filtered logs)
     const firstTimestamp = filteredLogLines[0]?.displayTime || '';
@@ -296,6 +327,8 @@ export function SummaryView() {
       topFailedUrls,
       slowestHttpRequests,
       syncRequestsByConnection,
+      httpRequestsWithTimestamps,
+      chartTimeRange: { minTime: chartMinTime, maxTime: chartMaxTime },
     };
   }, [rawLogLines, allHttpRequests, allRequests, connectionIds, startTime, endTime, localStartTime, localEndTime]);
 
@@ -329,6 +362,27 @@ export function SummaryView() {
         </div>
         
         <div className="header-right">
+          {shouldShowApplyButton && localStartTime !== null && localEndTime !== null && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                Selected: {new Date(localStartTime / 1000).toISOString().split('T')[1].split('.')[0]} - {new Date(localEndTime / 1000).toISOString().split('T')[1].split('.')[0]} UTC
+              </span>
+              <button
+                onClick={handleResetZoom}
+                className="btn-secondary"
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApplyGlobally}
+                className="btn-primary"
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+              >
+                Apply
+              </button>
+            </div>
+          )}
           <TimeRangeSelector />
         </div>
       </div>
@@ -340,31 +394,6 @@ export function SummaryView() {
           
           {/* Activity Chart */}
           <div className={styles.activityChartContainer}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', height: '24px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', visibility: shouldShowApplyButton ? 'visible' : 'hidden', opacity: shouldShowApplyButton ? 1 : 0, transition: 'opacity 0.15s ease-in-out' }}>
-                {shouldShowApplyButton && localStartTime !== null && localEndTime !== null && (
-                  <>
-                    <span style={{ fontSize: '12px', color: '#0066cc', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                      Selected: {new Date(localStartTime).toISOString().split('T')[1].split('.')[0]} - {new Date(localEndTime).toISOString().split('T')[1].split('.')[0]} UTC
-                    </span>
-                    <button
-                      onClick={handleResetZoom}
-                      className="btn-secondary"
-                      style={{ padding: '4px 12px', fontSize: '12px' }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleApplyGlobally}
-                      className="btn-primary"
-                      style={{ padding: '4px 12px', fontSize: '12px' }}
-                    >
-                      Apply
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
             <LogActivityChart 
               logLines={stats.filteredLogLines} 
               onTimeRangeSelected={handleTimeRangeSelected}
@@ -476,6 +505,21 @@ export function SummaryView() {
           )}
         </div>
 
+        {/* HTTP Requests Activity Chart */}
+        {stats.httpRequestsWithTimestamps.length > 0 && (
+          <section className={styles.summarySection}>
+            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests</h2>
+            <div className={styles.activityChartContainer}>
+              <HttpActivityChart
+                httpRequests={stats.httpRequestsWithTimestamps}
+                timeRange={stats.chartTimeRange}
+                onTimeRangeSelected={handleTimeRangeSelected}
+                onResetZoom={handleResetZoom}
+              />
+            </div>
+          </section>
+        )}
+
         {/* HTTP Errors Grid */}
         <div className={styles.errorsWarningsGrid}>
           {/* TOP HTTP Errors Section */}
@@ -550,9 +594,11 @@ export function SummaryView() {
                               </button>
                             </td>
                             <td>
-                              <span className={`${styles.statusBadge} ${styles.statusError}`}>
-                                {item.statuses.join(', ')}
-                              </span>
+                              {item.statuses.map((status, i) => (
+                                <span key={status} className={`${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(status)}`]}`}>
+                                  {status}{i < item.statuses.length - 1 ? ' ' : ''}
+                                </span>
+                              ))}
                             </td>
                             <td className={styles.alignRight}>{item.count}</td>
                           </tr>
@@ -581,7 +627,7 @@ export function SummaryView() {
                       <tr key={idx}>
                         <td>
                           <button
-                            className={styles.actionLink}
+                            className={`${styles.actionLink} ${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(error.status)}`]}`}
                             onClick={() =>
                               void navigate(`/http_requests?status=${error.status}`)
                             }
@@ -632,8 +678,7 @@ export function SummaryView() {
                     }
                     const commonPrefix = getCommonPrefix(uris);
                     return filtered.map((req) => {
-                      const statusCode = parseInt(req.status, 10);
-                      const statusClass = statusCode >= 400 ? styles.statusError : styles.statusSuccess;
+                      const badgeClass = req.status ? `badge${getHttpStatusBadgeClass(req.status)}` : 'badgePending';
                       return (
                       <tr key={req.id}>
                         <td>
@@ -657,7 +702,7 @@ export function SummaryView() {
                             : req.uri}
                         </td>
                         <td>
-                          <span className={`${styles.statusBadge} ${statusClass}`}>
+                          <span className={`${tableStyles.badge} ${tableStyles[badgeClass]}`}>
                             {req.status || 'pending'}
                           </span>
                         </td>
