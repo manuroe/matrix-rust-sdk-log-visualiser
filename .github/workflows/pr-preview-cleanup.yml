@@ -1,0 +1,50 @@
+name: PR Preview Cleanup
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+      - name: Remove stale previews (older than 30 days)
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          now=$(date +%s)
+          threshold=$((now - 30 * 24 * 60 * 60))
+          removed=0
+
+          for dir in pull/pr-*; do
+            if [ ! -d "$dir" ]; then
+              continue
+            fi
+            last_commit=$(git log -1 --format=%ct -- "$dir" || true)
+            if [ -z "$last_commit" ]; then
+              continue
+            fi
+            if [ "$last_commit" -lt "$threshold" ]; then
+              rm -rf "$dir"
+              removed=1
+            fi
+          done
+
+          if [ "$removed" -eq 1 ]; then
+            git add -A
+            git commit -m "chore: prune PR previews"
+            git push origin gh-pages
+          else
+            echo "No stale previews to remove."
+          fi

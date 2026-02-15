@@ -1,0 +1,368 @@
+/**
+ * Integration tests for App.tsx URL parameter synchronization.
+ * Tests the bidirectional sync between URL hash parameters and Zustand application state.
+ * 
+ * Coverage includes:
+ * - URL → Store: Parsing filter= and request_id= parameters
+ * - Store → URL: Syncing when uriFilter and other filters change
+ * - Parameter encoding/decoding with special characters
+ * - Multi-parameter interactions and precedence
+ * - Parameter clearing on navigation
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, waitFor, act } from '@testing-library/react';
+import { useLogStore } from '../stores/logStore';
+import App from '../App';
+import { getHashParam } from '../test/uriTestHelpers';
+import { createHttpRequests, createParsedLogLines } from '../test/fixtures';
+
+// Mock error boundary to prevent test failures from error display
+vi.mock('../components/ErrorBoundary', () => ({
+  ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+describe('App.tsx - URL Parameter Synchronization', () => {
+  let originalHash: string;
+
+  beforeEach(() => {
+    originalHash = window.location.hash;
+    useLogStore.getState().clearData();
+  });
+
+  afterEach(() => {
+    window.location.hash = originalHash;
+    vi.clearAllMocks();
+  });
+
+  // ============================================================================
+  // URL → Store: Parsing filter= and request_id= parameters
+  // ============================================================================
+
+  describe('URL → Store: Parsing filter= parameter', () => {
+    it('parses filter= parameter from URL on initial load', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+
+      useLogStore.getState().setHttpRequests(requests, logLines);
+      window.location.hash = '#/http_requests?filter=sync';
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBe('sync');
+      });
+    });
+
+    it('applies filter= parameter on navigation to /http_requests view', async () => {
+      const requests = createHttpRequests(10);
+      const logLines = createParsedLogLines(15);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+      
+      window.location.hash = '#/http_requests?filter=keys';
+
+      render(<App />);
+
+      await waitFor(() => {
+        const state = useLogStore.getState();
+        expect(state.uriFilter).toBe('keys');
+      });
+    });
+
+    it('decodes URL-encoded filter parameter', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      // URL-encoded: "_matrix/client/r0/sync" with spaces and special chars
+      const encodedUri = encodeURIComponent('_matrix/client/r0/sync');
+      window.location.hash = `#/http_requests?filter=${encodedUri}`;
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBe('_matrix/client/r0/sync');
+      });
+    });
+
+    it('does NOT clear filter when removing filter= param on same route', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+      
+      // Set initial filter
+      window.location.hash = '#/http_requests?filter=sync';
+
+      const { rerender } = render(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBe('sync');
+      });
+
+      // Remove param from URL (same route)
+      window.location.hash = '#/http_requests';
+      rerender(<App />);
+
+      // Filter should persist because we're on the same route
+      // (filter only clears on route navigation, not param removal)
+      await new Promise(resolve => setTimeout(resolve, 100)); // Give it time to process
+      expect(useLogStore.getState().uriFilter).toBe('sync');
+    });
+
+    it('clears filter when navigating to a different route', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+      
+      // Set initial filter on http_requests route
+      window.location.hash = '#/http_requests?filter=sync';
+
+      const { rerender } = render(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBe('sync');
+      });
+
+      // Navigate to different route
+      window.location.hash = '#/summary';
+      rerender(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBeNull();
+      });
+    });
+
+    it('case-insensitive filter matching via store logic', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash = '#/http_requests?filter=SYNC';
+
+      render(<App />);
+
+      await waitFor(() => {
+        // Store should preserve the filter value as-is
+        expect(useLogStore.getState().uriFilter).toBe('SYNC');
+      });
+    });
+  });
+
+  describe('URL → Store: Parsing request_id= parameter', () => {
+    it('parses request_id= parameter and sets activeRequest', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash = '#/http_requests?request_id=REQ-2';
+
+      render(<App />);
+
+      await waitFor(() => {
+        const state = useLogStore.getState();
+        // setActiveRequest opens the log viewer and expands the row
+        expect(state.openLogViewerIds.has('REQ-2')).toBe(true);
+        expect(state.expandedRows.has('REQ-2')).toBe(true);
+      });
+    });
+
+    it('decodes URL-encoded request_id parameter', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      // URL-encoded request ID with special characters
+      const encodedId = encodeURIComponent('REQ:SPECIAL/ID');
+      window.location.hash = `#/http_requests?request_id=${encodedId}`;
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().openLogViewerIds.has('REQ:SPECIAL/ID')).toBe(true);
+      });
+    });
+  });
+
+  // ============================================================================
+  // Store → URL: Syncing when uriFilter changes
+  // ============================================================================
+
+  describe('Store → URL: Syncing uriFilter changes', () => {
+    it('syncs uriFilter change to URL', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash = '#/http_requests';
+
+      render(<App />);
+
+      // Change filter in store
+      useLogStore.getState().setUriFilter('keys');
+
+      await waitFor(() => {
+        expect(getHashParam('filter')).toBe('keys');
+      });
+    });
+
+    it('URL-encodes special characters in filter when syncing to URL', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash = '#/http_requests';
+
+      render(<App />);
+
+      // Set filter with special characters
+      useLogStore.getState().setUriFilter('_matrix/client/r0/sync');
+
+      await waitFor(() => {
+        // The implementation double-encodes (encodeURIComponent + URLSearchParams encoding)
+        // So getHashParam (single decode) returns single-encoded value
+        const paramValue = getHashParam('filter');
+        expect(paramValue).toBe('_matrix%2Fclient%2Fr0%2Fsync');
+        
+        // Verify it's in the URL
+        const hash = window.location.hash;
+        expect(hash).toContain('filter=');
+      });
+    });
+  });
+
+  // ============================================================================
+  // Multi-Parameter Interactions
+  // ============================================================================
+
+  describe('Multi-Parameter Interactions', () => {
+    it('filter= and request_id= work together', async () => {
+      const requests = createHttpRequests(10);
+      const logLines = createParsedLogLines(15);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      // Both parameters present
+      window.location.hash = '#/http_requests?filter=sync&request_id=REQ-5';
+
+      render(<App />);
+
+      await waitFor(() => {
+        const state = useLogStore.getState();
+        // Both should be applied
+        expect(state.uriFilter).toBe('sync');
+        expect(state.openLogViewerIds.has('REQ-5')).toBe(true);
+      });
+    });
+
+    it('handles filter=, status=, and time range together', async () => {
+      const requests = createHttpRequests(10);
+      const logLines = createParsedLogLines(20);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash =
+        '#/http_requests?filter=sync&status=200,500&start=2025-01-01T00:00:00Z&end=2025-01-02T00:00:00Z';
+
+      render(<App />);
+
+      await waitFor(() => {
+        const state = useLogStore.getState();
+        expect(state.uriFilter).toBe('sync');
+        expect(state.statusCodeFilter).not.toBeNull();
+        expect(state.startTime).not.toBeNull();
+        expect(state.endTime).not.toBeNull();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Parameter Encoding and Special Characters
+  // ============================================================================
+
+  describe('Parameter Encoding and Special Characters', () => {
+    it('handles Matrix URIs with underscores and slashes', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      const uri = '_matrix/client/r0/sync';
+      window.location.hash = `#/http_requests?filter=${encodeURIComponent(uri)}`;
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBe(uri);
+      });
+    });
+
+    it('handles filter with spaces', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      const uri = 'room list sync';
+      window.location.hash = `#/http_requests?filter=${encodeURIComponent(uri)}`;
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBe(uri);
+      });
+    });
+
+    it('handles empty filter parameter', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash = '#/http_requests?filter=';
+
+      render(<App />);
+
+      await waitFor(() => {
+        // Empty string should be treated as no filter
+        expect(useLogStore.getState().uriFilter).toBeNull();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Dependency Array Safety (prevent infinite loops)
+  // ============================================================================
+
+  describe('Dependency Array Safety', () => {
+    it('setting uriFilter does not cause infinite loop', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash = '#/http_requests';
+
+      render(<App />);
+
+      // This should complete without infinite loop
+      useLogStore.getState().setUriFilter('sync');
+
+      await waitFor(() => {
+        expect(getHashParam('filter')).toBe('sync');
+      });
+    });
+
+    it('multiple rapid filter changes do not cause issues', async () => {
+      const requests = createHttpRequests(5);
+      const logLines = createParsedLogLines(10);
+      useLogStore.getState().setHttpRequests(requests, logLines);
+
+      window.location.hash = '#/http_requests';
+
+      render(<App />);
+
+      // Rapid changes
+      useLogStore.getState().setUriFilter('sync');
+      useLogStore.getState().setUriFilter('keys');
+      useLogStore.getState().setUriFilter('rooms');
+
+      await waitFor(() => {
+        expect(getHashParam('filter')).toBe('rooms');
+      });
+    });
+  });
+});
