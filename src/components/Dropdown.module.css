@@ -1,0 +1,81 @@
+/* Shared Dropdown Component Styles */
+
+/* Base dropdown container */
+.container {
+    position: relative;
+    display: inline-block;
+}
+
+/* Base dropdown button */
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: all var(--transition-default);
+    height: 32px;
+    box-sizing: border-box;
+}
+
+.button:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-dark);
+}
+
+.button:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-muted);
+}
+
+/* Base dropdown panel */
+.dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    z-index: var(--z-dropdown);
+    padding: 4px 0;
+}
+
+/* Base dropdown option */
+.option {
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--transition-default);
+    font-family: inherit;
+}
+
+.option:hover {
+    background: var(--bg-hover);
+}
+
+.optionActive {
+    background: var(--bg-selected);
+    color: var(--color-primary);
+    font-weight: 500;
+}
+
+/* Base dropdown divider */
+.divider {
+    height: 1px;
+    background: var(--border-default);
+    margin: 4px 0;
+}
