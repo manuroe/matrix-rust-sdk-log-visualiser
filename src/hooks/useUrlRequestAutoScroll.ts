@@ -3,7 +3,7 @@ import { useLogStore } from '../stores/logStore';
 import type { HttpRequest } from '../types/log.types';
 
 /**
- * Hook to handle URL hash `id=` parameter for auto-opening and scrolling to a request.
+ * Hook to handle URL hash `request_id=` parameter for auto-opening and scrolling to a request.
  * Opens the log viewer for the specified request ID and scrolls both panels to center it.
  *
  * @param filteredRequests - The list of filtered requests to search within
@@ -26,7 +26,7 @@ export function useUrlRequestAutoScroll(
 
   useEffect(() => {
     const hash = window.location.hash;
-    const match = hash.match(/id=([^&]+)/);
+    const match = hash.match(/request_id=([^&]+)/);
     if (match) {
       const reqId = decodeURIComponent(match[1]);
       
@@ -91,11 +91,11 @@ export function useUrlRequestAutoScroll(
     }
   }, [filteredRequests, openLogViewerIds, expandedRows, openLogViewer, toggleRowExpansion, leftPanelRef, onScrollToRequest]);
 
-  // Clear expanded state on unmount (unless there's an id parameter to preserve)
+  // Clear expanded state on unmount (unless there's a request_id parameter to preserve)
   useEffect(() => {
     return () => {
       const hash = window.location.hash;
-      const match = hash.match(/id=([^&]+)/);
+      const match = hash.match(/request_id=([^&]+)/);
       if (!match) {
         // Clear all at once without iteration to prevent infinite loops
         useLogStore.setState({ expandedRows: new Set(), openLogViewerIds: new Set() });

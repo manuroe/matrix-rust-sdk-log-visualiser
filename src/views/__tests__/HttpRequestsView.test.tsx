@@ -35,7 +35,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-5';
+    window.location.hash = '#/http_requests?request_id=REQ-5';
     
     render(<HttpRequestsView />);
 
@@ -53,7 +53,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-7';
+    window.location.hash = '#/http_requests?request_id=REQ-7';
     
     render(<HttpRequestsView />);
 
@@ -71,7 +71,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-50';
+    window.location.hash = '#/http_requests?request_id=REQ-50';
     
     render(<HttpRequestsView />);
 
@@ -89,7 +89,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-3';
+    window.location.hash = '#/http_requests?request_id=REQ-3';
     
     const { rerender } = render(<HttpRequestsView />);
 
@@ -120,7 +120,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-25';
+    window.location.hash = '#/http_requests?request_id=REQ-25';
     
     const { container } = render(<HttpRequestsView />);
 
@@ -154,7 +154,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests.slice(0, 5), // Only first 5 filtered
     });
 
-    window.location.hash = '#/http_requests?id=REQ-9'; // ID exists in all but not filtered
+    window.location.hash = '#/http_requests?request_id=REQ-9'; // ID exists in all but not filtered
     
     render(<HttpRequestsView />);
 
@@ -180,7 +180,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
     });
 
     // URL-encoded version of 'REQ:SPECIAL/CHARS'
-    window.location.hash = '#/http_requests?id=REQ%3ASPECIAL%2FCHARS';
+    window.location.hash = '#/http_requests?request_id=REQ%3ASPECIAL%2FCHARS';
     
     render(<HttpRequestsView />);
 
@@ -198,7 +198,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-9'; // Last item
+    window.location.hash = '#/http_requests?request_id=REQ-9'; // Last item
     
     render(<HttpRequestsView />);
 
@@ -215,7 +215,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-2';
+    window.location.hash = '#/http_requests?request_id=REQ-2';
     
     const { container, unmount } = render(<HttpRequestsView />);
 
@@ -237,7 +237,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // URL should no longer have the id parameter
-    expect(window.location.hash).not.toContain('id=REQ-2');
+    expect(window.location.hash).not.toContain('request_id=REQ-2');
     expect(window.location.hash).toBe('#/http_requests');
     
     // Cleanup to prevent async errors
@@ -252,7 +252,7 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
       filteredHttpRequests: requests,
     });
 
-    window.location.hash = '#/http_requests?id=REQ-3';
+    window.location.hash = '#/http_requests?request_id=REQ-3';
     
     const { container } = render(<HttpRequestsView />);
 

@@ -492,7 +492,7 @@ export function SummaryView() {
                             className={styles.clickableHeading}
                             onClick={() => {
                               const statuses = stats.httpErrorsByStatus.map(e => e.status).join(',');
-                              navigate(`/http_requests?status=${encodeURIComponent(statuses)}`);
+                              void navigate(`/http_requests?status=${encodeURIComponent(statuses)}`);
                             }}
                           >
                             {stats.topFailedUrls.reduce((sum, e) => sum + e.count, 0)}
@@ -526,9 +526,22 @@ export function SummaryView() {
                               <button
                                 className={styles.actionLink}
                                 title={item.uri}
-                                onClick={() =>
-                                  navigate(`/http_requests?uri=${encodeURIComponent(item.uri)}`)
-                                }
+                                onClick={() => {
+                                  // Find all requests matching this URI with error status
+                                  const matchingRequests = allHttpRequests.filter(req => {
+                                    if (req.uri !== item.uri) return false;
+                                    if (!req.status) return false;
+                                    const statusCode = parseInt(req.status, 10);
+                                    return statusCode >= 400;
+                                  });
+                                  
+                                  // If single occurrence, open with request_id param; else use filter param
+                                  if (matchingRequests.length === 1) {
+                                    void navigate(`/http_requests?request_id=${encodeURIComponent(matchingRequests[0].requestId)}`);
+                                  } else {
+                                    void navigate(`/http_requests?filter=${encodeURIComponent(item.uri)}`);
+                                  }
+                                }}
                                 style={{ textAlign: 'left', whiteSpace: 'normal' }}
                               >
                                 {commonPrefix && item.uri !== commonPrefix
@@ -570,7 +583,7 @@ export function SummaryView() {
                           <button
                             className={styles.actionLink}
                             onClick={() =>
-                              navigate(`/http_requests?status=${error.status}`)
+                              void navigate(`/http_requests?status=${error.status}`)
                             }
                           >
                             {error.status}
@@ -630,7 +643,7 @@ export function SummaryView() {
                         </td>
                         <td style={{ fontFamily: 'monospace', fontSize: '13px', color: '#007acc' }}>
                           <a
-                            href={`#/http_requests?id=${req.id}`}
+                            href={`#/http_requests?request_id=${req.id}`}
                             className={styles.actionLink}
                             title={req.id}
                             style={{ textDecoration: 'underline', color: '#007acc' }}
@@ -680,7 +693,7 @@ export function SummaryView() {
                         <button
                           className={styles.actionLink}
                           onClick={() =>
-                            navigate(`/http_requests/sync?conn=${item.connId}`)
+                            void navigate(`/http_requests/sync?conn=${item.connId}`)
                           }
                         >
                           View

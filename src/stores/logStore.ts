@@ -21,6 +21,9 @@ interface LogStore {
   // Special value 'Pending' represents requests without a status
   statusCodeFilter: Set<string> | null;
   
+  // URI filter for HTTP requests (null = no filter, string = substring match)
+  uriFilter: string | null;
+  
   // Global filters (shared across all views)
   startTime: string | null;
   endTime: string | null;
@@ -49,6 +52,7 @@ interface LogStore {
   setHttpRequests: (requests: HttpRequest[], rawLines: ParsedLogLine[]) => void;
   setHidePendingHttp: (hide: boolean) => void;
   setStatusCodeFilter: (filter: Set<string> | null) => void;
+  setUriFilter: (filter: string | null) => void;
   filterHttpRequests: () => void;
   
   // Global actions
@@ -89,6 +93,9 @@ export const useLogStore = create<LogStore>((set, get) => ({
   
   // Status code filter (null = all enabled)
   statusCodeFilter: null,
+  
+  // URI filter (null = no filter)
+  uriFilter: null,
   
   // Global filters
   startTime: null,
@@ -149,6 +156,11 @@ export const useLogStore = create<LogStore>((set, get) => ({
     set({ statusCodeFilter: filter });
     get().filterHttpRequests();
     get().filterRequests();
+  },
+
+  setUriFilter: (filter) => {
+    set({ uriFilter: filter });
+    get().filterHttpRequests();
   },
 
   setTimeFilter: (startTime, endTime) => {
@@ -223,7 +235,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   
   filterHttpRequests: () => {
-    const { allHttpRequests, rawLogLines, hidePendingHttp, statusCodeFilter, startTime, endTime } = get();
+    const { allHttpRequests, rawLogLines, hidePendingHttp, statusCodeFilter, uriFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set (in microseconds)
     let timeRangeUs: { startUs: number; endUs: number } | null = null;
@@ -245,6 +257,11 @@ export const useLogStore = create<LogStore>((set, get) => ({
       if (statusCodeFilter !== null) {
         const statusKey = r.status || 'Pending';
         if (!statusCodeFilter.has(statusKey)) return false;
+      }
+      
+      // URI filter (case-insensitive substring match)
+      if (uriFilter && uriFilter.length > 0) {
+        if (!r.uri.toLowerCase().includes(uriFilter.toLowerCase())) return false;
       }
       
       // Time filter
@@ -271,6 +288,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       allHttpRequests: [],
       filteredHttpRequests: [],
       statusCodeFilter: null,
+      uriFilter: null,
       startTime: null,
       endTime: null,
       expandedRows: new Set(),

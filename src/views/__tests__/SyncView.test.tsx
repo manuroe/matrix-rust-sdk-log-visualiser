@@ -35,7 +35,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-5';
+    window.location.hash = '#/sync?request_id=SYNC-5';
     
     render(<SyncView />);
 
@@ -53,7 +53,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-7';
+    window.location.hash = '#/sync?request_id=SYNC-7';
     
     render(<SyncView />);
 
@@ -71,7 +71,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-50';
+    window.location.hash = '#/sync?request_id=SYNC-50';
     
     render(<SyncView />);
 
@@ -89,7 +89,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-3';
+    window.location.hash = '#/sync?request_id=SYNC-3';
     
     const { rerender } = render(<SyncView />);
 
@@ -120,7 +120,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-25';
+    window.location.hash = '#/sync?request_id=SYNC-25';
     
     const { container } = render(<SyncView />);
 
@@ -154,7 +154,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests.slice(0, 5), // Only first 5 filtered
     });
 
-    window.location.hash = '#/sync?id=SYNC-9'; // ID exists in all but not filtered
+    window.location.hash = '#/sync?request_id=SYNC-9'; // ID exists in all but not filtered
     
     render(<SyncView />);
 
@@ -180,7 +180,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
     });
 
     // URL-encoded version of 'SYNC:SPECIAL/CHARS'
-    window.location.hash = '#/sync?id=SYNC%3ASPECIAL%2FCHARS';
+    window.location.hash = '#/sync?request_id=SYNC%3ASPECIAL%2FCHARS';
     
     render(<SyncView />);
 
@@ -198,7 +198,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-9'; // Last item
+    window.location.hash = '#/sync?request_id=SYNC-9'; // Last item
     
     render(<SyncView />);
 
@@ -215,7 +215,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-2';
+    window.location.hash = '#/sync?request_id=SYNC-2';
     
     const { container, unmount } = render(<SyncView />);
 
@@ -237,7 +237,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // URL should no longer have the id parameter
-    expect(window.location.hash).not.toContain('id=SYNC-2');
+    expect(window.location.hash).not.toContain('request_id=SYNC-2');
     expect(window.location.hash).toBe('#/sync');
     
     // Cleanup to prevent async errors
@@ -252,7 +252,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?id=SYNC-3';
+    window.location.hash = '#/sync?request_id=SYNC-3';
     
     const { container } = render(<SyncView />);
 

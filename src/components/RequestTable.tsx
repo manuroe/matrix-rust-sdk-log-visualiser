@@ -6,6 +6,8 @@ import { BurgerMenu } from './BurgerMenu';
 import { TimeRangeSelector } from './TimeRangeSelector';
 import { TimelineScaleSelector } from './TimelineScaleSelector';
 import { StatusFilterDropdown } from './StatusFilterDropdown';
+import { SearchInput } from './SearchInput';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { getWaterfallPosition, getWaterfallBarWidth, calculateTimelineWidth } from '../utils/timelineUtils';
 import { LogDisplayView } from '../views/LogDisplayView';
 import { useScrollSync } from '../hooks/useScrollSync';
@@ -58,6 +60,8 @@ export interface RequestTableProps {
   emptyMessage?: string;
   /** CSS selector prefix for row measurement (e.g., '.sync-view' or '') */
   rowSelector?: string;
+  /** Whether to show the URI filter (default: true) */
+  showUriFilter?: boolean;
 }
 
 /**
@@ -78,6 +82,7 @@ export function RequestTable({
   availableStatusCodes,
   headerSlot,
   emptyMessage = 'No requests found',
+  showUriFilter = true,
 }: RequestTableProps) {
   const {
     expandedRows,
@@ -86,12 +91,39 @@ export function RequestTable({
     toggleRowExpansion,
     closeLogViewer,
     setActiveRequest,
+    uriFilter,
+    setUriFilter,
   } = useLogStore();
 
   const waterfallContainerRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+
+  // URI filter state with debouncing
+  const [uriFilterInput, setUriFilterInput] = useState(uriFilter ?? '');
+  const debouncedUriFilter = useDebouncedValue(uriFilterInput, 300);
+
+  // Sync debounced URI filter to store
+  useEffect(() => {
+    const newFilter = debouncedUriFilter.length > 0 ? debouncedUriFilter : null;
+    if (newFilter !== uriFilter) {
+      setUriFilter(newFilter);
+    }
+  }, [debouncedUriFilter, uriFilter, setUriFilter]);
+
+  // Sync store changes back to input (e.g., when cleared externally)
+  useEffect(() => {
+    const storeValue = uriFilter ?? '';
+    if (storeValue !== uriFilterInput && storeValue !== debouncedUriFilter) {
+      setUriFilterInput(storeValue);
+    }
+  }, [uriFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleUriFilterClear = useCallback(() => {
+    setUriFilterInput('');
+    setUriFilter(null);
+  }, [setUriFilter]);
 
   // Use shared scroll sync hook
   useScrollSync(leftPanelRef, waterfallContainerRef);
@@ -156,13 +188,13 @@ export function RequestTable({
 
   /** Handle click on request ID - toggle expansion or open log viewer */
   const handleRequestClick = useCallback((requestId: string, req?: HttpRequest) => {
-    // Remove id parameter from URL if clicking a different request
+    // Remove request_id parameter from URL if clicking a different request
     const hash = window.location.hash;
-    const match = hash.match(/id=([^&]+)/);
+    const match = hash.match(/request_id=([^&]+)/);
     if (match) {
       const urlId = decodeURIComponent(match[1]);
       if (urlId !== requestId) {
-        const newHash = hash.replace(/[?&]id=[^&]+/, '').replace(/\?&/, '?').replace(/\?$/, '');
+        const newHash = hash.replace(/[?&]request_id=[^&]+/, '').replace(/\?&/, '?').replace(/\?$/, '');
         window.location.hash = newHash;
       }
     }
@@ -300,6 +332,16 @@ export function RequestTable({
         </div>
 
         <div className="header-right">
+          {showUriFilter && (
+            <SearchInput
+              value={uriFilterInput}
+              onChange={setUriFilterInput}
+              onClear={handleUriFilterClear}
+              placeholder="Filter URI..."
+              title="Filter requests by URI (case-insensitive substring match)"
+              aria-label="Filter requests by URI"
+            />
+          )}
           <StatusFilterDropdown availableStatusCodes={availableStatusCodes} />
           <TimelineScaleSelector msPerPixel={msPerPixel} />
           <TimeRangeSelector />

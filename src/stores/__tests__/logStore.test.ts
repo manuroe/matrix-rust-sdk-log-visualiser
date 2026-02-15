@@ -31,6 +31,7 @@ describe('logStore', () => {
       expect(state.connectionIds).toEqual([]);
       expect(state.rawLogLines).toEqual([]);
       expect(state.statusCodeFilter).toBeNull();
+      expect(state.uriFilter).toBeNull();
       expect(state.startTime).toBeNull();
       expect(state.endTime).toBeNull();
     });
@@ -432,6 +433,7 @@ describe('logStore', () => {
       useLogStore.getState().openLogViewer('REQ-2');
       useLogStore.getState().setTimeFilter('00:00:00', '00:00:10');
       useLogStore.getState().setStatusCodeFilter(new Set(['200']));
+      useLogStore.getState().setUriFilter('sync');
 
       // Clear all data
       useLogStore.getState().clearData();
@@ -446,6 +448,7 @@ describe('logStore', () => {
       expect(state.expandedRows.size).toBe(0);
       expect(state.openLogViewerIds.size).toBe(0);
       expect(state.statusCodeFilter).toBeNull();
+      expect(state.uriFilter).toBeNull();
       expect(state.startTime).toBeNull();
       expect(state.endTime).toBeNull();
     });
@@ -458,6 +461,75 @@ describe('logStore', () => {
 
       useLogStore.getState().setTimelineScale(5);
       expect(useLogStore.getState().timelineScale).toBe(5);
+    });
+  });
+
+  describe('setUriFilter', () => {
+    it('sets the uri filter and triggers filterHttpRequests', () => {
+      const requests = [
+        createHttpRequest({ uri: 'https://matrix.org/sync' }),
+        createHttpRequest({ uri: 'https://matrix.org/keys/upload' }),
+        createHttpRequest({ uri: 'https://matrix.org/rooms/join' }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, []);
+
+      // Filter to sync endpoint
+      useLogStore.getState().setUriFilter('sync');
+      const state = useLogStore.getState();
+
+      expect(state.uriFilter).toBe('sync');
+      expect(state.filteredHttpRequests).toHaveLength(1);
+      expect(state.filteredHttpRequests[0].uri).toContain('sync');
+    });
+
+    it('performs case-insensitive substring matching', () => {
+      const requests = [
+        createHttpRequest({ uri: 'https://matrix.org/SYNC' }),
+        createHttpRequest({ uri: 'https://matrix.org/keys' }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, []);
+
+      // Lowercase filter should match uppercase URI
+      useLogStore.getState().setUriFilter('sync');
+      const state = useLogStore.getState();
+
+      expect(state.filteredHttpRequests).toHaveLength(1);
+    });
+
+    it('null filter shows all requests', () => {
+      const requests = createHttpRequests(3);
+      useLogStore.getState().setHttpRequests(requests, []);
+
+      useLogStore.getState().setUriFilter('nonexistent');
+      expect(useLogStore.getState().filteredHttpRequests).toHaveLength(0);
+
+      useLogStore.getState().setUriFilter(null);
+      expect(useLogStore.getState().filteredHttpRequests).toHaveLength(3);
+    });
+
+    it('empty string filter shows all requests', () => {
+      const requests = createHttpRequests(3);
+      useLogStore.getState().setHttpRequests(requests, []);
+
+      useLogStore.getState().setUriFilter('');
+      expect(useLogStore.getState().filteredHttpRequests).toHaveLength(3);
+    });
+
+    it('combines with other filters', () => {
+      const requests = [
+        createHttpRequest({ uri: 'https://matrix.org/sync', status: '200' }),
+        createHttpRequest({ uri: 'https://matrix.org/sync', status: '500' }),
+        createHttpRequest({ uri: 'https://matrix.org/keys', status: '200' }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, []);
+
+      // Filter by URI
+      useLogStore.getState().setUriFilter('sync');
+      expect(useLogStore.getState().filteredHttpRequests).toHaveLength(2);
+
+      // Also filter by status
+      useLogStore.getState().setStatusCodeFilter(new Set(['200']));
+      expect(useLogStore.getState().filteredHttpRequests).toHaveLength(1);
     });
   });
 });

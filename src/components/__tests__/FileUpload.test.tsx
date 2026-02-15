@@ -51,7 +51,7 @@ describe('FileUpload navigation', () => {
   });
 
   it('navigates to last route after upload when available', async () => {
-    useLogStore.setState({ lastRoute: '/http_requests?id=REQ-1' });
+    useLogStore.setState({ lastRoute: '/http_requests?request_id=REQ-1' });
 
     const { container } = render(<FileUpload />);
     const input = container.querySelector('#file-input') as HTMLInputElement;
@@ -61,7 +61,7 @@ describe('FileUpload navigation', () => {
 
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/http_requests?id=REQ-1');
+        expect(mockNavigate).toHaveBeenCalledWith('/http_requests?request_id=REQ-1');
         resolve();
       }, 100);
     });

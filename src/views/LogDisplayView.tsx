@@ -7,6 +7,7 @@ import { buildDisplayItems, calculateGapExpansion, type ForcedRange } from '../u
 import { findMatchingIndices, expandWithContext, highlightText as highlightTextUtil } from '../utils/textMatching';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useMatchNavigation } from '../hooks/useMatchNavigation';
+import { SearchInput } from '../components/SearchInput';
 import styles from './LogDisplayView.module.css';
 
 interface LogDisplayViewProps {
@@ -229,12 +230,12 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     <div className={styles.logDisplayView}>
       <div className={styles.logToolbar}>
         <div className={styles.logToolbarLeft}>
-          <input
-            type="text"
-            className={styles.logSearchInput}
-            placeholder="Search logs..."
+          <SearchInput
             value={searchQueryInput}
-            onChange={(e) => setSearchQueryInput(e.target.value)}
+            onChange={setSearchQueryInput}
+            placeholder="Search logs..."
+            title="Search and highlight in filtered results"
+            expandOnFocus={false}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -245,7 +246,6 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 }
               }
             }}
-            title="Search and highlight in filtered results"
           />
           <label className={styles.logToolbarOption}>
             <input
@@ -298,13 +298,12 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             />
             Strip prefix
           </label>
-          <input
-            type="text"
-            className={styles.logSearchInput}
-            placeholder="Filter logs..."
+          <SearchInput
             value={filterQueryInput}
-            onChange={(e) => setFilterQueryInput(e.target.value)}
+            onChange={setFilterQueryInput}
+            placeholder="Filter logs..."
             title="Filter to show only matching lines"
+            expandOnFocus={false}
           />
           <div className={styles.logToolbarContextGroup}>
             <button

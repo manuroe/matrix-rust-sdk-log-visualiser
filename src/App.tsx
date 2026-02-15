@@ -27,6 +27,9 @@ function AppContent() {
     setTimelineScale, 
     statusCodeFilter,
     setStatusCodeFilter,
+    uriFilter,
+    setUriFilter,
+    setActiveRequest,
     rawLogLines, 
     setLastRoute 
   } = useLogStore();
@@ -38,6 +41,7 @@ function AppContent() {
   });
   const prevTimelineScaleRef = useRef<number>(DEFAULT_MS_PER_PIXEL);
   const prevStatusFilterRef = useRef<Set<string> | null>(null);
+  const prevUriFilterRef = useRef<string | null>(null);
   const prevPathnameRef = useRef<string>(location.pathname);
 
   // Initialize time filter, timeline scale, and status filter from URL
@@ -52,6 +56,8 @@ function AppContent() {
     const end = searchParams.get('end');
     const scale = searchParams.get('scale');
     const status = searchParams.get('status');
+    const filter = searchParams.get('filter');
+    const requestId = searchParams.get('request_id');
     
     // Track if this is a navigation (path change) vs just a param update
     const isNavigation = prevPathnameRef.current !== location.pathname;
@@ -105,7 +111,28 @@ function AppContent() {
       setStatusCodeFilter(null);
       prevStatusFilterRef.current = null;
     }
-  }, [searchParams, rawLogLines.length, location.pathname, setTimeFilter, setTimelineScale, setStatusCodeFilter]);
+
+    // Apply URI filter from URL
+    // Read current store state fresh to avoid having uriFilter in dependencies (prevents loops)
+    const currentUriFilter = useLogStore.getState().uriFilter;
+    if (filter) {
+      const decodedFilter = decodeURIComponent(filter);
+      if (decodedFilter !== currentUriFilter) {
+        setUriFilter(decodedFilter);
+        prevUriFilterRef.current = decodedFilter;
+      }
+    } else if (isNavigation && currentUriFilter !== null) {
+      // No filter param in URL AND this is a navigation - reset filter
+      setUriFilter(null);
+      prevUriFilterRef.current = null;
+    }
+
+    // Apply request_id param - automatically select that request
+    if (requestId) {
+      const decodedRequestId = decodeURIComponent(requestId);
+      setActiveRequest(decodedRequestId);
+    }
+  }, [searchParams, rawLogLines.length, location.pathname, setTimeFilter, setTimelineScale, setStatusCodeFilter, setUriFilter, setActiveRequest]);
 
   // Sync store changes to URL
   useEffect(() => {
@@ -120,16 +147,20 @@ function AppContent() {
       return false;
     })();
 
+    const uriFilterChanged = prevUriFilterRef.current !== uriFilter;
+
     const hasChanged =
       prevTimeFilterRef.current.startTime !== startTime ||
       prevTimeFilterRef.current.endTime !== endTime ||
       prevTimelineScaleRef.current !== timelineScale ||
-      statusFilterChanged;
+      statusFilterChanged ||
+      uriFilterChanged;
 
     if (hasChanged) {
       prevTimeFilterRef.current = { startTime, endTime };
       prevTimelineScaleRef.current = timelineScale;
       prevStatusFilterRef.current = statusCodeFilter;
+      prevUriFilterRef.current = uriFilter;
       const newParams = new URLSearchParams(searchParams);
       const startURL = timeToURLFormat(startTime);
       const endURL = timeToURLFormat(endTime);
@@ -158,10 +189,17 @@ function AppContent() {
       } else {
         newParams.delete('status');
       }
+
+      // Sync URI filter to URL (only if filtering)
+      if (uriFilter !== null && uriFilter.length > 0) {
+        newParams.set('filter', encodeURIComponent(uriFilter));
+      } else {
+        newParams.delete('filter');
+      }
       
       setSearchParams(newParams);
     }
-  }, [startTime, endTime, timelineScale, statusCodeFilter, searchParams, setSearchParams]);
+  }, [startTime, endTime, timelineScale, statusCodeFilter, uriFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     const fullPath = `${location.pathname}${location.search}${location.hash}`;
