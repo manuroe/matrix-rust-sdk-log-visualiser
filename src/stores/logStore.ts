@@ -59,7 +59,7 @@ interface LogStore {
   setTimeFilter: (startTime: string | null, endTime: string | null) => void;
   setTimelineScale: (scale: number) => void;
   toggleRowExpansion: (requestId: string) => void;
-  setActiveRequest: (requestId: string) => void; // Opens one request, closes all others
+  setActiveRequest: (requestId: string | null) => void; // Opens one request, closes all others; null clears selection
   clearData: () => void;
   
   // Log viewer actions
@@ -185,10 +185,15 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   setActiveRequest: (requestId) => {
-    // Atomically close all rows and open the new one
-    const expandedRows = new Set([requestId]);
-    const openLogViewerIds = new Set([requestId]);
-    set({ expandedRows, openLogViewerIds });
+    if (requestId === null) {
+      // Clear all selections
+      set({ expandedRows: new Set(), openLogViewerIds: new Set() });
+    } else {
+      // Atomically close all rows and open the new one
+      const expandedRows = new Set([requestId]);
+      const openLogViewerIds = new Set([requestId]);
+      set({ expandedRows, openLogViewerIds });
+    }
   },
 
   filterRequests: () => {

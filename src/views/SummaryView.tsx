@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
+import { useURLParams } from '../hooks/useURLParams';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
@@ -21,8 +22,8 @@ export function SummaryView() {
     connectionIds,
     startTime,
     endTime,
-    setTimeFilter,
   } = useLogStore();
+  const { setTimeFilter } = useURLParams();
 
   // Local zoom state (in microseconds)
   const [localStartTime, setLocalStartTime] = useState<TimestampMicros | null>(null);

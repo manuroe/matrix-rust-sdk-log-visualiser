@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useLogStore } from '../stores/logStore';
+import { useURLParams } from '../hooks/useURLParams';
 import { PENDING_STATUS_KEY } from '../utils/statusCodeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
 import styles from './StatusFilterDropdown.module.css';
@@ -11,10 +12,11 @@ interface StatusFilterDropdownProps {
 
 /**
  * Multi-select dropdown for filtering requests by HTTP status code.
- * Reads/writes statusCodeFilter from the global store.
+ * Reads statusCodeFilter from store (derived from URL), writes to URL via useURLParams.
  */
 export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropdownProps) {
-  const { statusCodeFilter, setStatusCodeFilter } = useLogStore();
+  const { statusCodeFilter } = useLogStore();
+  const { setStatusFilter } = useURLParams();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -39,30 +41,30 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
     if (statusCodeFilter === null) {
       // Currently showing all - switch to all except this one
       const newFilter = new Set(availableStatusCodes.filter(c => c !== code));
-      setStatusCodeFilter(newFilter);
+      setStatusFilter(newFilter);
     } else if (statusCodeFilter.has(code)) {
       // Remove this code from filter
       const newFilter = new Set(statusCodeFilter);
       newFilter.delete(code);
       // If no codes selected, reset to null (show all)
-      setStatusCodeFilter(newFilter.size === 0 ? null : newFilter);
+      setStatusFilter(newFilter.size === 0 ? null : newFilter);
     } else {
       // Add this code to filter
       const newFilter = new Set(statusCodeFilter);
       newFilter.add(code);
       // If all codes now selected, reset to null (show all)
       if (newFilter.size === availableStatusCodes.length) {
-        setStatusCodeFilter(null);
+        setStatusFilter(null);
       } else {
-        setStatusCodeFilter(newFilter);
+        setStatusFilter(newFilter);
       }
     }
-  }, [statusCodeFilter, availableStatusCodes, setStatusCodeFilter]);
+  }, [statusCodeFilter, availableStatusCodes, setStatusFilter]);
 
   /** Select all status codes (reset filter) */
   const selectAll = useCallback(() => {
-    setStatusCodeFilter(null);
-  }, [setStatusCodeFilter]);
+    setStatusFilter(null);
+  }, [setStatusFilter]);
 
   /** Check if a status code is enabled */
   const isEnabled = (code: string) => {

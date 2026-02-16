@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { useLogStore } from '../stores/logStore';
+import { useURLParams } from '../hooks/useURLParams';
 import styles from './TimelineScaleSelector.module.css';
 
 // Available timeline scale options (ms per pixel)
@@ -20,7 +20,7 @@ interface TimelineScaleSelectorProps {
  * Dropdown for selecting the timeline scale (ms per pixel).
  */
 export function TimelineScaleSelector({ msPerPixel }: TimelineScaleSelectorProps) {
-  const { setTimelineScale } = useLogStore();
+  const { setScale } = useURLParams();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,9 +41,9 @@ export function TimelineScaleSelector({ msPerPixel }: TimelineScaleSelectorProps
   }, [isOpen]);
 
   const handleSelect = useCallback((value: number) => {
-    setTimelineScale(value);
+    setScale(value);
     setIsOpen(false);
-  }, [setTimelineScale]);
+  }, [setScale]);
 
   const currentOption = TIMELINE_SCALE_OPTIONS.find(opt => opt.value === msPerPixel);
   const buttonLabel = currentOption?.label ?? `1px = ${msPerPixel}ms`;

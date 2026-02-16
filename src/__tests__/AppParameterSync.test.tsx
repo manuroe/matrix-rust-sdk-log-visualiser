@@ -1,10 +1,13 @@
 /**
  * Integration tests for App.tsx URL parameter synchronization.
- * Tests the bidirectional sync between URL hash parameters and Zustand application state.
+ * Tests the unidirectional sync from URL hash parameters to Zustand application state.
+ * 
+ * Architecture (URL as source of truth):
+ * - URL → Store: App.tsx parses URL params and updates store
+ * - Store → URL: Components write directly to URL via useURLParams hook
  * 
  * Coverage includes:
  * - URL → Store: Parsing filter= and request_id= parameters
- * - Store → URL: Syncing when uriFilter and other filters change
  * - Parameter encoding/decoding with special characters
  * - Multi-parameter interactions and precedence
  * - Parameter clearing on navigation
@@ -85,7 +88,7 @@ describe('App.tsx - URL Parameter Synchronization', () => {
       });
     });
 
-    it('does NOT clear filter when removing filter= param on same route', async () => {
+    it('clears filter when removing filter= param from URL', async () => {
       const requests = createHttpRequests(5);
       const logLines = createParsedLogLines(10);
       useLogStore.getState().setHttpRequests(requests, logLines);
@@ -103,10 +106,10 @@ describe('App.tsx - URL Parameter Synchronization', () => {
       window.location.hash = '#/http_requests';
       rerender(<App />);
 
-      // Filter should persist because we're on the same route
-      // (filter only clears on route navigation, not param removal)
-      await new Promise(resolve => setTimeout(resolve, 100)); // Give it time to process
-      expect(useLogStore.getState().uriFilter).toBe('sync');
+      // In URL-as-source-of-truth architecture, removing the param clears the filter
+      await waitFor(() => {
+        expect(useLogStore.getState().uriFilter).toBeNull();
+      });
     });
 
     it('clears filter when navigating to a different route', async () => {
@@ -179,53 +182,6 @@ describe('App.tsx - URL Parameter Synchronization', () => {
 
       await waitFor(() => {
         expect(useLogStore.getState().openLogViewerIds.has('REQ:SPECIAL/ID')).toBe(true);
-      });
-    });
-  });
-
-  // ============================================================================
-  // Store → URL: Syncing when uriFilter changes
-  // ============================================================================
-
-  describe('Store → URL: Syncing uriFilter changes', () => {
-    it('syncs uriFilter change to URL', async () => {
-      const requests = createHttpRequests(5);
-      const logLines = createParsedLogLines(10);
-      useLogStore.getState().setHttpRequests(requests, logLines);
-
-      window.location.hash = '#/http_requests';
-
-      render(<App />);
-
-      // Change filter in store
-      useLogStore.getState().setUriFilter('keys');
-
-      await waitFor(() => {
-        expect(getHashParam('filter')).toBe('keys');
-      });
-    });
-
-    it('URL-encodes special characters in filter when syncing to URL', async () => {
-      const requests = createHttpRequests(5);
-      const logLines = createParsedLogLines(10);
-      useLogStore.getState().setHttpRequests(requests, logLines);
-
-      window.location.hash = '#/http_requests';
-
-      render(<App />);
-
-      // Set filter with special characters
-      useLogStore.getState().setUriFilter('_matrix/client/r0/sync');
-
-      await waitFor(() => {
-        // The implementation double-encodes (encodeURIComponent + URLSearchParams encoding)
-        // So getHashParam (single decode) returns single-encoded value
-        const paramValue = getHashParam('filter');
-        expect(paramValue).toBe('_matrix%2Fclient%2Fr0%2Fsync');
-        
-        // Verify it's in the URL
-        const hash = window.location.hash;
-        expect(hash).toContain('filter=');
       });
     });
   });
@@ -320,48 +276,6 @@ describe('App.tsx - URL Parameter Synchronization', () => {
       await waitFor(() => {
         // Empty string should be treated as no filter
         expect(useLogStore.getState().uriFilter).toBeNull();
-      });
-    });
-  });
-
-  // ============================================================================
-  // Dependency Array Safety (prevent infinite loops)
-  // ============================================================================
-
-  describe('Dependency Array Safety', () => {
-    it('setting uriFilter does not cause infinite loop', async () => {
-      const requests = createHttpRequests(5);
-      const logLines = createParsedLogLines(10);
-      useLogStore.getState().setHttpRequests(requests, logLines);
-
-      window.location.hash = '#/http_requests';
-
-      render(<App />);
-
-      // This should complete without infinite loop
-      useLogStore.getState().setUriFilter('sync');
-
-      await waitFor(() => {
-        expect(getHashParam('filter')).toBe('sync');
-      });
-    });
-
-    it('multiple rapid filter changes do not cause issues', async () => {
-      const requests = createHttpRequests(5);
-      const logLines = createParsedLogLines(10);
-      useLogStore.getState().setHttpRequests(requests, logLines);
-
-      window.location.hash = '#/http_requests';
-
-      render(<App />);
-
-      // Rapid changes
-      useLogStore.getState().setUriFilter('sync');
-      useLogStore.getState().setUriFilter('keys');
-      useLogStore.getState().setUriFilter('rooms');
-
-      await waitFor(() => {
-        expect(getHashParam('filter')).toBe('rooms');
       });
     });
   });

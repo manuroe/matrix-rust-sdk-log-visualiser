@@ -272,20 +272,18 @@ describe('App routing fallback', () => {
       const logLines = createParsedLogLines(10);
       useLogStore.getState().setHttpRequests(requests, logLines);
 
-      // URL has encoded version (e.g., %21 for !)
-      const encodedMatrixUri =
-        '_matrix/client/r0/room/%21abc:matrix.org/messages?limit=10&dir=b';
-      // Store should have decoded version (! instead of %21)
-      const decodedMatrixUri =
+      // Matrix URIs often contain special characters like ! : @ #
+      // These should be preserved after URL encoding/decoding roundtrip
+      const matrixUri =
         '_matrix/client/r0/room/!abc:matrix.org/messages?limit=10&dir=b';
       
-      window.location.hash = `#/http_requests?filter=${encodeURIComponent(encodedMatrixUri)}`;
+      window.location.hash = `#/http_requests?filter=${encodeURIComponent(matrixUri)}`;
 
       render(<App />);
 
       await waitFor(() => {
-        // Store gets decoded value
-        expect(useLogStore.getState().uriFilter).toBe(decodedMatrixUri);
+        // Store gets decoded value (searchParams.get() decodes automatically)
+        expect(useLogStore.getState().uriFilter).toBe(matrixUri);
       });
     });
   });

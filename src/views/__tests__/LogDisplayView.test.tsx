@@ -524,3 +524,87 @@ describe('LogDisplayView filter & search behaviors', () => {
     expect(line15Container).toBeInTheDocument();
   });
 });
+
+describe('LogDisplayView requestFilter prop sync', () => {
+  it('updates filter input when requestFilter prop changes', async () => {
+    const total = 50;
+    const matchIndices = [10, 20, 30];
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
+
+    // Initial render with no filter
+    const { rerender } = render(<LogDisplayView requestFilter="" />);
+
+    // All lines should be visible (no filter active)
+    expect(getLineContainer(1)).toBeInTheDocument();
+    expect(getLineContainer(5)).toBeInTheDocument();
+
+    // Rerender with a filter prop - simulates URL→Store sync
+    rerender(<LogDisplayView requestFilter="MATCH" />);
+
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    // Now only matching lines should be visible
+    const line10Container = getLineContainer(10);
+    expect(line10Container).toBeInTheDocument();
+
+    // Non-matching lines should be hidden
+    expect(() => getLineContainer(5)).toThrow();
+  });
+
+  it('syncs long filter strings from URL', async () => {
+    const total = 20;
+    // Create logs where line 7 (index 7) matches a specific long string
+    // This simulates the user's URL with a very long filter
+    const matchIndices = [7]; // Line number 7 (lineNumber = startLineNumber + index = 0 + 7)
+    const longFilter = 'LONG_ERROR_MESSAGE_FROM_URL_PARAMETER';
+    const logs = createLogsWithMatches(total, matchIndices, longFilter);
+    useLogStore.setState({ rawLogLines: logs });
+
+    // Simulate URL with long filter (like the user's issue)
+    const { rerender } = render(<LogDisplayView requestFilter="" />);
+
+    // Initially no filter - all visible
+    expect(getLineContainer(0)).toBeInTheDocument();
+
+    // Apply filter via prop update (simulating URL→Store sync)
+    rerender(<LogDisplayView requestFilter={longFilter} />);
+
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    // Only line 7 (index 7) should match
+    const line7Container = getLineContainer(7);
+    expect(line7Container).toBeInTheDocument();
+
+    // Other lines should be hidden
+    expect(() => getLineContainer(0)).toThrow();
+    expect(() => getLineContainer(5)).toThrow();
+  });
+
+  it('clears filter when requestFilter prop becomes empty', async () => {
+    const total = 30;
+    const matchIndices = [15];
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(total, matchIndices) });
+
+    // Start with a filter
+    const { rerender } = render(<LogDisplayView requestFilter="MATCH" />);
+
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    // Only matching line visible
+    expect(getLineContainer(15)).toBeInTheDocument();
+    expect(() => getLineContainer(1)).toThrow();
+
+    // Clear filter via prop
+    rerender(<LogDisplayView requestFilter="" />);
+
+    // Wait for debounce
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    // Now all lines should be visible again
+    expect(getLineContainer(1)).toBeInTheDocument();
+    expect(getLineContainer(15)).toBeInTheDocument();
+  });
+});

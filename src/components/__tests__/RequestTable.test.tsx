@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { RequestTable } from '../RequestTable';
 import type { RequestTableProps, ColumnDef } from '../RequestTable';
 import { useLogStore } from '../../stores/logStore';
@@ -25,6 +26,23 @@ vi.mock('../../views/LogDisplayView', () => ({
 // Mock BurgerMenu
 vi.mock('../BurgerMenu', () => ({
   BurgerMenu: () => <div data-testid="burger-menu" />,
+}));
+
+// Mock useURLParams to directly update store (simulating App.tsx URL→Store sync)
+vi.mock('../../hooks/useURLParams', () => ({
+  useURLParams: () => ({
+    setUriFilter: (filter: string | null) => {
+      useLogStore.getState().setUriFilter(filter);
+    },
+    setStatusFilter: (codes: string[]) => {
+      useLogStore.getState().setStatusFilter(codes);
+    },
+    setTimeFilter: () => {},
+    setScale: (scale: number) => {
+      useLogStore.getState().setTimelineScale(scale);
+    },
+    setRequestId: () => {},
+  }),
 }));
 
 // Default columns for testing
@@ -49,6 +67,15 @@ function createProps(overrides: Partial<RequestTableProps> = {}): RequestTablePr
   };
 }
 
+// Wrapper to provide router context
+function renderWithRouter(ui: React.ReactElement, initialEntries: string[] = ['/http_requests']) {
+  return render(
+    <MemoryRouter initialEntries={initialEntries}>
+      {ui}
+    </MemoryRouter>
+  );
+}
+
 describe('RequestTable', () => {
   beforeEach(() => {
     useLogStore.getState().clearData();
@@ -58,13 +85,13 @@ describe('RequestTable', () => {
 
   describe('rendering', () => {
     it('renders the title', () => {
-      render(<RequestTable {...createProps({ title: 'My Requests' })} />);
+      renderWithRouter(<RequestTable {...createProps({ title: 'My Requests' })} />);
 
       expect(screen.getByText('My Requests')).toBeInTheDocument();
     });
 
     it('renders column headers', () => {
-      render(<RequestTable {...createProps()} />);
+      renderWithRouter(<RequestTable {...createProps()} />);
 
       expect(screen.getByText('Request ID')).toBeInTheDocument();
       expect(screen.getByText('Method')).toBeInTheDocument();
@@ -72,7 +99,7 @@ describe('RequestTable', () => {
     });
 
     it('renders the hide pending checkbox', () => {
-      render(<RequestTable {...createProps({ hidePending: true })} />);
+      renderWithRouter(<RequestTable {...createProps({ hidePending: true })} />);
 
       const checkbox = screen.getByRole('checkbox', { name: /hide pending/i });
       expect(checkbox).toBeInTheDocument();
@@ -80,7 +107,7 @@ describe('RequestTable', () => {
     });
 
     it('renders request count stats', () => {
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         filteredRequests: createRequests(3),
         totalCount: 5 
       })} />);
@@ -90,7 +117,7 @@ describe('RequestTable', () => {
     });
 
     it('renders empty message when no requests', () => {
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         filteredRequests: [],
         emptyMessage: 'Nothing to display' 
       })} />);
@@ -99,13 +126,13 @@ describe('RequestTable', () => {
     });
 
     it('renders default empty message', () => {
-      render(<RequestTable {...createProps({ filteredRequests: [] })} />);
+      renderWithRouter(<RequestTable {...createProps({ filteredRequests: [] })} />);
 
       expect(screen.getByText('No requests found')).toBeInTheDocument();
     });
 
     it('renders headerSlot when provided', () => {
-      render(<RequestTable {...createProps({
+      renderWithRouter(<RequestTable {...createProps({
         headerSlot: <div data-testid="custom-slot">Custom Header</div>
       })} />);
 
@@ -113,7 +140,7 @@ describe('RequestTable', () => {
     });
 
     it('renders timeline scale selector', () => {
-      render(<RequestTable {...createProps({ msPerPixel: 25 })} />);
+      renderWithRouter(<RequestTable {...createProps({ msPerPixel: 25 })} />);
 
       const scaleButton = screen.getByTitle('Timeline scale');
       expect(scaleButton).toHaveTextContent('1px = 25ms');
@@ -123,7 +150,7 @@ describe('RequestTable', () => {
   describe('interactions', () => {
     it('calls onHidePendingChange when checkbox is toggled', () => {
       const onHidePendingChange = vi.fn();
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         hidePending: true, 
         onHidePendingChange 
       })} />);
@@ -135,7 +162,7 @@ describe('RequestTable', () => {
     });
 
     it('updates timeline scale when selector changes', () => {
-      render(<RequestTable {...createProps({ msPerPixel: 10 })} />);
+      renderWithRouter(<RequestTable {...createProps({ msPerPixel: 10 })} />);
 
       // Open the dropdown
       const scaleButton = screen.getByTitle('Timeline scale');
@@ -158,7 +185,7 @@ describe('RequestTable', () => {
       ];
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      const { container } = render(<RequestTable {...createProps({ 
+      const { container } = renderWithRouter(<RequestTable {...createProps({ 
         filteredRequests: requests, 
         totalCount: 2 
       })} />);
@@ -195,7 +222,7 @@ describe('RequestTable', () => {
       ];
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      const { container } = render(<RequestTable {...createProps({ 
+      const { container } = renderWithRouter(<RequestTable {...createProps({ 
         filteredRequests: requests, 
         totalCount: 2 
       })} />);
@@ -231,7 +258,7 @@ describe('RequestTable', () => {
       ];
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         filteredRequests: requests, 
         totalCount: 2 
       })} />);
@@ -254,7 +281,7 @@ describe('RequestTable', () => {
         { id: 'status', label: 'Status', getValue: (r) => r.status || 'Pending' },
       ];
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         columns: columnsWithPendingDisplay,
         filteredRequests: requests, 
         totalCount: 1 
@@ -266,7 +293,7 @@ describe('RequestTable', () => {
 
   describe('status filter dropdown', () => {
     it('renders StatusFilterDropdown with available codes', () => {
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         availableStatusCodes: ['200', '201', '404']
       })} />);
 
@@ -277,7 +304,7 @@ describe('RequestTable', () => {
 
   describe('containerClassName', () => {
     it('applies containerClassName to app wrapper', () => {
-      const { container } = render(<RequestTable {...createProps({ 
+      const { container } = renderWithRouter(<RequestTable {...createProps({ 
         containerClassName: 'http-view'
       })} />);
 
@@ -285,7 +312,7 @@ describe('RequestTable', () => {
     });
 
     it('applies default app class when no containerClassName', () => {
-      const { container } = render(<RequestTable {...createProps()} />);
+      const { container } = renderWithRouter(<RequestTable {...createProps()} />);
 
       expect(container.querySelector('.app')).toBeInTheDocument();
     });
@@ -297,7 +324,7 @@ describe('RequestTable', () => {
 
   describe('URI Filter SearchInput', () => {
     it('renders SearchInput when showUriFilter is true', () => {
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: createRequests(2),
         totalCount: 2,
@@ -308,7 +335,7 @@ describe('RequestTable', () => {
     });
 
     it('does not render SearchInput when showUriFilter is false', () => {
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: false,
         filteredRequests: createRequests(2),
         totalCount: 2,
@@ -319,7 +346,7 @@ describe('RequestTable', () => {
     });
 
     it('renders SearchInput by default (showUriFilter defaults to true)', () => {
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         filteredRequests: createRequests(2),
         totalCount: 2,
       })} />);
@@ -337,7 +364,7 @@ describe('RequestTable', () => {
       );
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -365,7 +392,7 @@ describe('RequestTable', () => {
       );
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -400,7 +427,7 @@ describe('RequestTable', () => {
       useLogStore.getState().setHttpRequests(requests, rawLines);
       useLogStore.getState().setUriFilter('sync');
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -429,7 +456,7 @@ describe('RequestTable', () => {
       );
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -455,7 +482,7 @@ describe('RequestTable', () => {
       useLogStore.getState().setHttpRequests(requests, rawLines);
       useLogStore.getState().setUriFilter('sync');
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -482,7 +509,7 @@ describe('RequestTable', () => {
       );
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -505,7 +532,7 @@ describe('RequestTable', () => {
       );
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -528,7 +555,7 @@ describe('RequestTable', () => {
       );
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -553,7 +580,7 @@ describe('RequestTable', () => {
       );
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
-      render(<RequestTable {...createProps({ 
+      renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -586,7 +613,7 @@ describe('RequestTable', () => {
       useLogStore.getState().setHttpRequests(requests, rawLines);
       useLogStore.getState().setUriFilter('sync');
 
-      const { rerender } = render(<RequestTable {...createProps({ 
+      const { rerender } = renderWithRouter(<RequestTable {...createProps({ 
         showUriFilter: true,
         filteredRequests: requests,
         totalCount: 5,
@@ -598,12 +625,16 @@ describe('RequestTable', () => {
       // Change timeline scale
       useLogStore.getState().setTimelineScale(25);
 
-      rerender(<RequestTable {...createProps({ 
-        showUriFilter: true,
-        filteredRequests: requests,
-        totalCount: 5,
-        msPerPixel: 25,
-      })} />);
+      rerender(
+        <MemoryRouter initialEntries={['/http_requests']}>
+          <RequestTable {...createProps({ 
+            showUriFilter: true,
+            filteredRequests: requests,
+            totalCount: 5,
+            msPerPixel: 25,
+          })} />
+        </MemoryRouter>
+      );
 
       // Filter should still be there
       expect(useLogStore.getState().uriFilter).toBe('sync');

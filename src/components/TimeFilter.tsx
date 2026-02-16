@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLogStore } from '../stores/logStore';
+import { useURLParams } from '../hooks/useURLParams';
 import { getTimeDisplayName, parseTimeInput } from '../utils/timeUtils';
 import { ValidationError } from '../utils/errorHandling';
 import ErrorDisplay from './ErrorDisplay';
@@ -14,7 +15,8 @@ const SHORTCUTS = [
 ];
 
 export function TimeFilter() {
-  const { startTime, endTime, setTimeFilter } = useLogStore();
+  const { startTime, endTime } = useLogStore();
+  const { setTimeFilter } = useURLParams();
   const [showCustom, setShowCustom] = useState(false);
   const [customStart, setCustomStart] = useState(startTime || '');
   const [customEnd, setCustomEnd] = useState(endTime || '');

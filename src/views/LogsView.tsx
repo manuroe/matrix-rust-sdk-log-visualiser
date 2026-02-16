@@ -1,17 +1,22 @@
-import { useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useMemo } from 'react';
 import { useLogStore } from '../stores/logStore';
+import { useURLParams } from '../hooks/useURLParams';
 import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { calculateTimeRangeMicros } from '../utils/timeUtils';
 
 export function LogsView() {
-  const [searchParams] = useSearchParams();
-  const { rawLogLines, startTime, endTime } = useLogStore();
+  const { rawLogLines, startTime, endTime, uriFilter } = useLogStore();
+  const { setUriFilter } = useURLParams();
   
-  // Get filter from URL param to prefill the input (not for automatic filtering)
-  const filterPrefill = searchParams.get('filter') || '';
+  // Get filter from store (synced from URL via App.tsx)
+  const filterPrefill = uriFilter ?? '';
+
+  // Callback to update URL when filter changes
+  const handleFilterChange = useCallback((filter: string) => {
+    setUriFilter(filter || null);
+  }, [setUriFilter]);
 
   // Filter log lines by time range only
   const filteredLines = useMemo(() => {
@@ -75,6 +80,7 @@ export function LogsView() {
             timestamp: line.displayTime
           }))}
           requestFilter={filterPrefill}
+          onFilterChange={handleFilterChange}
           prevRequestLineRange={prevRequestLineRange}
           nextRequestLineRange={nextRequestLineRange}
         />

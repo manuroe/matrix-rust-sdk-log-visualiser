@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useLogStore } from '../stores/logStore';
+import { useURLParams } from '../hooks/useURLParams';
 import { WaterfallTimeline } from './WaterfallTimeline';
 import { BurgerMenu } from './BurgerMenu';
 import { TimeRangeSelector } from './TimeRangeSelector';
@@ -93,8 +94,8 @@ export function RequestTable({
     closeLogViewer,
     setActiveRequest,
     uriFilter,
-    setUriFilter,
   } = useLogStore();
+  const { setUriFilter } = useURLParams();
 
   const waterfallContainerRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
@@ -105,7 +106,7 @@ export function RequestTable({
   const [uriFilterInput, setUriFilterInput] = useState(uriFilter ?? '');
   const debouncedUriFilter = useDebouncedValue(uriFilterInput, 300);
 
-  // Sync debounced URI filter to store
+  // Sync debounced URI filter to URL
   useEffect(() => {
     const newFilter = debouncedUriFilter.length > 0 ? debouncedUriFilter : null;
     if (newFilter !== uriFilter) {
@@ -113,7 +114,7 @@ export function RequestTable({
     }
   }, [debouncedUriFilter, uriFilter, setUriFilter]);
 
-  // Sync store changes back to input (e.g., when cleared externally)
+  // Sync store changes back to input (e.g., when URL changes externally)
   useEffect(() => {
     const storeValue = uriFilter ?? '';
     if (storeValue !== uriFilterInput && storeValue !== debouncedUriFilter) {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
 import { useThemeStore } from '../stores/themeStore';
 import styles from './BurgerMenu.module.css';
@@ -9,6 +9,7 @@ export function BurgerMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { clearData, clearLastRoute } = useLogStore();
   const { theme, setTheme } = useThemeStore();
 
@@ -34,7 +35,15 @@ export function BurgerMenu() {
   };
 
   const handleNavigate = (path: string) => {
-    void navigate(path);
+    // Preserve only time filter params (start/end) when switching views
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+    const params = new URLSearchParams();
+    if (start) params.set('start', start);
+    if (end) params.set('end', end);
+    const queryString = params.toString();
+    const fullPath = queryString ? `${path}?${queryString}` : path;
+    void navigate(fullPath);
     setIsOpen(false);
   };
 

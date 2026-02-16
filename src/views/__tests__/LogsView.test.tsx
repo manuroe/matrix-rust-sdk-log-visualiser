@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { screen, within, waitFor } from '@testing-library/dom';
 import { useLogStore } from '../../stores/logStore';
@@ -8,8 +8,9 @@ import * as TimeUtils from '../../utils/timeUtils';
 import logDisplayStyles from '../LogDisplayView.module.css';
 
 // Mock react-router-dom for useSearchParams
+const mockSetSearchParams = vi.fn();
 vi.mock('react-router-dom', () => ({
-  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  useSearchParams: () => [new URLSearchParams(), mockSetSearchParams],
 }));
 
 // Mock react-virtual to simplify rendering in tests
@@ -35,6 +36,11 @@ vi.mock('../../components/TimeRangeSelector', () => ({
 }));
 
 describe('LogsView', () => {
+  beforeEach(() => {
+    useLogStore.getState().clearData();
+    mockSetSearchParams.mockClear();
+  });
+  
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -200,5 +206,30 @@ describe('LogsView', () => {
     const shownCount = parseInt(shownCountEl.textContent || '0');
     
     expect(shownCount).toBe(10);
+  });
+
+  it('does not clear filter param on mount when uriFilter is set', async () => {
+    const logs = createParsedLogLines(10);
+    useLogStore.setState({ rawLogLines: logs, uriFilter: 'existing-filter' });
+
+    // Clear any previous calls
+    mockSetSearchParams.mockClear();
+
+    render(<LogsView />);
+
+    // Wait for any effects to settle
+    await waitFor(() => {
+      // setSearchParams should NOT have been called to clear the filter
+      // If it was called, it would mean we're resetting the URL param
+      const callsWithEmptyFilter = mockSetSearchParams.mock.calls.filter(
+        (call: any[]) => {
+          const params = call[0];
+          // Check if any call cleared the filter
+          return params instanceof URLSearchParams && 
+                 (params.get('filter') === null || params.get('filter') === '');
+        }
+      );
+      expect(callsWithEmptyFilter.length).toBe(0);
+    });
   });
 });

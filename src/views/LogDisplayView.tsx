@@ -15,12 +15,13 @@ interface LogDisplayViewProps {
   defaultShowOnlyMatching?: boolean;
   defaultLineWrap?: boolean;
   onClose?: () => void;
+  onFilterChange?: (filter: string) => void;
   prevRequestLineRange?: { start: number; end: number };
   nextRequestLineRange?: { start: number; end: number };
   logLines?: ParsedLogLine[];
 }
 
-export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _defaultShowOnlyMatching = false, defaultLineWrap = false, onClose, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
+export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _defaultShowOnlyMatching = false, defaultLineWrap = false, onClose, onFilterChange, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
   const { rawLogLines } = useLogStore();
   
   // Use passed logLines if provided, otherwise use all raw log lines from store
@@ -29,9 +30,37 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
   const [searchQueryInput, setSearchQueryInput] = useState('');
   const [filterQueryInput, setFilterQueryInput] = useState(requestFilter);
   
+  // Track when we're syncing from prop to avoid calling onFilterChange
+  const isSyncingFromProp = useRef(false);
+  
+  // Sync filter input when requestFilter prop changes (e.g., URL→Store sync)
+  useEffect(() => {
+    if (requestFilter !== filterQueryInput) {
+      isSyncingFromProp.current = true;
+      setFilterQueryInput(requestFilter);
+    }
+  }, [requestFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  
   // Debounce inputs to avoid recalculating on every keystroke
   const searchQuery = useDebouncedValue(searchQueryInput, 300);
   const filterQuery = useDebouncedValue(filterQueryInput, 300);
+
+  // Notify parent when debounced filter value changes (only for user-initiated changes)
+  useEffect(() => {
+    // If we just synced from prop, clear the flag when debounced value catches up
+    if (isSyncingFromProp.current) {
+      if (filterQuery === requestFilter) {
+        isSyncingFromProp.current = false;
+      }
+      // Don't call onFilterChange while syncing
+      return;
+    }
+    
+    if (onFilterChange && filterQuery !== requestFilter) {
+      onFilterChange(filterQuery);
+    }
+  }, [filterQuery, onFilterChange, requestFilter]);
+
   const [contextLines, setContextLines] = useState(0);
   const [lineWrap, setLineWrap] = useState(defaultLineWrap);
   const [caseSensitive, setCaseSensitive] = useState(false);

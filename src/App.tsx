@@ -13,194 +13,53 @@ import { SyncView } from './views/SyncView';
 import { HttpRequestsView } from './views/HttpRequestsView';
 import { LogsView } from './views/LogsView';
 import { useLogStore } from './stores/logStore';
-import { urlToTimeFormat, timeToURLFormat } from './utils/timeUtils';
+import { urlToTimeFormat } from './utils/timeUtils';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DEFAULT_MS_PER_PIXEL } from './utils/timelineUtils';
+import { parseStatusParam } from './hooks/useURLParams';
 
 function AppContent() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { 
-    setTimeFilter, 
-    startTime, 
-    endTime, 
-    timelineScale, 
-    setTimelineScale, 
-    statusCodeFilter,
-    setStatusCodeFilter,
-    uriFilter,
-    setUriFilter,
-    setActiveRequest,
-    rawLogLines, 
-    setLastRoute 
-  } = useLogStore();
+  const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const prevTimeFilterRef = useRef<{ startTime: string | null; endTime: string | null }>({
-    startTime: null,
-    endTime: null,
-  });
-  const prevTimelineScaleRef = useRef<number>(DEFAULT_MS_PER_PIXEL);
-  const prevStatusFilterRef = useRef<Set<string> | null>(null);
-  const prevUriFilterRef = useRef<string | null>(null);
-  const prevPathnameRef = useRef<string>(location.pathname);
+  const { rawLogLines, setLastRoute } = useLogStore();
+  
+  // Ref to prevent redirect loops
+  const isRedirecting = useRef(false);
 
-  // Initialize time filter, timeline scale, and status filter from URL
-  // Also update prev refs so the sync effect doesn't see these as "changes"
+  // Reset redirect flag when location changes
   useEffect(() => {
-    // Don't initialize filters if there's no data - redirect will handle it
+    isRedirecting.current = false;
+  }, [location.pathname, location.search]);
+
+  // Single effect: URL → Store (one direction only)
+  // Components write to URL, this effect syncs URL to store
+  useEffect(() => {
+    // Don't sync if there's no data - redirect will handle it
     if (rawLogLines.length === 0) {
       return;
     }
 
-    const start = searchParams.get('start');
-    const end = searchParams.get('end');
-    const scale = searchParams.get('scale');
-    const status = searchParams.get('status');
+    const store = useLogStore.getState();
+    const start = urlToTimeFormat(searchParams.get('start'));
+    const end = urlToTimeFormat(searchParams.get('end'));
+    const scaleParam = searchParams.get('scale');
+    const scale = scaleParam ? parseInt(scaleParam, 10) : DEFAULT_MS_PER_PIXEL;
+    const status = parseStatusParam(searchParams.get('status'));
     const filter = searchParams.get('filter');
     const requestId = searchParams.get('request_id');
-    
-    // Track if this is a navigation (path change) vs just a param update
-    const isNavigation = prevPathnameRef.current !== location.pathname;
-    prevPathnameRef.current = location.pathname;
-    
-    // Parse status codes from URL
-    const statusCodesFromUrl = status 
-      ? new Set(status.split(',').filter(s => s.trim()))
-      : null;
-    
-    // Read current store state fresh (not from closure) to avoid stale comparisons
-    // This is critical: we don't want this effect to re-run when store changes,
-    // only when URL changes. But we need fresh store state for comparison.
-    const currentStatusFilter = useLogStore.getState().statusCodeFilter;
-    
-    // Check if URL status differs from current store state
-    const urlStatusDiffersFromStore = (() => {
-      if (statusCodesFromUrl === null && currentStatusFilter === null) return false;
-      if (statusCodesFromUrl === null || currentStatusFilter === null) return true;
-      if (statusCodesFromUrl.size !== currentStatusFilter.size) return true;
-      for (const code of statusCodesFromUrl) {
-        if (!currentStatusFilter.has(code)) return true;
-      }
-      return false;
-    })();
-    
-    if (start || end) {
-      const startFormatted = urlToTimeFormat(start);
-      const endFormatted = urlToTimeFormat(end);
-      setTimeFilter(startFormatted, endFormatted);
-      // Update prev ref to prevent sync effect from seeing this as a change
-      prevTimeFilterRef.current = { startTime: startFormatted, endTime: endFormatted };
+
+    // Update store (derived from URL)
+    store.setTimeFilter(start, end);
+    if (!isNaN(scale) && scale > 0) {
+      store.setTimelineScale(scale);
     }
-    
-    if (scale) {
-      const scaleNum = parseInt(scale, 10);
-      if (!isNaN(scaleNum) && scaleNum > 0) {
-        setTimelineScale(scaleNum);
-        prevTimelineScaleRef.current = scaleNum;
-      }
-    }
-    
-    // Apply status filter from URL only on navigation or if URL has explicit status param
-    if (statusCodesFromUrl && statusCodesFromUrl.size > 0) {
-      if (urlStatusDiffersFromStore) {
-        setStatusCodeFilter(statusCodesFromUrl);
-        prevStatusFilterRef.current = statusCodesFromUrl;
-      }
-    } else if (isNavigation && currentStatusFilter !== null) {
-      // No status param in URL AND this is a navigation - reset to show all
-      setStatusCodeFilter(null);
-      prevStatusFilterRef.current = null;
-    }
+    store.setStatusCodeFilter(status);
+    store.setUriFilter(filter);
+    store.setActiveRequest(requestId); // null clears selection (reactive)
+  }, [searchParams, rawLogLines.length]);
 
-    // Apply URI filter from URL
-    // Read current store state fresh to avoid having uriFilter in dependencies (prevents loops)
-    const currentUriFilter = useLogStore.getState().uriFilter;
-    if (filter) {
-      const decodedFilter = decodeURIComponent(filter);
-      if (decodedFilter !== currentUriFilter) {
-        setUriFilter(decodedFilter);
-        prevUriFilterRef.current = decodedFilter;
-      }
-    } else if (isNavigation && currentUriFilter !== null) {
-      // No filter param in URL AND this is a navigation - reset filter
-      setUriFilter(null);
-      prevUriFilterRef.current = null;
-    }
-
-    // Apply request_id param - automatically select that request
-    if (requestId) {
-      const decodedRequestId = decodeURIComponent(requestId);
-      setActiveRequest(decodedRequestId);
-    }
-  }, [searchParams, rawLogLines.length, location.pathname, setTimeFilter, setTimelineScale, setStatusCodeFilter, setUriFilter, setActiveRequest]);
-
-  // Sync store changes to URL
-  useEffect(() => {
-    // Check if status filter changed (comparing Set contents)
-    const statusFilterChanged = (() => {
-      if (prevStatusFilterRef.current === statusCodeFilter) return false;
-      if (prevStatusFilterRef.current === null || statusCodeFilter === null) return true;
-      if (prevStatusFilterRef.current.size !== statusCodeFilter.size) return true;
-      for (const code of statusCodeFilter) {
-        if (!prevStatusFilterRef.current.has(code)) return true;
-      }
-      return false;
-    })();
-
-    const uriFilterChanged = prevUriFilterRef.current !== uriFilter;
-
-    const hasChanged =
-      prevTimeFilterRef.current.startTime !== startTime ||
-      prevTimeFilterRef.current.endTime !== endTime ||
-      prevTimelineScaleRef.current !== timelineScale ||
-      statusFilterChanged ||
-      uriFilterChanged;
-
-    if (hasChanged) {
-      prevTimeFilterRef.current = { startTime, endTime };
-      prevTimelineScaleRef.current = timelineScale;
-      prevStatusFilterRef.current = statusCodeFilter;
-      prevUriFilterRef.current = uriFilter;
-      const newParams = new URLSearchParams(searchParams);
-      const startURL = timeToURLFormat(startTime);
-      const endURL = timeToURLFormat(endTime);
-      
-      if (startURL) {
-        newParams.set('start', startURL);
-      } else {
-        newParams.delete('start');
-      }
-      if (endURL) {
-        newParams.set('end', endURL);
-      } else {
-        newParams.delete('end');
-      }
-      
-      // Sync timeline scale to URL (only if not default)
-      if (timelineScale !== DEFAULT_MS_PER_PIXEL) {
-        newParams.set('scale', timelineScale.toString());
-      } else {
-        newParams.delete('scale');
-      }
-      
-      // Sync status filter to URL (only if filtering specific codes)
-      if (statusCodeFilter !== null && statusCodeFilter.size > 0) {
-        newParams.set('status', Array.from(statusCodeFilter).join(','));
-      } else {
-        newParams.delete('status');
-      }
-
-      // Sync URI filter to URL (only if filtering)
-      if (uriFilter !== null && uriFilter.length > 0) {
-        newParams.set('filter', encodeURIComponent(uriFilter));
-      } else {
-        newParams.delete('filter');
-      }
-      
-      setSearchParams(newParams);
-    }
-  }, [startTime, endTime, timelineScale, statusCodeFilter, uriFilter, searchParams, setSearchParams]);
-
+  // Track last route for "continue where you left off"
   useEffect(() => {
     const fullPath = `${location.pathname}${location.search}${location.hash}`;
     if (location.pathname !== '/') {
@@ -208,9 +67,11 @@ function AppContent() {
     }
   }, [location.pathname, location.search, location.hash, setLastRoute]);
 
+  // Redirect to landing if no data
   useEffect(() => {
     const hasData = rawLogLines.length > 0;
-    if (!hasData && location.pathname !== '/') {
+    if (!hasData && location.pathname !== '/' && !isRedirecting.current) {
+      isRedirecting.current = true;
       void navigate('/', { replace: true });
     }
   }, [rawLogLines.length, location.pathname, navigate]);

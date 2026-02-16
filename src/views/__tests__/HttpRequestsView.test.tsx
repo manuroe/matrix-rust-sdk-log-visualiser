@@ -7,8 +7,13 @@ import type { HttpRequest } from '../../types/log.types';
 
 // Mock dependencies
 vi.mock('react-router-dom', () => ({
-  useLocation: () => ({ hash: '' }),
+  useLocation: () => ({ hash: window.location.hash }),
   useNavigate: () => vi.fn(),
+  useSearchParams: () => {
+    const hash = window.location.hash;
+    const queryString = hash.includes('?') ? hash.split('?')[1] : '';
+    return [new URLSearchParams(queryString), vi.fn()];
+  },
 }));
 
 describe('HttpRequestsView - ID Parameter Deep Linking', () => {

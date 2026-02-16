@@ -86,7 +86,9 @@ CI runs benchmarks on PRs, generates `benchmark/baseline.json` directly, and bui
 - Keep documentation high-level; link to code for implementation specifics.
 
 ## Reference Files (Entry Points)
+- Routing: [docs/APP_ROUTING.md](docs/APP_ROUTING.md)
 - Store: [src/stores/logStore.ts](src/stores/logStore.ts)
+- URL params: [src/hooks/useURLParams.ts](src/hooks/useURLParams.ts)
 - Parser: [src/utils/logParser.ts](src/utils/logParser.ts)
 - Time utilities: [src/utils/timeUtils.ts](src/utils/timeUtils.ts)
 - Log views: [src/views](src/views)
