@@ -113,7 +113,7 @@
 }
 
 /* SyncView has different columns */
-.syncView .timelineHeaderSticky {
+:global(.sync-view) .timelineHeaderSticky {
     grid-template-columns: 70px 115px 45px 45px;
     gap: 6px;
     padding: 3px 12px;
@@ -146,7 +146,7 @@
 }
 
 /* SyncView has different columns */
-.syncView .requestRowSticky {
+:global(.sync-view) .requestRowSticky {
     grid-template-columns: 70px 115px 45px 45px;
     gap: 6px;
     padding: 3px 12px;
