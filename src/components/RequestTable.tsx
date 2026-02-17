@@ -262,6 +262,20 @@ export function RequestTable({
   // Use shared URL auto-scroll hook (placed after handleWaterfallRowClick is defined)
   useUrlRequestAutoScroll(filteredRequests, leftPanelRef, handleWaterfallRowClick);
 
+  /** Map column class names to CSS module class names */
+  const getColumnClass = (className?: string): string => {
+    if (!className) return '';
+    const classMap: Record<string, string> = {
+      time: styles.time,
+      uri: styles.uri,
+      method: styles.method,
+      size: styles.size,
+      duration: styles.duration,
+      status: styles.status,
+    };
+    return classMap[className] || '';
+  };
+
   /** Render the expanded log viewer for a request */
   const renderExpandedLogViewer = () => {
     const expandedRequestId = Array.from(openLogViewerIds).find(id => expandedRows.has(id));
@@ -356,7 +370,7 @@ export function RequestTable({
             {columns.map((col) => (
               <div
                 key={col.id}
-                className={`${styles.stickyCol} ${col.className || ''}`}
+                className={`${styles.stickyCol} ${getColumnClass(col.className)}`}
               >
                 {col.label}
               </div>
@@ -400,7 +414,7 @@ export function RequestTable({
                             return (
                               <div
                                 key={col.id}
-                                className={`${styles.requestId} ${styles.clickable} ${styles.stickyCol} ${col.className || ''}`}
+                                className={`${styles.requestId} ${styles.clickable} ${styles.stickyCol} ${getColumnClass(col.className)}`}
                                 data-testid={`request-id-${req.requestId}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -414,7 +428,7 @@ export function RequestTable({
                           return (
                             <div
                               key={col.id}
-                              className={`${styles.stickyCol} ${col.className || ''}`}
+                              className={`${styles.stickyCol} ${getColumnClass(col.className)}`}
                               title={col.getValue(req)}
                             >
                               {col.getValue(req)}
