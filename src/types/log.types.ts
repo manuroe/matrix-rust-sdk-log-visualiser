@@ -14,6 +14,7 @@ export interface HttpRequest {
 
 export interface SyncRequest extends HttpRequest {
   connId: string;
+  timeout?: number;
 }
 
 export interface LogParserResult {

@@ -64,6 +64,24 @@ export interface RequestTableProps {
   rowSelector?: string;
   /** Whether to show the URI filter (default: true) */
   showUriFilter?: boolean;
+  /**
+   * Optional override for the bar background color.
+   * Receives the request and the default computed color; return a CSS color string.
+   * Use this to apply view-specific coloring (e.g., timeout-exceeded state).
+   */
+  getBarColor?: (req: HttpRequest, defaultColor: string) => string;
+  /**
+   * Optional renderer for overlay elements inside the waterfall bar.
+   * Receives the request plus timeline dimensions so the caller can compute
+   * pixel positions (e.g., a vertical tick at the timeout boundary).
+   */
+  renderBarOverlay?: (
+    req: HttpRequest,
+    barWidthPx: number,
+    msPerPixel: number,
+    totalDuration: number,
+    timelineWidth: number
+  ) => ReactNode;
 }
 
 /**
@@ -85,6 +103,8 @@ export function RequestTable({
   headerSlot,
   emptyMessage = 'No requests found',
   showUriFilter = true,
+  getBarColor,
+  renderBarOverlay,
 }: RequestTableProps) {
   const {
     expandedRows,
@@ -456,7 +476,8 @@ export function RequestTable({
                       const status = req.status ? req.status : 'Pending';
                       const isPending = !req.status;
                       const statusCode = req.status ? req.status.split(' ')[0] : '';
-                      const barColor = isPending ? 'var(--http-pending)' : getHttpStatusColor(statusCode);
+                      const defaultBarColor = isPending ? 'var(--http-pending)' : getHttpStatusColor(statusCode);
+                      const barColor = getBarColor ? getBarColor(req, defaultBarColor) : defaultBarColor;
 
                       return (
                         <div
@@ -486,7 +507,9 @@ export function RequestTable({
                                   background: barColor,
                                 }}
                                 title={isPending ? 'Pending' : status}
-                              />
+                              >
+                                {!isPending && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
+                              </div>
                               <span className={styles.waterfallDuration} title={isPending ? 'Pending' : status}>
                                 {isPending ? '...' : statusCode === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
                               </span>

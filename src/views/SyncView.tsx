@@ -1,9 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useLogStore } from '../stores/logStore';
 import { applyTimeRangeFilterMicros } from '../utils/timeUtils';
 import { RequestTable } from '../components/RequestTable';
 import type { ColumnDef } from '../components/RequestTable';
 import { extractAvailableStatusCodes } from '../utils/statusCodeUtils';
+import type { SyncRequest, HttpRequest } from '../types/log.types';
+import { useURLParams } from '../hooks/useURLParams';
+import { renderTimeoutExceededOverlay } from '../utils/waterfallTimeoutOverlay';
 
 /**
  * Sync Requests view - displays /sync requests in a timeline with waterfall visualization.
@@ -15,6 +18,7 @@ export function SyncView() {
     filteredRequests,
     connectionIds,
     selectedConnId,
+    selectedTimeout,
     hidePending,
     startTime,
     endTime,
@@ -23,7 +27,10 @@ export function SyncView() {
     getDisplayTime,
     setSelectedConnId,
     setHidePending,
+    setSelectedTimeout,
   } = useLogStore();
+
+  const { setTimeoutFilter } = useURLParams();
 
   // Calculate total for selected connection, considering time range filter
   const totalCount = useMemo(() => {
@@ -66,20 +73,80 @@ export function SyncView() {
     },
   ], [getDisplayTime]);
 
-  // Connection selector dropdown for header
+  /**
+   * Render the timeout-exceeded segment inside the bar.
+   * The bar stays status-colored up to timeout; the overflow part is warning-colored.
+   * timeout=0 means the whole duration is overflow if requestDurationMs > 0.
+   */
+  const renderBarOverlay = useCallback(
+    (
+      req: HttpRequest,
+      barWidthPx: number,
+      msPerPixel: number,
+      totalDuration: number,
+      timelineWidth: number
+    ) => renderTimeoutExceededOverlay(
+      req,
+      barWidthPx,
+      msPerPixel,
+      totalDuration,
+      timelineWidth,
+      (request) => (request as SyncRequest).timeout,
+    ),
+    []
+  );
+
+  // Compute distinct timeout values present in the data, sorted ascending
+  const availableTimeouts = useMemo(() => {
+    const seen = new Set<number>();
+    for (const r of allRequests) {
+      if (r.timeout !== undefined) seen.add(r.timeout);
+    }
+    return Array.from(seen).sort((a, b) => a - b);
+  }, [allRequests]);
+
+  /** Human-readable label for a timeout value. */
+  function formatTimeout(ms: number): string {
+    if (ms === 0) return '0ms (catchup)';
+    if (ms === 30000) return '30s (long-poll)';
+    return ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`;
+  }
+
+  // Connection selector + timeout selector for header
   const connectionSelector = (
-    <select
-      id="conn-filter"
-      value={selectedConnId}
-      onChange={(e) => setSelectedConnId(e.target.value)}
-      className="select-compact"
-    >
-      {connectionIds.map((connId) => (
-        <option key={connId} value={connId}>
-          {connId}
-        </option>
-      ))}
-    </select>
+    <>
+      <select
+        id="conn-filter"
+        value={selectedConnId}
+        onChange={(e) => setSelectedConnId(e.target.value)}
+        className="select-compact"
+      >
+        {connectionIds.map((connId) => (
+          <option key={connId} value={connId}>
+            {connId}
+          </option>
+        ))}
+      </select>
+      {availableTimeouts.length > 1 && (
+        <select
+          id="timeout-filter"
+          value={selectedTimeout ?? ''}
+          onChange={(e) => {
+            const val = e.target.value === '' ? null : parseInt(e.target.value, 10);
+            setSelectedTimeout(val);
+            setTimeoutFilter(val);
+          }}
+          className="select-compact"
+        >
+          <option value="">All timeouts</option>
+          {availableTimeouts.map((t) => (
+            <option key={t} value={t}>
+              {formatTimeout(t)}
+            </option>
+          ))}
+        </select>
+      )}
+    </>
   );
 
   return (
@@ -97,6 +164,7 @@ export function SyncView() {
       emptyMessage="No sync requests found in log file"
       rowSelector=".sync-view"
       showUriFilter={false}
+      renderBarOverlay={renderBarOverlay}
     />
   );
 }

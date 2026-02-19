@@ -37,6 +37,8 @@ export function useURLParams() {
   const status = parseStatusParam(searchParams.get('status'));
   const filter = searchParams.get('filter');
   const requestId = searchParams.get('request_id');
+  const timeoutParam = searchParams.get('timeout');
+  const timeout = timeoutParam !== null ? parseInt(timeoutParam, 10) : null;
 
   // Helper to update params while preserving others
   const updateParams = useCallback((updates: Record<string, string | null>) => {
@@ -82,6 +84,13 @@ export function useURLParams() {
     });
   }, [updateParams]);
 
+  // Set timeout filter
+  const setTimeoutFilter = useCallback((newTimeout: number | null) => {
+    updateParams({
+      timeout: newTimeout !== null ? newTimeout.toString() : null,
+    });
+  }, [updateParams]);
+
   // Set request ID (for auto-select)
   const setRequestId = useCallback((newRequestId: string | null) => {
     updateParams({
@@ -97,11 +106,13 @@ export function useURLParams() {
     status,
     filter,
     requestId,
+    timeout,
     // Write functions
     setTimeFilter,
     setScale,
     setStatusFilter,
     setUriFilter,
     setRequestId,
+    setTimeoutFilter,
   };
 }

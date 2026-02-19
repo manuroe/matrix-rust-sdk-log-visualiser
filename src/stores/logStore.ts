@@ -11,6 +11,8 @@ interface LogStore {
   connectionIds: string[];
   selectedConnId: string;
   hidePending: boolean;
+  /** null = show all timeout values; number = show only requests with that timeout */
+  selectedTimeout: number | null;
   
   // HTTP requests state (all requests, not just sync)
   allHttpRequests: HttpRequest[];
@@ -46,6 +48,7 @@ interface LogStore {
   setRequests: (requests: SyncRequest[], connIds: string[], rawLines: ParsedLogLine[]) => void;
   setSelectedConnId: (connId: string) => void;
   setHidePending: (hide: boolean) => void;
+  setSelectedTimeout: (timeout: number | null) => void;
   filterRequests: () => void;
   
   // HTTP requests actions
@@ -85,6 +88,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   connectionIds: [],
   selectedConnId: '',
   hidePending: true,
+  selectedTimeout: null,
   
   // HTTP requests state
   allHttpRequests: [],
@@ -136,6 +140,11 @@ export const useLogStore = create<LogStore>((set, get) => ({
 
   setHidePending: (hide) => {
     set({ hidePending: hide });
+    get().filterRequests();
+  },
+
+  setSelectedTimeout: (timeout) => {
+    set({ selectedTimeout: timeout });
     get().filterRequests();
   },
   
@@ -197,7 +206,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   filterRequests: () => {
-    const { allRequests, rawLogLines, selectedConnId, hidePending, statusCodeFilter, startTime, endTime } = get();
+    const { allRequests, rawLogLines, selectedConnId, hidePending, selectedTimeout, statusCodeFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set (in microseconds)
     let timeRangeUs: { startUs: number; endUs: number } | null = null;
@@ -214,6 +223,9 @@ export const useLogStore = create<LogStore>((set, get) => ({
     const filtered = allRequests.filter((r) => {
       // Connection filter
       if (selectedConnId && r.connId !== selectedConnId) return false;
+
+      // Timeout filter
+      if (selectedTimeout !== null && r.timeout !== selectedTimeout) return false;
       
       // Pending filter
       if (hidePending && !r.status) return false;
@@ -290,6 +302,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       filteredRequests: [],
       connectionIds: [],
       selectedConnId: '',
+      selectedTimeout: null,
       allHttpRequests: [],
       filteredHttpRequests: [],
       statusCodeFilter: null,

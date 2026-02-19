@@ -188,14 +188,23 @@ export function parseLogFile(logContent: string): LogParserResult {
   const syncRequests: SyncRequest[] = [];
   const lines = logContent.split('\n');
 
-  // Build a map of request_id to connId by scanning lines again
-  const connIdMap = new Map<string, string>();
+  // Build a map of request_id to sync metadata by scanning lines again
+  const syncMetadataMap = new Map<string, { connId?: string; timeout?: number }>();
   for (const line of lines) {
     if (line.includes('request_id=') && line.includes('/sync')) {
       const reqIdMatch = line.match(/request_id="([^"]+)"/);
       const connMatch = line.match(/conn_id="([^"]+)"/);
-      if (reqIdMatch && connMatch) {
-        connIdMap.set(reqIdMatch[1], connMatch[1]);
+      const timeoutMatch = line.match(/\btimeout=([+-]?\d+(?:\.\d+)?)/);
+
+      if (reqIdMatch) {
+        const requestId = reqIdMatch[1];
+        const existingMetadata = syncMetadataMap.get(requestId) || {};
+        const parsedTimeout = timeoutMatch ? Number(timeoutMatch[1]) : undefined;
+
+        syncMetadataMap.set(requestId, {
+          connId: connMatch?.[1] || existingMetadata.connId,
+          timeout: parsedTimeout ?? existingMetadata.timeout,
+        });
       }
     }
   }
@@ -203,10 +212,12 @@ export function parseLogFile(logContent: string): LogParserResult {
   // Filter HTTP requests for sync URIs and add connId
   for (const httpReq of httpRequests) {
     if (httpReq.uri.includes('/sync')) {
-      const connId = connIdMap.get(httpReq.requestId) || '';
+      const metadata = syncMetadataMap.get(httpReq.requestId);
+      const connId = metadata?.connId || '';
       syncRequests.push({
         ...httpReq,
         connId,
+        timeout: metadata?.timeout,
       });
     }
   }

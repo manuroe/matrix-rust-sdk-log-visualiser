@@ -300,6 +300,7 @@
     height: 14px;
     border-radius: var(--radius-sm);
     position: relative;
+    overflow: hidden;
 }
 
 .waterfallDuration {

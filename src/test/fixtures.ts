@@ -133,6 +133,7 @@ export function createSyncRequest(
   return {
     ...httpRequest,
     connId: overrides.connId ?? 'conn-1',
+    timeout: overrides.timeout,
   };
 }
 

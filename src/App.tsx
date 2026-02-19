@@ -48,6 +48,8 @@ function AppContent() {
     const status = parseStatusParam(searchParams.get('status'));
     const filter = searchParams.get('filter');
     const requestId = searchParams.get('request_id');
+    const timeoutParam = searchParams.get('timeout');
+    const timeout = timeoutParam !== null ? parseInt(timeoutParam, 10) : null;
 
     // Update store (derived from URL)
     store.setTimeFilter(start, end);
@@ -56,6 +58,7 @@ function AppContent() {
     }
     store.setStatusCodeFilter(status);
     store.setUriFilter(filter);
+    store.setSelectedTimeout(!isNaN(timeout ?? NaN) ? timeout : null);
     store.setActiveRequest(requestId); // null clears selection (reactive)
   }, [searchParams, rawLogLines.length]);
 

@@ -148,6 +148,7 @@
   --waterfall-pending: #ff9800;
   --waterfall-error: #dc3545;
   --waterfall-default: #0066cc;
+  --waterfall-timeout-exceeded: #e65100;
 
   /* -------------------------------------------------------------------------
      HTTP Status Code Colors

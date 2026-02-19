@@ -8,6 +8,7 @@ import { ParsingError } from '../errorHandling';
 
 // Sample log line formats from real Matrix Rust SDK logs
 const SEND_LINE = '2026-01-26T17:02:25.042916Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=1 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root > sync_once{conn_id="room-list"} > send{request_id="REQ-62" method=POST uri="https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/sync" request_size="5.9k"}';
+const SEND_LINE_WITH_TIMEOUT = SEND_LINE.replace('sync_once{conn_id="room-list"}', 'sync_once{conn_id="room-list" timeout=0}');
 
 const RESPONSE_LINE = '2026-01-26T17:02:25.416416Z DEBUG matrix_sdk::http_client: Got response | crates/matrix-sdk/src/http_client/mod.rs:210 | spans: root > next_sync_with_lock{store_generation=55} > sync_once{conn_id="encryption"} > send{request_id="REQ-63" method=POST uri="https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/sync" request_size="113B" status=200 response_size="7.4k" request_duration=359.998542ms}';
 
@@ -292,6 +293,26 @@ describe('logParser', () => {
       const result = parseLogFile(content);
 
       expect(result.rawLogLines).toHaveLength(2);
+    });
+
+    it('extracts sync timeout when present', () => {
+      const responseLine = RESPONSE_LINE.replace('REQ-63', 'REQ-62').replace('conn_id="encryption"', 'conn_id="room-list"');
+      const content = [SEND_LINE_WITH_TIMEOUT, responseLine].join('\n');
+
+      const result = parseLogFile(content);
+
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].timeout).toBe(0);
+    });
+
+    it('keeps sync timeout undefined when not present', () => {
+      const responseLine = RESPONSE_LINE.replace('REQ-63', 'REQ-62').replace('conn_id="encryption"', 'conn_id="room-list"');
+      const content = [SEND_LINE, responseLine].join('\n');
+
+      const result = parseLogFile(content);
+
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].timeout).toBeUndefined();
     });
   });
 });
