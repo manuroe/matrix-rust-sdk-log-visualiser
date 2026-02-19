@@ -106,6 +106,14 @@ describe('RequestTable', () => {
       expect(checkbox).toBeChecked();
     });
 
+    it('renders the /sync checkbox enabled by default', () => {
+      renderWithRouter(<RequestTable {...createProps()} />);
+
+      const syncCheckbox = screen.getByRole('checkbox', { name: '/sync' });
+      expect(syncCheckbox).toBeInTheDocument();
+      expect(syncCheckbox).toBeChecked();
+    });
+
     it('renders request count stats', () => {
       renderWithRouter(<RequestTable {...createProps({ 
         filteredRequests: createRequests(3),
@@ -159,6 +167,43 @@ describe('RequestTable', () => {
       fireEvent.click(checkbox);
 
       expect(onShowPendingChange).toHaveBeenCalledWith(false);
+    });
+
+    it('hides /sync requests when /sync checkbox is unchecked', () => {
+      const requests = [
+        createHttpRequest({
+          requestId: 'SYNC-REQ',
+          uri: 'https://matrix.example.org/_matrix/client/v3/sync?since=abc',
+          sendLineNumber: 0,
+          responseLineNumber: 1,
+        }),
+        createHttpRequest({
+          requestId: 'NONSYNC-REQ',
+          uri: 'https://matrix.example.org/_matrix/client/v3/rooms/!room:example.org/messages',
+          sendLineNumber: 2,
+          responseLineNumber: 3,
+        }),
+      ];
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: 1700000000000000 }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: 1700000001000000 }),
+        createParsedLogLine({ lineNumber: 2, timestampUs: 1700000002000000 }),
+        createParsedLogLine({ lineNumber: 3, timestampUs: 1700000003000000 }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, rawLines);
+
+      renderWithRouter(<RequestTable {...createProps({ filteredRequests: requests, totalCount: 2 })} />);
+
+      expect(screen.getByText('SYNC-REQ')).toBeInTheDocument();
+      expect(screen.getByText('NONSYNC-REQ')).toBeInTheDocument();
+      expect(document.getElementById('shown-count')).toHaveTextContent('2');
+
+      const syncCheckbox = screen.getByRole('checkbox', { name: '/sync' });
+      fireEvent.click(syncCheckbox);
+
+      expect(screen.queryByText('SYNC-REQ')).not.toBeInTheDocument();
+      expect(screen.getByText('NONSYNC-REQ')).toBeInTheDocument();
+      expect(document.getElementById('shown-count')).toHaveTextContent('1');
     });
 
     it('updates timeline scale when selector changes', () => {

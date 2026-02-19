@@ -121,6 +121,12 @@ export function RequestTable({
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [showSyncRequests, setShowSyncRequests] = useState(true);
+
+  const isSyncRequest = (req: HttpRequest): boolean => /\/sync(?:[/?]|$)/i.test(req.uri);
+  const displayedRequests = showSyncRequests
+    ? filteredRequests
+    : filteredRequests.filter((req) => !isSyncRequest(req));
 
   // URI filter state with debouncing
   const [uriFilterInput, setUriFilterInput] = useState(uriFilter ?? '');
@@ -145,14 +151,14 @@ export function RequestTable({
   const handleUriFilterClear = useCallback(() => {
     setUriFilterInput('');
     setUriFilter(null);
-  }, [setUriFilter]);
+  }, [setUriFilter, setUriFilterInput]);
 
   // Use shared scroll sync hook
   useScrollSync(leftPanelRef, waterfallContainerRef);
 
   // Calculate timeline scale
   // Find the maximum extent: the latest point where any request bar ends
-  const timeData = filteredRequests
+  const timeData = displayedRequests
     .map((r) => {
       const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
       const startTime = microsToMs(sendLine?.timestampUs ?? 0);
@@ -174,7 +180,7 @@ export function RequestTable({
   const totalDuration = Math.max(1, maxExtent - minTime);
 
   // Calculate timeline width using shared logic
-  const visibleTimes = filteredRequests
+  const visibleTimes = displayedRequests
     .slice(0, 20)
     .map((r) => {
       const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
@@ -280,7 +286,7 @@ export function RequestTable({
   }, [rawLogLines, minTime, totalDuration, timelineWidth, msPerPixel]);
 
   // Use shared URL auto-scroll hook (placed after handleWaterfallRowClick is defined)
-  useUrlRequestAutoScroll(filteredRequests, leftPanelRef, handleWaterfallRowClick);
+  useUrlRequestAutoScroll(displayedRequests, leftPanelRef, handleWaterfallRowClick);
 
   /** Map column class names to CSS module class names */
   const getColumnClass = (className?: string): string => {
@@ -301,12 +307,12 @@ export function RequestTable({
     const expandedRequestId = Array.from(openLogViewerIds).find(id => expandedRows.has(id));
     if (!expandedRequestId) return null;
 
-    const req = filteredRequests.find(r => r.requestId === expandedRequestId);
+    const req = displayedRequests.find(r => r.requestId === expandedRequestId);
     if (!req) return null;
 
-    const reqIndex = filteredRequests.findIndex(r => r.requestId === expandedRequestId);
-    const prevRequest = reqIndex > 0 ? filteredRequests[reqIndex - 1] : null;
-    const nextRequest = reqIndex < filteredRequests.length - 1 ? filteredRequests[reqIndex + 1] : null;
+    const reqIndex = displayedRequests.findIndex(r => r.requestId === expandedRequestId);
+    const prevRequest = reqIndex > 0 ? displayedRequests[reqIndex - 1] : null;
+    const nextRequest = reqIndex < displayedRequests.length - 1 ? displayedRequests[reqIndex + 1] : null;
 
     const prevRequestLineRange = prevRequest ? {
       start: prevRequest.sendLineNumber,
@@ -356,6 +362,15 @@ export function RequestTable({
           <label className="checkbox-compact">
             <input
               type="checkbox"
+              checked={showSyncRequests}
+              onChange={(e) => setShowSyncRequests(e.target.checked)}
+            />
+            /sync
+          </label>
+
+          <label className="checkbox-compact">
+            <input
+              type="checkbox"
               checked={showPending}
               onChange={(e) => onShowPendingChange(e.target.checked)}
             />
@@ -363,7 +378,7 @@ export function RequestTable({
           </label>
 
           <div className="stats-compact">
-            <span id="shown-count">{filteredRequests.length}</span> / <span id="total-count">{totalCount}</span>
+            <span id="shown-count">{displayedRequests.length}</span> / <span id="total-count">{totalCount}</span>
           </div>
         </div>
 
@@ -411,13 +426,13 @@ export function RequestTable({
 
         <div className={styles.scrollContent}>
           <div className={styles.timelineContent}>
-            {filteredRequests.length === 0 ? (
+            {displayedRequests.length === 0 ? (
               <div className={styles.noData}>{emptyMessage}</div>
             ) : (
               <div className={styles.timelineContentWrapper}>
                 {/* Left panel - sticky columns */}
                 <div className={styles.timelineRowsLeft} ref={leftPanelRef}>
-                  {filteredRequests.map((req) => (
+                  {displayedRequests.map((req) => (
                     <div
                       key={`sticky-${req.requestId}`}
                       data-row-id={`sticky-${req.requestId}`}
@@ -463,7 +478,7 @@ export function RequestTable({
                 {/* Right panel - waterfall */}
                 <div className={styles.timelineRowsRight} ref={waterfallContainerRef}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
-                    {filteredRequests.map((req) => {
+                    {displayedRequests.map((req) => {
                       const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
                       const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
                       const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
