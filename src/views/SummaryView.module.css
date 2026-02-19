@@ -1,0 +1,142 @@
+/* Summary View Module */
+.summarySection {
+    composes: section from '../components/Card.module.css';
+}
+
+.summarySection h2 {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.summarySection h3 {
+    font-size: var(--font-size-sm);
+    margin-bottom: 6px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+.summaryGrid {
+    composes: cardGrid from '../components/Card.module.css';
+}
+
+.summaryCard {
+    composes: cardCentered from '../components/Card.module.css';
+}
+
+.summaryValue {
+    composes: cardValue from '../components/Card.module.css';
+}
+
+.summaryLabel {
+    composes: cardLabel from '../components/Card.module.css';
+}
+
+.summarySubtext {
+    composes: cardSubtext from '../components/Card.module.css';
+}
+
+.errorsWarningsGrid {
+    composes: twoColumnGrid from '../components/Card.module.css';
+}
+
+.summaryTableContainer {
+    margin-top: 0;
+}
+
+.summaryTable {
+    composes: table from '../components/Table.module.css';
+    font-size: var(--font-size-sm);
+}
+
+.summaryTable thead {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.summaryTable th {
+    padding: 4px 8px;
+    text-align: left;
+    font-weight: 500;
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summaryTable td {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+
+.summaryTable tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+.alignRight {
+    composes: alignRight from '../components/Table.module.css';
+}
+
+.uriCell {
+    composes: monoCell from '../components/Table.module.css';
+}
+
+.durationBadge {
+    composes: badge badgeInfo from '../components/Table.module.css';
+}
+
+.statusBadge {
+    composes: badge from '../components/Table.module.css';
+}
+
+.statusSuccess {
+    composes: badgeSuccess from '../components/Table.module.css';
+}
+
+.statusError {
+    composes: badgeError from '../components/Table.module.css';
+}
+
+.actionLink {
+    composes: actionLink from '../components/Table.module.css';
+}
+
+.clickableHeading {
+    cursor: pointer;
+    color: var(--color-info);
+    transition: color var(--transition-slow);
+}
+
+.clickableHeading:hover {
+    color: var(--color-primary-hover);
+    text-decoration: underline;
+}
+
+/* Log Activity Chart */
+.activityChartContainer {
+    margin-top: 4px;
+}
+
+.activityChartContainer h3 {
+    font-size: var(--font-size-sm);
+    margin-bottom: 6px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+.logActivityChart {
+    composes: cardCompact from '../components/Card.module.css';
+}
+
+.logActivityChart svg {
+    display: block;
+    max-width: 100%;
+}
+
+.chartEmpty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-placeholder);
+    font-size: var(--font-size-lg);
+}

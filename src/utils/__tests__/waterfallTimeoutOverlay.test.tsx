@@ -1,0 +1,94 @@
+import { describe, expect, it } from 'vitest';
+import { isValidElement } from 'react';
+import { renderTimeoutExceededOverlay } from '../waterfallTimeoutOverlay';
+import type { HttpRequest } from '../../types/log.types';
+
+function createRequest(overrides: Partial<HttpRequest> = {}): HttpRequest {
+  return {
+    requestId: 'req-1',
+    method: 'GET',
+    uri: '/_matrix/client/v3/sync',
+    status: '200',
+    requestSize: '1KB',
+    responseSize: '2KB',
+    requestDurationMs: 0,
+    sendLineNumber: 1,
+    responseLineNumber: 2,
+    ...overrides,
+  };
+}
+
+describe('renderTimeoutExceededOverlay', () => {
+  it('returns null when timeout is missing', () => {
+    const req = createRequest({ requestDurationMs: 35_000 });
+
+    const result = renderTimeoutExceededOverlay(
+      req,
+      350,
+      100,
+      100_000,
+      1000,
+      () => undefined,
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when request duration does not exceed timeout', () => {
+    const req = createRequest({ requestDurationMs: 30_000 });
+
+    const result = renderTimeoutExceededOverlay(
+      req,
+      300,
+      100,
+      100_000,
+      1000,
+      () => 30_000,
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('renders overflow segment only after timeout boundary', () => {
+    const req = createRequest({ requestDurationMs: 50_000 });
+
+    const result = renderTimeoutExceededOverlay(
+      req,
+      500,
+      100,
+      100_000,
+      1000,
+      () => 30_000,
+    );
+
+    expect(isValidElement(result)).toBe(true);
+    if (!isValidElement<{ style: Record<string, string> }>(result)) {
+      return;
+    }
+
+    expect(result.props.style.left).toBe('300px');
+    expect(result.props.style.width).toBe('200px');
+    expect(result.props.style.background).toBe('var(--waterfall-timeout-exceeded)');
+  });
+
+  it('renders full bar as overflow for timeout=0', () => {
+    const req = createRequest({ requestDurationMs: 15_000 });
+
+    const result = renderTimeoutExceededOverlay(
+      req,
+      150,
+      100,
+      100_000,
+      1000,
+      () => 0,
+    );
+
+    expect(isValidElement(result)).toBe(true);
+    if (!isValidElement<{ style: Record<string, string> }>(result)) {
+      return;
+    }
+
+    expect(result.props.style.left).toBe('0px');
+    expect(result.props.style.width).toBe('150px');
+  });
+});
