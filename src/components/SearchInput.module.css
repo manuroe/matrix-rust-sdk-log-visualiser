@@ -1,0 +1,71 @@
+/* Reusable Search Input with Clear Button */
+
+.container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.input {
+  height: 32px;
+  width: 320px;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  transition: border-color var(--transition-default), box-shadow var(--transition-default), width var(--transition-default);
+}
+
+.input:hover {
+  border-color: var(--border-dark);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-muted);
+}
+
+.input.expandable:focus {
+  width: 400px;
+}
+
+.input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.clearButton {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-default), color var(--transition-default);
+}
+
+.clearButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.clearButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-primary-muted);
+}
