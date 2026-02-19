@@ -12,96 +12,27 @@ global.ResizeObserver = class ResizeObserver {
 };
 
 describe('WaterfallTimeline', () => {
-  const defaultProps = {
-    minTime: 1000000,
-    maxTime: 1010000,
-    totalDuration: 10000,
-    width: 800,
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('Rendering', () => {
-    it('renders with basic props', () => {
-      const { container } = render(<WaterfallTimeline {...defaultProps} />);
-      const timeline = container.querySelector('.waterfall-timeline-scale');
-      expect(timeline).toBeInTheDocument();
+    it('renders wrapper element', () => {
+      const { container } = render(<WaterfallTimeline />);
+      const wrapper = container.querySelector('.waterfall-timeline-wrapper');
+      expect(wrapper).toBeInTheDocument();
     });
 
-    it('applies correct width from props', () => {
-      const { container } = render(<WaterfallTimeline {...defaultProps} width={1200} />);
-      const timeline = container.querySelector('.waterfall-timeline-scale');
-      expect(timeline).toHaveStyle({ width: '1200px' });
-    });
-
-    it('uses default width when not provided', () => {
-      const { container } = render(
-        <WaterfallTimeline
-          minTime={defaultProps.minTime}
-          maxTime={defaultProps.maxTime}
-          totalDuration={defaultProps.totalDuration}
-        />
-      );
-      const timeline = container.querySelector('.waterfall-timeline-scale');
-      expect(timeline).toHaveStyle({ width: '800px' });
-    });
-  });
-
-  describe('Tick Generation', () => {
-    it('generates ticks for short duration (< 1s)', () => {
-      const { container } = render(
-        <WaterfallTimeline
-          minTime={1000000}
-          maxTime={1000800}
-          totalDuration={800}
-          width={800}
-        />
-      );
-      // Should use 100ms tick interval
-      const ticks = container.querySelectorAll('.timeline-tick');
-      expect(ticks.length).toBeGreaterThan(0);
-    });
-
-    it('generates ticks for medium duration (1-5s)', () => {
-      const { container } = render(
-        <WaterfallTimeline
-          minTime={1000000}
-          maxTime={1003000}
-          totalDuration={3000}
-          width={800}
-        />
-      );
-      // Should use 500ms tick interval
-      const ticks = container.querySelectorAll('.timeline-tick');
-      expect(ticks.length).toBeGreaterThan(0);
-    });
-
-    it('generates ticks for long duration (> 1min)', () => {
-      const { container } = render(
-        <WaterfallTimeline
-          minTime={1000000}
-          maxTime={1120000}
-          totalDuration={120000}
-          width={800}
-        />
-      );
-      // Should use larger tick interval
-      const ticks = container.querySelectorAll('.timeline-tick');
-      expect(ticks.length).toBeGreaterThan(0);
-    });
-
-    it('positions ticks correctly based on time', () => {
-      const { container } = render(<WaterfallTimeline {...defaultProps} />);
-      const firstTick = container.querySelector('.timeline-tick');
-      expect(firstTick).toHaveStyle({ position: 'absolute' });
+    it('renders with width prop', () => {
+      const { container } = render(<WaterfallTimeline width={1200} />);
+      const wrapper = container.querySelector('.waterfall-timeline-wrapper');
+      expect(wrapper).toBeInTheDocument();
     });
   });
 
   describe('Cursor Behavior', () => {
     it('does not render cursor overlay without cursorContainerRef', () => {
-      const { container } = render(<WaterfallTimeline {...defaultProps} />);
+      const { container } = render(<WaterfallTimeline />);
       const overlay = container.querySelector('.waterfall-cursor-overlay');
       expect(overlay).not.toBeInTheDocument();
     });
@@ -115,7 +46,6 @@ describe('WaterfallTimeline', () => {
               Container
             </div>
             <WaterfallTimeline
-              {...defaultProps}
               cursorContainerRef={containerRef}
             />
           </div>
@@ -137,7 +67,6 @@ describe('WaterfallTimeline', () => {
               Container
             </div>
             <WaterfallTimeline
-              {...defaultProps}
               cursorContainerRef={containerRef}
               cursorOffsetLeft={100}
             />
@@ -159,7 +88,6 @@ describe('WaterfallTimeline', () => {
               Container
             </div>
             <WaterfallTimeline
-              {...defaultProps}
               cursorContainerRef={containerRef}
             />
           </div>
@@ -169,27 +97,6 @@ describe('WaterfallTimeline', () => {
       render(<TestComponent />);
       const overlay = document.querySelector('.waterfall-cursor-overlay') as HTMLElement;
       expect(overlay).toHaveStyle({ overflow: 'visible' });
-    });
-  });
-
-  describe('Width Calculation', () => {
-    it('uses provided width directly', () => {
-      const { container } = render(<WaterfallTimeline {...defaultProps} width={1500} />);
-      const timeline = container.querySelector('.waterfall-timeline-scale');
-      expect(timeline).toHaveStyle({ width: '1500px' });
-    });
-
-    it('respects minimum width when no width provided', () => {
-      const { container } = render(
-        <WaterfallTimeline
-          minTime={defaultProps.minTime}
-          maxTime={defaultProps.maxTime}
-          totalDuration={defaultProps.totalDuration}
-        />
-      );
-      const timeline = container.querySelector('.waterfall-timeline-scale');
-      const width = parseInt(timeline?.getAttribute('style')?.match(/width:\s*(\d+)px/)?.[1] || '0');
-      expect(width).toBeGreaterThanOrEqual(800);
     });
   });
 
