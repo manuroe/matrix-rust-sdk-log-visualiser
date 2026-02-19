@@ -121,6 +121,7 @@ export function SyncView() {
         onChange={(e) => setSelectedConnId(e.target.value)}
         className="select-compact"
       >
+        <option value="">All conn-id</option>
         {connectionIds.map((connId) => (
           <option key={connId} value={connId}>
             {connId}
