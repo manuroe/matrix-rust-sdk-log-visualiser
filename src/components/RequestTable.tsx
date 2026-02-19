@@ -168,7 +168,6 @@ export function RequestTable({
     .filter((t) => t.startTime > 0);
   
   const minTime = timeData.length > 0 ? Math.min(...timeData.map(t => t.startTime)) : 0;
-  const maxTime = timeData.length > 0 ? Math.max(...timeData.map(t => t.startTime)) : 0;
   // Use maxExtent to ensure the timeline is wide enough for all bars including their widths
   // Add extra time (in ms) to account for the duration label displayed after the last bar (e.g., "12888ms")
   // 80px worth of label space at the current scale
@@ -413,11 +412,7 @@ export function RequestTable({
           </div>
           <div className={styles.timelineHeaderWaterfall}>
             <WaterfallTimeline
-              minTime={minTime}
-              maxTime={maxTime}
-              totalDuration={totalDuration}
               width={timelineWidth}
-              msPerPixel={msPerPixel}
               cursorContainerRef={waterfallContainerRef}
               cursorOffsetLeft={0}
             />
