@@ -59,8 +59,8 @@ function createProps(overrides: Partial<RequestTableProps> = {}): RequestTablePr
     columns: defaultColumns,
     filteredRequests: [],
     totalCount: 0,
-    hidePending: true,
-    onHidePendingChange: vi.fn(),
+    showPending: false,
+    onShowPendingChange: vi.fn(),
     msPerPixel: 10,
     availableStatusCodes: ['200', '404', '500'],
     ...overrides,
@@ -98,10 +98,10 @@ describe('RequestTable', () => {
       expect(screen.getByText('Status')).toBeInTheDocument();
     });
 
-    it('renders the hide pending checkbox', () => {
-      renderWithRouter(<RequestTable {...createProps({ hidePending: true })} />);
+    it('renders the pending checkbox', () => {
+      renderWithRouter(<RequestTable {...createProps({ showPending: true })} />);
 
-      const checkbox = screen.getByRole('checkbox', { name: /hide pending/i });
+      const checkbox = screen.getByRole('checkbox', { name: /pending/i });
       expect(checkbox).toBeInTheDocument();
       expect(checkbox).toBeChecked();
     });
@@ -148,17 +148,17 @@ describe('RequestTable', () => {
   });
 
   describe('interactions', () => {
-    it('calls onHidePendingChange when checkbox is toggled', () => {
-      const onHidePendingChange = vi.fn();
+    it('calls onShowPendingChange when checkbox is toggled', () => {
+      const onShowPendingChange = vi.fn();
       renderWithRouter(<RequestTable {...createProps({ 
-        hidePending: true, 
-        onHidePendingChange 
+        showPending: true,
+        onShowPendingChange
       })} />);
 
-      const checkbox = screen.getByRole('checkbox', { name: /hide pending/i });
+      const checkbox = screen.getByRole('checkbox', { name: /pending/i });
       fireEvent.click(checkbox);
 
-      expect(onHidePendingChange).toHaveBeenCalledWith(false);
+      expect(onShowPendingChange).toHaveBeenCalledWith(false);
     });
 
     it('updates timeline scale when selector changes', () => {
@@ -287,7 +287,7 @@ describe('RequestTable', () => {
         totalCount: 1 
       })} />);
 
-      expect(screen.getByText('Pending')).toBeInTheDocument();
+      expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
     });
   });
 

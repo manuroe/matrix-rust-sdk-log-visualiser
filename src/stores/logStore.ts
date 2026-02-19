@@ -10,14 +10,14 @@ interface LogStore {
   filteredRequests: SyncRequest[];
   connectionIds: string[];
   selectedConnId: string;
-  hidePending: boolean;
+  showPending: boolean;
   /** null = show all timeout values; number = show only requests with that timeout */
   selectedTimeout: number | null;
   
   // HTTP requests state (all requests, not just sync)
   allHttpRequests: HttpRequest[];
   filteredHttpRequests: HttpRequest[];
-  hidePendingHttp: boolean;
+  showPendingHttp: boolean;
   
   // Status code filter (null = all enabled, Set = specific codes enabled)
   // Special value 'Pending' represents requests without a status
@@ -47,13 +47,13 @@ interface LogStore {
   // Sync-specific actions
   setRequests: (requests: SyncRequest[], connIds: string[], rawLines: ParsedLogLine[]) => void;
   setSelectedConnId: (connId: string) => void;
-  setHidePending: (hide: boolean) => void;
+  setShowPending: (show: boolean) => void;
   setSelectedTimeout: (timeout: number | null) => void;
   filterRequests: () => void;
   
   // HTTP requests actions
   setHttpRequests: (requests: HttpRequest[], rawLines: ParsedLogLine[]) => void;
-  setHidePendingHttp: (hide: boolean) => void;
+  setShowPendingHttp: (show: boolean) => void;
   setStatusCodeFilter: (filter: Set<string> | null) => void;
   setUriFilter: (filter: string | null) => void;
   filterHttpRequests: () => void;
@@ -87,13 +87,13 @@ export const useLogStore = create<LogStore>((set, get) => ({
   filteredRequests: [],
   connectionIds: [],
   selectedConnId: '',
-  hidePending: true,
+  showPending: false,
   selectedTimeout: null,
   
   // HTTP requests state
   allHttpRequests: [],
   filteredHttpRequests: [],
-  hidePendingHttp: true,
+  showPendingHttp: false,
   
   // Status code filter (null = all enabled)
   statusCodeFilter: null,
@@ -138,8 +138,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
     get().filterRequests();
   },
 
-  setHidePending: (hide) => {
-    set({ hidePending: hide });
+  setShowPending: (show) => {
+    set({ showPending: show });
     get().filterRequests();
   },
 
@@ -156,8 +156,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
     get().filterHttpRequests();
   },
   
-  setHidePendingHttp: (hide) => {
-    set({ hidePendingHttp: hide });
+  setShowPendingHttp: (show) => {
+    set({ showPendingHttp: show });
     get().filterHttpRequests();
   },
   
@@ -206,7 +206,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   filterRequests: () => {
-    const { allRequests, rawLogLines, selectedConnId, hidePending, selectedTimeout, statusCodeFilter, startTime, endTime } = get();
+    const { allRequests, rawLogLines, selectedConnId, showPending, selectedTimeout, statusCodeFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set (in microseconds)
     let timeRangeUs: { startUs: number; endUs: number } | null = null;
@@ -228,7 +228,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       if (selectedTimeout !== null && r.timeout !== selectedTimeout) return false;
       
       // Pending filter
-      if (hidePending && !r.status) return false;
+      if (!showPending && !r.status) return false;
       
       // Status code filter (null = all enabled)
       if (statusCodeFilter !== null) {
@@ -252,7 +252,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   
   filterHttpRequests: () => {
-    const { allHttpRequests, rawLogLines, hidePendingHttp, statusCodeFilter, uriFilter, startTime, endTime } = get();
+    const { allHttpRequests, rawLogLines, showPendingHttp, statusCodeFilter, uriFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set (in microseconds)
     let timeRangeUs: { startUs: number; endUs: number } | null = null;
@@ -268,7 +268,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
     
     const filtered = allHttpRequests.filter((r) => {
       // Pending filter
-      if (hidePendingHttp && !r.status) return false;
+      if (!showPendingHttp && !r.status) return false;
       
       // Status code filter (null = all enabled)
       if (statusCodeFilter !== null) {

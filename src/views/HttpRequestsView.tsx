@@ -17,13 +17,13 @@ export function HttpRequestsView() {
     allHttpRequests,
     allRequests,
     filteredHttpRequests,
-    hidePendingHttp,
+    showPendingHttp,
     startTime,
     endTime,
     timelineScale,
     rawLogLines,
     getDisplayTime,
-    setHidePendingHttp,
+    setShowPendingHttp,
   } = useLogStore();
 
   // Calculate total considering time range filter
@@ -122,8 +122,8 @@ export function HttpRequestsView() {
       columns={columns}
       filteredRequests={filteredHttpRequests}
       totalCount={totalCount}
-      hidePending={hidePendingHttp}
-      onHidePendingChange={setHidePendingHttp}
+      showPending={showPendingHttp}
+      onShowPendingChange={setShowPendingHttp}
       msPerPixel={timelineScale}
       availableStatusCodes={availableStatusCodes}
       emptyMessage="No HTTP requests found in log file"

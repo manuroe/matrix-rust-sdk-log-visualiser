@@ -48,10 +48,10 @@ export interface RequestTableProps {
   filteredRequests: HttpRequest[];
   /** Total count to display (pre-calculated by the view) */
   totalCount: number;
-  /** Whether to hide pending requests */
-  hidePending: boolean;
-  /** Callback when hide pending checkbox changes */
-  onHidePendingChange: (value: boolean) => void;
+  /** Whether to show pending requests */
+  showPending: boolean;
+  /** Callback when pending checkbox changes */
+  onShowPendingChange: (value: boolean) => void;
   /** Timeline scale (ms per pixel) */
   msPerPixel: number;
   /** Available status codes for filtering (including 'Pending' if applicable) */
@@ -96,8 +96,8 @@ export function RequestTable({
   containerClassName = '',
   filteredRequests,
   totalCount,
-  hidePending,
-  onHidePendingChange,
+  showPending,
+  onShowPendingChange,
   msPerPixel,
   availableStatusCodes,
   headerSlot,
@@ -356,10 +356,10 @@ export function RequestTable({
           <label className="checkbox-compact">
             <input
               type="checkbox"
-              checked={hidePending}
-              onChange={(e) => onHidePendingChange(e.target.checked)}
+              checked={showPending}
+              onChange={(e) => onShowPendingChange(e.target.checked)}
             />
-            Hide pending
+            Pending
           </label>
 
           <div className="stats-compact">

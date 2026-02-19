@@ -41,8 +41,8 @@ describe('logStore', () => {
 
       expect(state.expandedRows.size).toBe(0);
       expect(state.openLogViewerIds.size).toBe(0);
-      expect(state.hidePending).toBe(true);
-      expect(state.hidePendingHttp).toBe(true);
+      expect(state.showPending).toBe(false);
+      expect(state.showPendingHttp).toBe(false);
     });
   });
 
@@ -87,7 +87,7 @@ describe('logStore', () => {
       useLogStore.getState().setRequests(requests, connIds, []);
       const state = useLogStore.getState();
 
-      // With hidePending=true (default), completed request should be included
+      // With showPending=false (default), completed request should be included
       expect(state.filteredRequests).toHaveLength(1);
     });
   });
@@ -113,7 +113,7 @@ describe('logStore', () => {
       useLogStore.getState().setHttpRequests(requests, []);
       const state = useLogStore.getState();
 
-      // With hidePendingHttp=true (default), only completed requests
+      // With showPendingHttp=false (default), only completed requests
       expect(state.filteredHttpRequests).toHaveLength(1);
       expect(state.filteredHttpRequests[0].status).toBe('200');
     });
@@ -121,13 +121,13 @@ describe('logStore', () => {
 
   describe('filterRequests', () => {
     beforeEach(() => {
-      // Reset store to ensure clean default state (hidePending=true, etc.)
+      // Reset store to ensure clean default state (showPending=false, etc.)
       useLogStore.getState().clearData();
-      // Note: clearData doesn't reset hidePending to default, so we need a full reset
+      // Note: clearData doesn't reset showPending to default, so we need a full reset
       // This tests with fresh store state plus our test data
       useLogStore.setState({
-        hidePending: true,
-        hidePendingHttp: true,
+        showPending: false,
+        showPendingHttp: false,
       });
       
       const requests = [
@@ -140,7 +140,7 @@ describe('logStore', () => {
     });
 
     it('filters by connection ID', () => {
-      useLogStore.getState().setHidePending(false);
+      useLogStore.getState().setShowPending(true);
       useLogStore.getState().setSelectedConnId('encryption');
       const state = useLogStore.getState();
 
@@ -148,8 +148,8 @@ describe('logStore', () => {
       expect(state.filteredRequests[0].requestId).toBe('REQ-3');
     });
 
-    it('filters out pending requests when hidePending is true', () => {
-      // Default hidePending=true, selected is room-list by default
+    it('filters out pending requests when showPending is false', () => {
+      // Default showPending=false, selected is room-list by default
       const state = useLogStore.getState();
 
       // Room-list requests with status: REQ-1 (200), REQ-4 (401)
@@ -157,15 +157,15 @@ describe('logStore', () => {
       expect(state.filteredRequests.every(r => r.status !== '')).toBe(true);
     });
 
-    it('includes pending requests when hidePending is false', () => {
-      useLogStore.getState().setHidePending(false);
+    it('includes pending requests when showPending is true', () => {
+      useLogStore.getState().setShowPending(true);
       const state = useLogStore.getState();
 
       expect(state.filteredRequests).toHaveLength(3); // All room-list requests
     });
 
     it('filters by status code filter', () => {
-      useLogStore.getState().setHidePending(false);
+      useLogStore.getState().setShowPending(true);
       useLogStore.getState().setStatusCodeFilter(new Set(['401']));
       const state = useLogStore.getState();
 
@@ -175,7 +175,7 @@ describe('logStore', () => {
 
     it('includes pending requests when status filter includes Pending', () => {
       useLogStore.getState().setStatusCodeFilter(new Set(['Pending']));
-      useLogStore.getState().setHidePending(false);
+      useLogStore.getState().setShowPending(true);
       const state = useLogStore.getState();
 
       expect(state.filteredRequests).toHaveLength(1);
@@ -188,8 +188,8 @@ describe('logStore', () => {
       // Reset store to ensure clean default state
       useLogStore.getState().clearData();
       useLogStore.setState({
-        hidePending: true,
-        hidePendingHttp: true,
+        showPending: false,
+        showPendingHttp: false,
       });
       
       const requests = [
@@ -201,15 +201,15 @@ describe('logStore', () => {
       useLogStore.getState().setHttpRequests(requests, []);
     });
 
-    it('filters out pending requests when hidePendingHttp is true', () => {
+    it('filters out pending requests when showPendingHttp is false', () => {
       const state = useLogStore.getState();
 
       expect(state.filteredHttpRequests).toHaveLength(3);
       expect(state.filteredHttpRequests.every(r => r.status !== '')).toBe(true);
     });
 
-    it('includes pending requests when hidePendingHttp is false', () => {
-      useLogStore.getState().setHidePendingHttp(false);
+    it('includes pending requests when showPendingHttp is true', () => {
+      useLogStore.getState().setShowPendingHttp(true);
       const state = useLogStore.getState();
 
       expect(state.filteredHttpRequests).toHaveLength(4);

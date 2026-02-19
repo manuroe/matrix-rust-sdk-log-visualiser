@@ -19,14 +19,14 @@ export function SyncView() {
     connectionIds,
     selectedConnId,
     selectedTimeout,
-    hidePending,
+    showPending,
     startTime,
     endTime,
     timelineScale,
     rawLogLines,
     getDisplayTime,
     setSelectedConnId,
-    setHidePending,
+    setShowPending,
     setSelectedTimeout,
   } = useLogStore();
 
@@ -157,8 +157,8 @@ export function SyncView() {
       containerClassName="sync-view"
       filteredRequests={filteredRequests}
       totalCount={totalCount}
-      hidePending={hidePending}
-      onHidePendingChange={setHidePending}
+      showPending={showPending}
+      onShowPendingChange={setShowPending}
       msPerPixel={timelineScale}
       availableStatusCodes={availableStatusCodes}
       headerSlot={connectionSelector}
