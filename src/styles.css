@@ -101,3 +101,9 @@
     padding: 20px;
     background: var(--bg-secondary);
 }
+
+/* Expanded Log Viewer */
+.expanded-log-viewer {
+    border-top: 2px solid var(--border-default);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
