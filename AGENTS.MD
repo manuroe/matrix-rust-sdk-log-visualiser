@@ -51,6 +51,11 @@ This document is a lightweight guide for contributors and automated agents. It f
   - Example: `npm run bench benchmark/local/report.json`
 - Build benchmark report: `npm run bench:report <json-path> [-- --output <md-path>] [-- --baseline <baseline-path>]`
   - Local: `npm run bench:report benchmark/local/report.json -- --output benchmark/local/report.md`
+- Fetch PR review comments: `npm run pr:comments` (auto-detects current branch) or `npm run pr:comments -- --pr <number>`
+
+## PR Review Workflow (for Agents)
+
+When prompted **"Review PR comments"**: run `npm run pr:comments`, read `pr-comments-for-agent.md`, create todo list, fix each systematically, verify with `npm test -- --run`, summarize changes.
 
 ## Architecture (Conceptual)
 1. Parse log text into structured records once.
