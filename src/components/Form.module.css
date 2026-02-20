@@ -1,0 +1,72 @@
+/* Shared Form Component Styles */
+
+/* Input group container with label */
+.inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Input group label */
+.inputLabel {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+}
+
+/* Base text input */
+.textInput {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    font-family: var(--font-mono);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    transition: border-color var(--transition-default), box-shadow var(--transition-default);
+}
+
+.textInput:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-muted);
+}
+
+.textInput::placeholder {
+    color: var(--text-placeholder);
+}
+
+/* Larger text input variant */
+.textInputLarge {
+    composes: textInput;
+    padding: 8px 12px;
+    font-size: var(--font-size-lg);
+    border-radius: var(--radius-md);
+}
+
+/* Checkbox label wrapper */
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.checkboxLabel input[type="checkbox"] {
+    cursor: pointer;
+    margin: 0;
+}
+
+/* Action buttons row */
+.actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}

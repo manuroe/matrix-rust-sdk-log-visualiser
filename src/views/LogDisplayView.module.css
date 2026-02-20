@@ -1,0 +1,414 @@
+/* Log Display View Module */
+.logDisplayView {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.logToolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 16px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-default);
+    gap: 12px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.logToolbarLeft,
+.logToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logSearchInput {
+    composes: textInputLarge from '../components/Form.module.css';
+    width: auto;
+    min-width: 300px;
+}
+
+.logToolbarOption {
+    composes: checkboxLabel from '../components/Form.module.css';
+}
+
+.searchResultsCount {
+    font-size: var(--font-size-base);
+    color: var(--text-tertiary);
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    min-width: 60px;
+    text-align: center;
+}
+
+.searchNavigation {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.searchNavigation .btnToolbar {
+    padding: 4px 8px;
+    min-width: 28px;
+}
+
+.btnToolbar {
+    composes: toolbarButton from '../components/Button.module.css';
+}
+
+.btnToolbar:hover {
+    background: var(--bg-hover);
+}
+
+.btnToolbar.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.btnIcon {
+    composes: iconButton from '../components/Button.module.css';
+}
+
+.closeIcon {
+    margin-left: 8px;
+    font-weight: 700;
+}
+
+.closeIcon:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+.logToolbarContextGroup {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.btnContextToggle {
+    padding: 6px 10px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    border-right: 1px solid var(--border-medium) !important;
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    font-size: var(--font-size-xl) !important;
+    line-height: 1 !important;
+    cursor: pointer;
+    transition: background-color var(--transition-default);
+}
+
+.btnContextToggle:hover {
+    background: var(--bg-hover) !important;
+}
+
+.btnContextToggle.active {
+    background: var(--color-primary) !important;
+    color: white !important;
+    border-right-color: var(--color-primary) !important;
+}
+
+.logContextInput {
+    width: 60px;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 0;
+    font-size: var(--font-size-md);
+    text-align: center;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.logContextInput:focus {
+    outline: none;
+    background: var(--color-primary-light);
+}
+
+.logContextInput:disabled {
+    background: var(--bg-secondary);
+    color: var(--text-placeholder);
+    cursor: not-allowed;
+}
+
+/* Log Content - Always dark theme for readability */
+.logContentWrapper {
+    flex: 1;
+    overflow: auto;
+    background: var(--log-bg);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
+    line-height: 1.5;
+}
+
+.logContent {
+    width: auto;
+    min-width: 100%;
+    padding-left: 28px;
+    position: relative;
+}
+
+.logLine {
+    display: flex;
+    align-items: flex-start;
+    padding: 2px 8px;
+    color: var(--log-text);
+    border-left: 3px solid transparent;
+    transition: background-color var(--transition-fast);
+    width: fit-content;
+    min-width: 100%;
+}
+
+.logLine:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.matchLine {
+    background: var(--log-match-bg);
+    border-left-color: var(--log-search-highlight);
+}
+
+.currentMatch {
+    background: var(--log-current-match-bg) !important;
+    border-left-color: var(--color-warning) !important;
+    border-left-width: 4px !important;
+}
+
+.nowrap {
+    white-space: nowrap;
+}
+
+.wrap {
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 2;
+}
+
+.logLineNumber {
+    flex-shrink: 0;
+    width: 60px;
+    text-align: right;
+    color: var(--log-text-muted);
+    user-select: none;
+    padding-right: 12px;
+}
+
+.logLineTimestamp {
+    flex-shrink: 0;
+    width: 140px;
+    color: var(--log-timestamp);
+    padding-right: 12px;
+}
+
+.logLineLevel {
+    flex-shrink: 0;
+    width: 60px;
+    font-weight: 600;
+    text-align: center;
+    padding: 0 8px;
+}
+
+.logLineText {
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Log Level Colors */
+.levelTrace {
+    color: var(--log-level-trace);
+}
+
+.levelTrace .logLineLevel {
+    color: var(--log-level-trace);
+}
+
+.levelDebug {
+    color: var(--log-level-debug-text);
+}
+
+.levelDebug .logLineLevel {
+    color: var(--log-level-debug);
+}
+
+.levelInfo {
+    color: var(--log-text);
+}
+
+.levelInfo .logLineLevel {
+    color: var(--log-level-info);
+}
+
+.levelWarn {
+    color: var(--log-level-warn-text);
+}
+
+.levelWarn .logLineLevel {
+    color: var(--log-level-warn);
+}
+
+.levelError {
+    color: var(--log-level-error-text);
+}
+
+.levelError .logLineLevel {
+    color: var(--log-level-error);
+}
+
+.levelUnknown {
+    color: var(--log-text);
+}
+
+.levelUnknown .logLineLevel {
+    color: var(--log-text-muted);
+}
+
+/* Search Highlight */
+.searchHighlight {
+    background: var(--log-search-highlight);
+    color: #000;
+    padding: 0 2px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+}
+
+/* Empty State */
+.logEmptyState {
+    text-align: center;
+    padding: 60px 20px;
+    color: #e0e0e0;
+    background: var(--log-bg);
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+}
+
+/* Scrollbar Styling */
+.logContentWrapper::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.logContentWrapper::-webkit-scrollbar-track {
+    background: var(--log-bg);
+}
+
+.logContentWrapper::-webkit-scrollbar-thumb {
+    background: var(--log-scrollbar);
+    border-radius: var(--radius-lg);
+}
+
+.logContentWrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--log-scrollbar-hover);
+}
+
+/* Expanded Log Viewer */
+.expandedLogViewer {
+    border-top: 1px solid var(--border-default);
+    background: var(--bg-tertiary);
+    padding: 16px;
+    height: 500px;
+    overflow: hidden;
+}
+
+/* Log Gap Controls */
+.logGapControls {
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0px;
+    z-index: 10;
+}
+
+.logGapDivider {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(120, 120, 120, 0.5) 5%, rgba(120, 120, 120, 0.5) 95%, transparent);
+    pointer-events: none;
+}
+
+.logGapDividerAbove {
+    top: 0;
+}
+
+.logGapDividerBelow {
+    bottom: 0;
+}
+
+.logGapArrow {
+    width: 20px;
+    height: 10px;
+    padding: 0;
+    margin: 0;
+    background: rgba(80, 80, 80, 0.5);
+    border: 1px solid #555;
+    border-radius: 2px;
+    color: #aaa;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.logGapArrow:hover {
+    color: #fff;
+    background: rgba(100, 100, 100, 0.8);
+    border-color: #888;
+}
+
+.logGapArrow:active {
+    color: #fff;
+    background: rgba(120, 120, 120, 0.9);
+}
+
+.logGapArrow svg {
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+}
+
+/* Log Gap Context Menu */
+.logGapContextMenu {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 4px;
+    min-width: 200px;
+}
+
+.contextMenuItem {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    text-align: left;
+    font-size: var(--font-size-md);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition-default);
+}
+
+.contextMenuItem:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.contextMenuItem:active {
+    background: var(--bg-selected);
+}

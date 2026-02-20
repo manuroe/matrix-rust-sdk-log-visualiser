@@ -1,0 +1,86 @@
+/* TimeRangeSelector Component Styles */
+.timeRangeSelector {
+    composes: container from './Dropdown.module.css';
+}
+
+.timeRangeButton {
+    composes: button from './Dropdown.module.css';
+    gap: 6px;
+}
+
+.timeRangeIcon {
+    font-size: var(--font-size-md);
+}
+
+.timeRangeText {
+    color: var(--text-primary);
+}
+
+.timeRangeDropdown {
+    composes: dropdown from './Dropdown.module.css';
+    min-width: 200px;
+}
+
+.timeRangeShortcuts {
+    padding: 4px;
+}
+
+.timeRangeItem {
+    composes: option from './Dropdown.module.css';
+    border-radius: var(--radius-sm);
+}
+
+.active {
+    composes: optionActive from './Dropdown.module.css';
+}
+
+.timeRangeClear {
+    color: var(--color-error);
+}
+
+.timeRangeClear:hover {
+    background: var(--color-error-light);
+}
+
+.timeRangeDivider {
+    composes: divider from './Dropdown.module.css';
+}
+
+.timeRangeCustom {
+    padding: 12px;
+}
+
+.customInputGroup {
+    composes: inputGroup from './Form.module.css';
+    margin-bottom: 10px;
+}
+
+.customInputGroup label {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+}
+
+.customInputGroup input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    font-family: var(--font-mono);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    transition: border-color var(--transition-default), box-shadow var(--transition-default);
+}
+
+.customInputGroup input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-muted);
+}
+
+.customActions {
+    composes: actions from './Form.module.css';
+}
