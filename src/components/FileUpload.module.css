@@ -75,11 +75,10 @@
     bottom: 50px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--color-error);
-    color: var(--text-inverse);
+    color: var(--color-error);
     padding: 12px 24px;
     border-radius: var(--radius-lg);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
+    font-weight: 500;
     z-index: calc(var(--z-dropdown) + 1);
-    box-shadow: var(--shadow-md);
 }

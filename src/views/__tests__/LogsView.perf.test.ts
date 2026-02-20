@@ -14,6 +14,7 @@ import { describe, bench } from 'vitest';
 import {
   generateLogLines,
   PERF_TEST_SCALES,
+  getMemorySnapshot,
 } from '../../test/performanceFixtures';
 import {
   computeFilteredLines,

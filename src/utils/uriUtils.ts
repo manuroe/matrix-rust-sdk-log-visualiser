@@ -23,18 +23,22 @@ export function findCommonUriPrefix(uris: string[]): string {
   // Extract relative paths first
   const paths = uris.map(extractRelativeUri);
 
-  // Find the shortest path to limit prefix search
-  const minLength = Math.min(...paths.map(p => p.length));
-
-  let commonPrefix = '';
-  for (let i = 0; i < minLength; i++) {
-    const char = paths[0][i];
-    if (paths.every(path => path[i] === char)) {
-      commonPrefix += char;
-    } else {
-      break;
-    }
+  // Find lexicographically smallest and largest paths
+  let minPath = paths[0];
+  let maxPath = paths[0];
+  for (let i = 1; i < paths.length; i++) {
+    const current = paths[i];
+    if (current < minPath) minPath = current;
+    if (current > maxPath) maxPath = current;
   }
+
+  // Common prefix of all paths is the common prefix of minPath and maxPath
+  const limit = Math.min(minPath.length, maxPath.length);
+  let i = 0;
+  while (i < limit && minPath[i] === maxPath[i]) {
+    i++;
+  }
+  const commonPrefix = minPath.slice(0, i);
 
   // Only return prefix up to the last `/` to avoid breaking path segments
   const lastSlash = commonPrefix.lastIndexOf('/');

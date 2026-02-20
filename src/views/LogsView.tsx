@@ -23,11 +23,21 @@ export function LogsView() {
     if (rawLogLines.length === 0) return [];
 
     // Calculate time range with min/max log time as reference
-    const times = rawLogLines
-      .map((line) => line.timestampUs)
-      .filter((t) => t > 0);
-    const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
-    const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
+    let minLogTimeUs = Infinity;
+    let maxLogTimeUs = -Infinity;
+
+    for (const line of rawLogLines) {
+      const t = line.timestampUs;
+      if (t > 0) {
+        if (t < minLogTimeUs) minLogTimeUs = t;
+        if (t > maxLogTimeUs) maxLogTimeUs = t;
+      }
+    }
+
+    if (minLogTimeUs === Infinity) {
+      minLogTimeUs = 0;
+      maxLogTimeUs = 0;
+    }
 
     const { startUs, endUs } = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
 
@@ -52,6 +62,15 @@ export function LogsView() {
     end: rawLogLines.length - 1
   } : undefined;
 
+  // Memoize transformed log lines to avoid rebuilding on every render
+  const transformedLines = useMemo(() => 
+    filteredLines.map(line => ({
+      ...line,
+      timestamp: line.displayTime
+    })),
+    [filteredLines]
+  );
+
   return (
     <div className="app">
       <div className="header-compact">
@@ -75,10 +94,7 @@ export function LogsView() {
 
       <div className="logs-view-container">
         <LogDisplayView 
-          logLines={filteredLines.map(line => ({
-            ...line,
-            timestamp: line.displayTime
-          }))}
+          logLines={transformedLines}
           requestFilter={filterPrefill}
           onFilterChange={handleFilterChange}
           prevRequestLineRange={prevRequestLineRange}

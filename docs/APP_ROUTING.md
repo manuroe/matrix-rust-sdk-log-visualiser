@@ -6,13 +6,13 @@ This document describes the routing architecture: **URL as single source of trut
 
 ## Routes & Parameters Matrix
 
-| Route | Page | `start` | `end` | `scale` | `status` | `filter` | `request_id` |
-|-------|------|:-------:|:-----:|:-------:|:--------:|:--------:|:------------:|
-| `/` | LandingPage | - | - | - | - | - | - |
-| `/summary` | SummaryView | ✓ | ✓ | - | - | - | - |
-| `/logs` | LogsView | ✓ | ✓ | - | - | ✓ | - |
-| `/http_requests` | HttpRequestsView | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `/http_requests/sync` | SyncView | ✓ | ✓ | ✓ | ✓ | - | ✓ |
+| Route | Page | `start` | `end` | `scale` | `status` | `filter` | `request_id` | `timeout` |
+|-------|------|:-------:|:-----:|:-------:|:--------:|:--------:|:------------:|:---------:|
+| `/` | LandingPage | - | - | - | - | - | - | - |
+| `/summary` | SummaryView | ✓ | ✓ | - | - | - | - | - |
+| `/logs` | LogsView | ✓ | ✓ | - | - | ✓ | - | - |
+| `/http_requests` | HttpRequestsView | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - |
+| `/http_requests/sync` | SyncView | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ |
 
 **Legend**: ✓ = used, - = not used
 
@@ -32,6 +32,7 @@ This document describes the routing architecture: **URL as single source of trut
 | `status` | Comma-separated codes | HTTP status filter | `null` (show all, omit from URL) |
 | `filter` | URL-encoded string | URI substring filter | `null` (no filter, omit from URL) |
 | `request_id` | URL-encoded string | Auto-select request | `null` |
+| `timeout` | Integer | Highlight sync requests exceeding timeout (ms) | `null` (no timeout highlighting) |
 
 ### Time Filter Formats
 

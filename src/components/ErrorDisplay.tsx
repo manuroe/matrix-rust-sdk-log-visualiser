@@ -35,6 +35,8 @@ export default function ErrorDisplay({ error, onDismiss, className = '' }: Error
   return (
     <div
       className={className}
+      role={isError ? 'alert' : undefined}
+      aria-live={isError ? undefined : 'polite'}
       style={{
         color,
         marginTop: '10px',
@@ -44,6 +46,7 @@ export default function ErrorDisplay({ error, onDismiss, className = '' }: Error
       {error.userMessage}
       {onDismiss && (
         <button
+          type="button"
           onClick={onDismiss}
           style={{
             background: 'none',

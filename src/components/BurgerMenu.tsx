@@ -96,6 +96,7 @@ export function BurgerMenu() {
               className={`${styles.themeButton} ${theme === 'system' ? styles.active : ''}`}
               onClick={() => setTheme('system')}
               data-tooltip="System"
+              aria-label="System theme"
             >
               ◐
             </button>
@@ -103,6 +104,7 @@ export function BurgerMenu() {
               className={`${styles.themeButton} ${theme === 'light' ? styles.active : ''}`}
               onClick={() => setTheme('light')}
               data-tooltip="Light"
+              aria-label="Light theme"
             >
               ☀
             </button>
@@ -110,6 +112,7 @@ export function BurgerMenu() {
               className={`${styles.themeButton} ${theme === 'dark' ? styles.active : ''}`}
               onClick={() => setTheme('dark')}
               data-tooltip="Dark"
+              aria-label="Dark theme"
             >
               ☾
             </button>

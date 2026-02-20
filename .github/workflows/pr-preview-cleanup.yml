@@ -27,10 +27,17 @@ jobs:
           threshold=$((now - 30 * 24 * 60 * 60))
           removed=0
 
-          for dir in pull/pr-*; do
+          for dir in pull/*; do
             if [ ! -d "$dir" ]; then
               continue
             fi
+            dir_name=$(basename "$dir")
+            case "$dir_name" in
+              ''|*[!0-9]*)
+                # Skip non-numeric directories; previews are in pull/<PR_NUMBER>
+                continue
+                ;;
+            esac
             last_commit=$(git log -1 --format=%ct -- "$dir" || true)
             if [ -z "$last_commit" ]; then
               continue

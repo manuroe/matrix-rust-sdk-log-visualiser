@@ -49,8 +49,14 @@ export function calculateTimelineWidth(
   return { timelineWidth, pixelsPerMs };
 }
 
-/**configurable scaling to ensure alignment with bar widths
- * @param msPerPixel - Scaling factor (ms per pixel), defaults to 10
+/**
+ * Calculate waterfall position with configurable scaling to ensure alignment with bar widths.
+ * @param requestTime - Request start time in milliseconds.
+ * @param minTime - Minimum time across all requests.
+ * @param totalDuration - Total duration of the timeline in milliseconds.
+ * @param timelineWidth - Width of the timeline in pixels.
+ * @param msPerPixel - Scaling factor (ms per pixel), defaults to 10.
+ * @returns Horizontal position in pixels for the request on the waterfall timeline.
  */
 export function getWaterfallPosition(
   requestTime: number,

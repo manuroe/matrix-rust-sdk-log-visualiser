@@ -33,12 +33,20 @@ export function useURLParams() {
   const start = searchParams.get('start');
   const end = searchParams.get('end');
   const scaleParam = searchParams.get('scale');
-  const scale = scaleParam ? parseInt(scaleParam, 10) : DEFAULT_MS_PER_PIXEL;
+  let scale: number = DEFAULT_MS_PER_PIXEL;
+  if (scaleParam !== null) {
+    const parsedScale = parseInt(scaleParam, 10);
+    scale = Number.isNaN(parsedScale) || parsedScale <= 0 ? DEFAULT_MS_PER_PIXEL : parsedScale;
+  }
   const status = parseStatusParam(searchParams.get('status'));
   const filter = searchParams.get('filter');
   const requestId = searchParams.get('request_id');
   const timeoutParam = searchParams.get('timeout');
-  const timeout = timeoutParam !== null ? parseInt(timeoutParam, 10) : null;
+  let timeout: number | null = null;
+  if (timeoutParam !== null) {
+    const parsedTimeout = parseInt(timeoutParam, 10);
+    timeout = Number.isNaN(parsedTimeout) ? null : parsedTimeout;
+  }
 
   // Helper to update params while preserving others
   const updateParams = useCallback((updates: Record<string, string | null>) => {

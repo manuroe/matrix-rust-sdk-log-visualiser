@@ -21,8 +21,13 @@ export function FileUpload() {
   const [validationWarnings, setValidationWarnings] = useState<AppError[]>([]);
 
   const isGzipFile = (file: File): boolean => {
-    // Check by MIME type only (no extension check)
-    return file.type === 'application/gzip' || file.type === 'application/x-gzip';
+    // Prefer MIME type when provided, but fall back to filename extension for robustness
+    if (file.type === 'application/gzip' || file.type === 'application/x-gzip') {
+      return true;
+    }
+
+    const fileName = file.name.toLowerCase();
+    return fileName.endsWith('.gz') || fileName.endsWith('.log.gz');
   };
 
   // Helper functions defined before use

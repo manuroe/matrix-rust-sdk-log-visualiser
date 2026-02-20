@@ -6,7 +6,6 @@
 
 import fs from 'fs';
 import type { Benchmark, Reporter } from 'vitest';
-const outputPath = process.env.BENCHMARK_OUTPUT!;
 
 interface BenchmarkWithMemory {
   id: string;
@@ -47,6 +46,13 @@ export default class BenchmarkReporterWithMemory implements Reporter {
   }
 
   async onFinished() {
+    // Validate BENCHMARK_OUTPUT at runtime to avoid hard crashes during non-benchmark runs
+    const outputPath = process.env.BENCHMARK_OUTPUT;
+    if (!outputPath) {
+      console.warn('BENCHMARK_OUTPUT not set; skipping benchmark enrichment');
+      return;
+    }
+
     // Wait a bit for files to be written
     await new Promise(resolve => setTimeout(resolve, 100));
 
