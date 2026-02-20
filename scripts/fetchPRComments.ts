@@ -17,20 +17,8 @@ import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-interface PRComment {
-  id: string;
-  author: string;
-  body: string;
-  createdAt: string;
-  path?: string;
-  line?: number;
-  startLine?: number;
-  state?: 'PENDING' | 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'DISMISSED';
-  isResolved?: boolean;
-}
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDirPath = dirname(currentFilePath);
 
 interface FormattedComment {
   id: string;
@@ -41,6 +29,65 @@ interface FormattedComment {
   startLine?: number;
   isResolved: boolean;
   createdAt: string;
+}
+
+interface GitHubUser {
+  login?: string;
+}
+
+interface ReviewCommentApi {
+  id?: string | number;
+  user?: GitHubUser;
+  body?: string;
+  path?: string;
+  line?: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  original_line?: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  start_line?: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  original_start_line?: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  created_at?: string;
+}
+
+interface ReviewBody {
+  id?: string;
+  author?: GitHubUser;
+  body?: string;
+  state?: string;
+  submittedAt?: string;
+}
+
+interface GeneralComment {
+  id?: string;
+  author?: GitHubUser;
+  body?: string;
+  createdAt?: string;
+}
+
+interface PRData {
+  number: number;
+  title: string;
+  author?: GitHubUser;
+  reviews?: ReviewBody[];
+  comments?: GeneralComment[];
+  reviewComments?: ReviewCommentApi[];
+}
+
+function parseJson<T>(value: string): T {
+  return JSON.parse(value) as T;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function printLine(message = ''): void {
+  process.stdout.write(`${message}\n`);
 }
 
 /**
@@ -63,7 +110,7 @@ function parseArgs(): { prNumber?: string } {
 function checkGHCLI(): void {
   try {
     execSync('gh --version', { stdio: 'ignore' });
-  } catch (error) {
+  } catch {
     console.error('❌ GitHub CLI (gh) is not installed.');
     console.error('Install it with: brew install gh');
     console.error('Then authenticate with: gh auth login');
@@ -74,13 +121,13 @@ function checkGHCLI(): void {
 /**
  * Fetch PR data using GitHub CLI
  */
-function fetchPRData(prNumber?: string): any {
+function fetchPRData(prNumber?: string): PRData {
   try {
     // First, get basic PR info
     const prArg = prNumber ? prNumber : '';
     const cmd = `gh pr view ${prArg} --json number,title,author,reviews,comments`;
     const output = execSync(cmd, { encoding: 'utf-8' });
-    const prData = JSON.parse(output);
+    const prData = parseJson<PRData>(output);
     
     // Now fetch review comments (inline comments) using the API
     // These are separate from review bodies
@@ -88,18 +135,19 @@ function fetchPRData(prNumber?: string): any {
     const repo = execSync('gh repo view --json name -q .name', { encoding: 'utf-8' }).trim();
     const reviewCommentsCmd = `gh api repos/${owner}/${repo}/pulls/${prData.number}/comments`;
     const reviewCommentsOutput = execSync(reviewCommentsCmd, { encoding: 'utf-8' });
-    const reviewComments = JSON.parse(reviewCommentsOutput);
+    const reviewComments = parseJson<ReviewCommentApi[]>(reviewCommentsOutput);
     
     // Add review comments to the PR data
     prData.reviewComments = reviewComments;
     
     return prData;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Failed to fetch PR data');
-    if (error.message.includes('no pull requests found')) {
+    const errorMessage = getErrorMessage(error);
+    if (errorMessage.includes('no pull requests found')) {
       console.error('No PR found for the current branch. Specify --pr <number>');
     } else {
-      console.error(error.message);
+      console.error(errorMessage);
     }
     process.exit(1);
   }
@@ -108,7 +156,7 @@ function fetchPRData(prNumber?: string): any {
 /**
  * Extract and format comments from PR data
  */
-function extractComments(prData: any): FormattedComment[] {
+function extractComments(prData: PRData): FormattedComment[] {
   const comments: FormattedComment[] = [];
   
   // Extract review comments (inline code comments from API)
@@ -179,7 +227,7 @@ function extractComments(prData: any): FormattedComment[] {
  * Read code context from file
  */
 function getCodeContext(filePath: string, line: number, startLine?: number): string {
-  const workspaceRoot = join(__dirname, '..');
+  const workspaceRoot = join(currentDirPath, '..');
   const fullPath = join(workspaceRoot, filePath);
   
   if (!existsSync(fullPath)) {
@@ -201,7 +249,7 @@ function getCodeContext(filePath: string, line: number, startLine?: number): str
     });
     
     return contextLines.join('\n');
-  } catch (error) {
+  } catch {
     return '[Error reading file]';
   }
 }
@@ -209,7 +257,7 @@ function getCodeContext(filePath: string, line: number, startLine?: number): str
 /**
  * Format comments as markdown for agent
  */
-function formatForAgent(prData: any, comments: FormattedComment[]): string {
+function formatForAgent(prData: PRData, comments: FormattedComment[]): string {
   const unresolvedComments = comments.filter(c => !c.isResolved);
   const resolvedComments = comments.filter(c => c.isResolved);
   
@@ -260,35 +308,35 @@ function formatForAgent(prData: any, comments: FormattedComment[]): string {
 function main() {
   const { prNumber } = parseArgs();
   
-  console.log('🔍 Checking GitHub CLI...');
+  printLine('🔍 Checking GitHub CLI...');
   checkGHCLI();
   
-  console.log(`📥 Fetching PR data${prNumber ? ` for PR #${prNumber}` : ' for current branch'}...`);
+  printLine(`📥 Fetching PR data${prNumber ? ` for PR #${prNumber}` : ' for current branch'}...`);
   const prData = fetchPRData(prNumber);
   
-  console.log(`✅ Found PR #${prData.number}: ${prData.title}`);
+  printLine(`✅ Found PR #${prData.number}: ${prData.title}`);
   
-  console.log('📝 Extracting comments...');
+  printLine('📝 Extracting comments...');
   const comments = extractComments(prData);
   
-  console.log(`💾 Saving structured data...`);
-  const workspaceRoot = join(__dirname, '..');
+  printLine('💾 Saving structured data...');
+  const workspaceRoot = join(currentDirPath, '..');
   const jsonPath = join(workspaceRoot, 'pr-comments.json');
   writeFileSync(jsonPath, JSON.stringify({ pr: prData.number, title: prData.title, comments }, null, 2));
-  console.log(`   → ${jsonPath}`);
+  printLine(`   → ${jsonPath}`);
   
-  console.log('📄 Formatting for agent...');
+  printLine('📄 Formatting for agent...');
   const markdown = formatForAgent(prData, comments);
   const mdPath = join(workspaceRoot, 'pr-comments-for-agent.md');
   writeFileSync(mdPath, markdown);
-  console.log(`   → ${mdPath}`);
+  printLine(`   → ${mdPath}`);
   
-  console.log('\n' + '='.repeat(60));
-  console.log(markdown);
-  console.log('='.repeat(60));
-  console.log(`\n✨ Done! Found ${comments.length} comments (${comments.filter(c => !c.isResolved).length} unresolved)`);
-  console.log('\n💡 Copy the output above or the contents of pr-comments-for-agent.md');
-  console.log('   and paste it to the agent with the prompt: "Review PR comments"');
+  printLine(`\n${'='.repeat(60)}`);
+  printLine(markdown);
+  printLine('='.repeat(60));
+  printLine(`\n✨ Done! Found ${comments.length} comments (${comments.filter(c => !c.isResolved).length} unresolved)`);
+  printLine('\n💡 Copy the output above or the contents of pr-comments-for-agent.md');
+  printLine('   and paste it to the agent with the prompt: "Review PR comments"');
 }
 
 main();
