@@ -1,0 +1,143 @@
+/* Shared Table Component Styles */
+
+/* Base table */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+/* Table header */
+.tableHead {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.tableHeadCell {
+    padding: 4px 8px;
+    text-align: left;
+    font-weight: 500;
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Table body cells */
+.tableCell {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+
+/* Hover effect on rows */
+.tableRowHover:hover {
+    background: var(--bg-hover);
+}
+
+/* Alignment helpers */
+.alignRight {
+    text-align: right;
+}
+
+.alignCenter {
+    text-align: center;
+}
+
+/* Mono-spaced cell (URIs, code, etc.) */
+.monoCell {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Badge styles for table cells */
+.badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    font-family: var(--font-mono);
+}
+
+.badgeInfo {
+    background: var(--color-info-bg);
+    color: var(--color-info-text);
+}
+
+.badgeSuccess {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+}
+
+.badgeError {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+}
+
+.badgeWarning {
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+}
+
+.badgePending {
+    background: var(--http-pending);
+    color: white;
+}
+
+/* HTTP Status Code Badge Styles (solid background with contrasting text) */
+/* 2xx Success codes - white text on green */
+.badgeHttp200 { background: var(--http-200); color: white; }
+.badgeHttp201 { background: var(--http-201); color: white; }
+.badgeHttp202 { background: var(--http-202); color: white; }
+.badgeHttp204 { background: var(--http-204); color: white; }
+.badgeHttp2xx { background: var(--http-2xx); color: white; }
+
+/* 3xx Redirect codes - white text on blue/cyan */
+.badgeHttp301 { background: var(--http-301); color: white; }
+.badgeHttp302 { background: var(--http-302); color: white; }
+.badgeHttp304 { background: var(--http-304); color: white; }
+.badgeHttp307 { background: var(--http-307); color: #1a1a2e; }
+.badgeHttp308 { background: var(--http-308); color: white; }
+.badgeHttp3xx { background: var(--http-3xx); color: white; }
+
+/* 4xx Client Error codes - dark text on orange/yellow (lighter colors) */
+.badgeHttp400 { background: var(--http-400); color: #1a1a2e; }
+.badgeHttp401 { background: var(--http-401); color: white; }
+.badgeHttp403 { background: var(--http-403); color: white; }
+.badgeHttp404 { background: var(--http-404); color: #1a1a2e; }
+.badgeHttp405 { background: var(--http-405); color: #1a1a2e; }
+.badgeHttp408 { background: var(--http-408); color: white; }
+.badgeHttp409 { background: var(--http-409); color: #1a1a2e; }
+.badgeHttp410 { background: var(--http-410); color: white; }
+.badgeHttp422 { background: var(--http-422); color: #1a1a2e; }
+.badgeHttp429 { background: var(--http-429); color: #1a1a2e; }
+.badgeHttp4xx { background: var(--http-4xx); color: #1a1a2e; }
+
+/* 5xx Server Error codes - white text on red */
+.badgeHttp500 { background: var(--http-500); color: white; }
+.badgeHttp501 { background: var(--http-501); color: white; }
+.badgeHttp502 { background: var(--http-502); color: white; }
+.badgeHttp503 { background: var(--http-503); color: white; }
+.badgeHttp504 { background: var(--http-504); color: white; }
+.badgeHttp5xx { background: var(--http-5xx); color: white; }
+
+/* Action link in tables */
+.actionLink {
+    background: none;
+    border: none;
+    color: var(--color-info);
+    cursor: pointer;
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    padding: 0;
+}
+
+.actionLink:hover {
+    text-decoration: underline;
+    color: var(--color-primary-hover);
+}
