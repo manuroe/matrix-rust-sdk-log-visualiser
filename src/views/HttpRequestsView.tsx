@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useLogStore } from '../stores/logStore';
-import { applyTimeRangeFilterMicros } from '../utils/timeUtils';
+import { countRequestsForTimeRange } from '../utils/timeUtils';
 import { RequestTable } from '../components/RequestTable';
 import type { ColumnDef } from '../components/RequestTable';
 import { extractRelativeUri, findCommonUriPrefix, stripCommonPrefix } from '../utils/uriUtils';
@@ -27,9 +27,8 @@ export function HttpRequestsView() {
     setShowPendingHttp,
   } = useLogStore();
 
-  // Calculate total considering time range filter
-  const totalCount = useMemo(() => 
-    applyTimeRangeFilterMicros(allHttpRequests, rawLogLines, startTime, endTime).length,
+  const totalCount = useMemo(
+    () => countRequestsForTimeRange(allHttpRequests, rawLogLines, startTime, endTime),
     [allHttpRequests, rawLogLines, startTime, endTime]
   );
 

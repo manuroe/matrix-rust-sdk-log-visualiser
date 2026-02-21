@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, waitFor, screen } from '@testing-library/react';
 import { HttpRequestsView } from '../HttpRequestsView';
 import { useLogStore } from '../../stores/logStore';
-import { createHttpRequests, createHttpRequest } from '../../test/fixtures';
+import { createHttpRequests, createHttpRequest, createParsedLogLines } from '../../test/fixtures';
 import type { HttpRequest } from '../../types/log.types';
 import { act } from '@testing-library/react';
 
@@ -315,5 +315,115 @@ describe('HttpRequestsView - ID Parameter Deep Linking', () => {
 
     // URL should still have the id parameter (consistency)
     expect(window.location.hash).toBe(originalHash);
+  });
+});
+
+describe('HttpRequestsView - stats-compact with active time window', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollTo = vi.fn();
+    // Ensure the store is reset before each test
+    useLogStore.getState().clearData();
+    window.location.hash = '';
+  });
+
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  /**
+   * Regression: when a time window is active, pending requests (responseLineNumber === 0)
+   * were not included in totalCount (denominator) but were included in the shown count
+   * (numerator), producing e.g. "31 / 10" where numerator > denominator.
+   * After the fix the denominator includes pending items when showPendingHttp is true.
+   */
+  it('shown count never exceeds total count when pending is enabled and a time window is set', () => {
+    // 10 log lines spanning T+0s..T+9s
+    const rawLogLines = createParsedLogLines(10);
+
+    // 3 completed requests whose responses land within the window T+0..T+4
+    const completedInWindow = [
+      createHttpRequest({ requestId: 'COMP-1', sendLineNumber: 0, responseLineNumber: 1, status: '200' }),
+      createHttpRequest({ requestId: 'COMP-2', sendLineNumber: 2, responseLineNumber: 3, status: '200' }),
+      createHttpRequest({ requestId: 'COMP-3', sendLineNumber: 4, responseLineNumber: 4, status: '200' }),
+    ];
+
+    // 1 completed request whose response falls outside the window
+    const completedOutOfWindow = [
+      createHttpRequest({ requestId: 'COMP-OUT', sendLineNumber: 6, responseLineNumber: 8, status: '200' }),
+    ];
+
+    // 2 pending requests (responseLineNumber === 0, no status)
+    const pendingRequests = [
+      createHttpRequest({ requestId: 'PEND-1', sendLineNumber: 5, responseLineNumber: 0, status: '' }),
+      createHttpRequest({ requestId: 'PEND-2', sendLineNumber: 7, responseLineNumber: 0, status: '' }),
+    ];
+
+    const allRequests = [...completedInWindow, ...completedOutOfWindow, ...pendingRequests];
+
+    // Use ISO strings that exactly bracket T+0..T+4 (rawLogLines[0]..rawLogLines[4])
+    const startTime = rawLogLines[0].isoTimestamp;
+    const endTime = rawLogLines[4].isoTimestamp;
+
+    // Populate store and run the filter so filteredHttpRequests reflects the time window
+    useLogStore.setState({
+      allHttpRequests: allRequests,
+      rawLogLines,
+      startTime,
+      endTime,
+      showPendingHttp: true,
+    });
+    useLogStore.getState().filterHttpRequests();
+
+    act(() => { render(<HttpRequestsView />); });
+
+    const shownEl = document.getElementById('shown-count');
+    const totalEl = document.getElementById('total-count');
+    expect(shownEl).not.toBeNull();
+    expect(totalEl).not.toBeNull();
+
+    const shown = parseInt(shownEl!.textContent ?? '', 10);
+    const total = parseInt(totalEl!.textContent ?? '', 10);
+
+    // Shown must never exceed total
+    expect(shown).toBeLessThanOrEqual(total);
+    // 3 completed in window + 2 pending = 5 shown, 5 total
+    expect(shown).toBe(5);
+    expect(total).toBe(5);
+  });
+
+  it('total count matches shown count when pending is disabled and a time window is set', () => {
+    const rawLogLines = createParsedLogLines(10);
+
+    const completedInWindow = [
+      createHttpRequest({ requestId: 'COMP-1', sendLineNumber: 0, responseLineNumber: 1, status: '200' }),
+      createHttpRequest({ requestId: 'COMP-2', sendLineNumber: 2, responseLineNumber: 3, status: '200' }),
+    ];
+    const pendingRequests = [
+      createHttpRequest({ requestId: 'PEND-1', sendLineNumber: 5, responseLineNumber: 0, status: '' }),
+    ];
+
+    const allRequests = [...completedInWindow, ...pendingRequests];
+    const startTime = rawLogLines[0].isoTimestamp;
+    const endTime = rawLogLines[4].isoTimestamp;
+
+    useLogStore.setState({
+      allHttpRequests: allRequests,
+      rawLogLines,
+      startTime,
+      endTime,
+      showPendingHttp: false,
+    });
+    useLogStore.getState().filterHttpRequests();
+
+    act(() => { render(<HttpRequestsView />); });
+
+    const shownEl = document.getElementById('shown-count');
+    const totalEl = document.getElementById('total-count');
+    const shown = parseInt(shownEl!.textContent ?? '', 10);
+    const total = parseInt(totalEl!.textContent ?? '', 10);
+
+    // Pending is off: shown = 2 completed in window; total = 2 completed + 1 pending
+    expect(shown).toBe(2);
+    expect(total).toBe(3);
   });
 });

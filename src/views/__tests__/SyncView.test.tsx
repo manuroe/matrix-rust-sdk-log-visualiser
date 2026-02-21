@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, waitFor, screen } from '@testing-library/react';
 import { SyncView } from '../SyncView';
 import { useLogStore } from '../../stores/logStore';
-import { createSyncRequests, createSyncRequest } from '../../test/fixtures';
+import { createSyncRequests, createSyncRequest, createParsedLogLines } from '../../test/fixtures';
 import type { SyncRequest } from '../../types/log.types';
 import { act } from '@testing-library/react';
 
@@ -357,5 +357,115 @@ describe('SyncView - ID Parameter Deep Linking', () => {
 
     // URL should still have the id parameter (consistency)
     expect(window.location.hash).toBe(originalHash);
+  });
+});
+
+describe('SyncView - stats-compact with active time window', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollTo = vi.fn();
+    useLogStore.getState().clearData();
+    window.location.hash = '';
+  });
+
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  /**
+   * Regression: when a time window is active, pending sync requests (responseLineNumber === 0)
+   * were excluded from totalCount but included in the shown count, producing
+   * e.g. "31 / 10" where numerator > denominator.
+   * After the fix the denominator includes pending items when showPending is true.
+   */
+  it('shown count never exceeds total count when pending is enabled and a time window is set', () => {
+    const rawLogLines = createParsedLogLines(10);
+
+    // 3 completed sync requests whose responses land within the window T+0..T+4
+    const completedInWindow = [
+      createSyncRequest({ requestId: 'SYNC-C1', sendLineNumber: 0, responseLineNumber: 1, status: '200', connId: 'conn-1' }),
+      createSyncRequest({ requestId: 'SYNC-C2', sendLineNumber: 2, responseLineNumber: 3, status: '200', connId: 'conn-1' }),
+      createSyncRequest({ requestId: 'SYNC-C3', sendLineNumber: 4, responseLineNumber: 4, status: '200', connId: 'conn-1' }),
+    ];
+
+    // 1 completed request outside the window
+    const completedOutOfWindow = [
+      createSyncRequest({ requestId: 'SYNC-OUT', sendLineNumber: 6, responseLineNumber: 8, status: '200', connId: 'conn-1' }),
+    ];
+
+    // 2 pending requests (responseLineNumber === 0, no status)
+    const pendingRequests = [
+      createSyncRequest({ requestId: 'SYNC-P1', sendLineNumber: 5, responseLineNumber: 0, status: '', connId: 'conn-1' }),
+      createSyncRequest({ requestId: 'SYNC-P2', sendLineNumber: 7, responseLineNumber: 0, status: '', connId: 'conn-1' }),
+    ];
+
+    const allRequests = [...completedInWindow, ...completedOutOfWindow, ...pendingRequests];
+
+    const startTime = rawLogLines[0].isoTimestamp;
+    const endTime = rawLogLines[4].isoTimestamp;
+
+    useLogStore.setState({
+      allRequests,
+      rawLogLines,
+      startTime,
+      endTime,
+      showPending: true,
+      selectedConnId: '',
+      connectionIds: ['conn-1'],
+    });
+    useLogStore.getState().filterRequests();
+
+    act(() => { render(<SyncView />); });
+
+    const shownEl = document.getElementById('shown-count');
+    const totalEl = document.getElementById('total-count');
+    expect(shownEl).not.toBeNull();
+    expect(totalEl).not.toBeNull();
+
+    const shown = parseInt(shownEl!.textContent ?? '', 10);
+    const total = parseInt(totalEl!.textContent ?? '', 10);
+
+    // Shown must never exceed total
+    expect(shown).toBeLessThanOrEqual(total);
+    // 3 completed in window + 2 pending = 5 shown, 5 total
+    expect(shown).toBe(5);
+    expect(total).toBe(5);
+  });
+
+  it('total count matches shown count when pending is disabled and a time window is set', () => {
+    const rawLogLines = createParsedLogLines(10);
+
+    const completedInWindow = [
+      createSyncRequest({ requestId: 'SYNC-C1', sendLineNumber: 0, responseLineNumber: 1, status: '200', connId: 'conn-1' }),
+      createSyncRequest({ requestId: 'SYNC-C2', sendLineNumber: 2, responseLineNumber: 3, status: '200', connId: 'conn-1' }),
+    ];
+    const pendingRequests = [
+      createSyncRequest({ requestId: 'SYNC-P1', sendLineNumber: 5, responseLineNumber: 0, status: '', connId: 'conn-1' }),
+    ];
+
+    const allRequests = [...completedInWindow, ...pendingRequests];
+    const startTime = rawLogLines[0].isoTimestamp;
+    const endTime = rawLogLines[4].isoTimestamp;
+
+    useLogStore.setState({
+      allRequests,
+      rawLogLines,
+      startTime,
+      endTime,
+      showPending: false,
+      selectedConnId: '',
+      connectionIds: ['conn-1'],
+    });
+    useLogStore.getState().filterRequests();
+
+    act(() => { render(<SyncView />); });
+
+    const shownEl = document.getElementById('shown-count');
+    const totalEl = document.getElementById('total-count');
+    const shown = parseInt(shownEl!.textContent ?? '', 10);
+    const total = parseInt(totalEl!.textContent ?? '', 10);
+
+    // Pending is off: shown = 2 completed in window; total = 2 completed + 1 pending
+    expect(shown).toBe(2);
+    expect(total).toBe(3);
   });
 });

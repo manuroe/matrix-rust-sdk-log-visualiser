@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useLogStore } from '../stores/logStore';
-import { applyTimeRangeFilterMicros } from '../utils/timeUtils';
+import { countRequestsForTimeRange } from '../utils/timeUtils';
 import { RequestTable } from '../components/RequestTable';
 import type { ColumnDef } from '../components/RequestTable';
 import { extractAvailableStatusCodes } from '../utils/statusCodeUtils';
@@ -33,12 +33,11 @@ export function SyncView() {
 
   const { setTimeoutFilter } = useURLParams();
 
-  // Calculate total for selected connection, considering time range filter
   const totalCount = useMemo(() => {
     const connFilteredRequests = allRequests.filter(
       (r) => !selectedConnId || r.connId === selectedConnId
     );
-    return applyTimeRangeFilterMicros(connFilteredRequests, rawLogLines, startTime, endTime).length;
+    return countRequestsForTimeRange(connFilteredRequests, rawLogLines, startTime, endTime);
   }, [allRequests, selectedConnId, rawLogLines, startTime, endTime]);
 
   // Compute available status codes from all requests (including Pending)

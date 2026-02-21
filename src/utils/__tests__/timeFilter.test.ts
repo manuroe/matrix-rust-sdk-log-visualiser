@@ -13,6 +13,7 @@ import {
   microsToISO,
   filterValueToURL,
   urlToFilterValue,
+  countRequestsForTimeRange,
 } from '../timeUtils';
 
 describe('Time Filter Utilities', () => {
@@ -274,5 +275,63 @@ describe('Time Filter Utilities', () => {
       expect(getTimeDisplayName('last-min')).toBe('Last min');
       expect(parseTimeInput('last-min')).toBe('last-min');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// countRequestsForTimeRange
+// ---------------------------------------------------------------------------
+
+describe('countRequestsForTimeRange', () => {
+  // Helper: build minimal rawLogLines with sequential microsecond timestamps.
+  // Line i gets timestampUs = BASE_US + i * 1_000_000 (1 second apart).
+  const BASE_US = new Date('2024-01-15T10:00:00Z').getTime() * 1000;
+  const SEC_US = 1_000_000;
+
+  const makeLines = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      lineNumber: i,
+      timestampUs: (BASE_US + i * SEC_US) as number,
+    }));
+
+  // ISO strings for lines 0, 2, 4
+  const isoAt = (i: number) => new Date((BASE_US + i * SEC_US) / 1000).toISOString();
+
+  const makeReq = (responseLineNumber: number) => ({ responseLineNumber });
+
+  it('returns all requests when no filter is active', () => {
+    const rawLogLines = makeLines(10);
+    const requests = [makeReq(1), makeReq(3), makeReq(0), makeReq(0)]; // 2 pending
+    expect(countRequestsForTimeRange(requests, rawLogLines, null, null)).toBe(4);
+  });
+
+  it('counts only completed requests in range + all pending when a filter is set', () => {
+    const rawLogLines = makeLines(10);
+    // 2 completed inside window (lines 1, 3), 1 outside (line 7), 2 pending
+    const requests = [makeReq(1), makeReq(3), makeReq(7), makeReq(0), makeReq(0)];
+    const start = isoAt(0); // line 0
+    const end   = isoAt(4); // line 4
+    // Expected: 2 in-range + 2 pending = 4
+    expect(countRequestsForTimeRange(requests, rawLogLines, start, end)).toBe(4);
+  });
+
+  it('includes all pending requests even when no completed request falls in window', () => {
+    const rawLogLines = makeLines(10);
+    // 1 completed outside window, 3 pending
+    const requests = [makeReq(8), makeReq(0), makeReq(0), makeReq(0)];
+    const start = isoAt(0);
+    const end   = isoAt(2);
+    expect(countRequestsForTimeRange(requests, rawLogLines, start, end)).toBe(3);
+  });
+
+  it('returns 0 when no requests', () => {
+    const rawLogLines = makeLines(5);
+    expect(countRequestsForTimeRange([], rawLogLines, isoAt(0), isoAt(4))).toBe(0);
+  });
+
+  it('returns length when no filter even if all are pending', () => {
+    const rawLogLines = makeLines(5);
+    const requests = [makeReq(0), makeReq(0), makeReq(0)];
+    expect(countRequestsForTimeRange(requests, rawLogLines, null, null)).toBe(3);
   });
 });
