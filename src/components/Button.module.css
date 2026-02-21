@@ -1,0 +1,79 @@
+/* Shared Button Component Styles */
+
+/* Base pill/toggle button - compact button with border and rounded corners */
+.pillButton {
+    padding: 6px 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-default);
+    white-space: nowrap;
+}
+
+.pillButton:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* Active state for pill buttons - use with .active class in JS */
+.pillButtonActive {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+/* Secondary/muted pill button variant */
+.pillButtonSecondary {
+    background: var(--bg-secondary);
+    border-color: var(--border-medium);
+    color: var(--text-tertiary);
+}
+
+.pillButtonSecondary:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-dark);
+    color: var(--text-primary);
+}
+
+/* Toolbar button - slightly different hover behavior */
+.toolbarButton {
+    padding: 6px 12px;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-default);
+}
+
+.toolbarButton:hover {
+    background: var(--bg-hover);
+}
+
+/* Icon button - square with centered content */
+.iconButton {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xl);
+    line-height: 1;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-default);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-default);
+}
+
+.iconButton:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-medium);
+}
