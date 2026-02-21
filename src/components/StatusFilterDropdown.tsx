@@ -89,11 +89,14 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
         className={styles.button}
         onClick={() => setIsOpen(!isOpen)}
         title="Filter by status code"
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        aria-controls="status-filter-dropdown"
       >
         {buttonLabel}
       </button>
       {isOpen && (
-        <div className={styles.dropdown}>
+        <div className={styles.dropdown} id="status-filter-dropdown">
           <button
             className={styles.selectAll}
             onClick={selectAll}

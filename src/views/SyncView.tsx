@@ -87,7 +87,7 @@ export function SyncView() {
   /**
    * Render the timeout-exceeded segment inside the bar.
    * The bar stays status-colored up to timeout; the overflow part is warning-colored.
-   * timeout=0 means the whole duration is overflow if requestDurationMs > 0.
+   * For catchup requests (timeout=0), the overflow overlay is disabled (no overlay is rendered).
    */
   const renderBarOverlay = useCallback(
     (

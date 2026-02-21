@@ -98,7 +98,7 @@ describe('uriUtils', () => {
       expect(findCommonUriPrefix(uris)).toBe('/api/v1');
     });
 
-    it('returns empty string when prefix would break path segment', () => {
+    it('returns prefix up to last slash to avoid breaking a segment', () => {
       const uris = [
         '/api/v1/users',
         '/api/v2/posts',

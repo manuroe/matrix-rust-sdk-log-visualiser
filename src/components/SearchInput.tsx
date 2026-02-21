@@ -65,9 +65,9 @@ export function SearchInput({
         className={inputClass}
         value={value}
         onChange={handleChange}
-        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         {...inputProps}
+        onKeyDown={handleKeyDown}
       />
       {hasValue && (
         <button

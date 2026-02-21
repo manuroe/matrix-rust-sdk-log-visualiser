@@ -158,8 +158,9 @@ export function TimeRangeSelector() {
           ) : (
             <div className={styles.timeRangeCustom}>
               <div className={styles.customInputGroup}>
-                <label>From:</label>
+                <label htmlFor="time-range-from">From:</label>
                 <input
+                  id="time-range-from"
                   type="text"
                   placeholder="start, last-5-min, 1970-01-01T12:34:56.123456Z"
                   value={customStart}
@@ -174,8 +175,9 @@ export function TimeRangeSelector() {
                 />
               </div>
               <div className={styles.customInputGroup}>
-                <label>To:</label>
+                <label htmlFor="time-range-to">To:</label>
                 <input
+                  id="time-range-to"
                   type="text"
                   placeholder="end, 1970-01-01T12:34:56.123456Z"
                   value={customEnd}
