@@ -3,7 +3,7 @@
  * Tests rendering of statistics and user interactions.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SummaryView } from '../SummaryView';
 import { useLogStore } from '../../stores/logStore';
@@ -14,17 +14,34 @@ import {
   createSyncRequest,
 } from '../../test/fixtures';
 import type { ParsedLogLine } from '../../types/log.types';
+import type { TimestampMicros } from '../../types/time.types';
+
+// ─── Captured callback registry (refreshed each render) ────────────────────
+let capturedOnTimeRangeSelected: ((startUs: TimestampMicros, endUs: TimestampMicros) => void) | undefined;
+
+// ─── useURLParams mock ──────────────────────────────────────────────────────
+const mockSetTimeFilter = vi.fn();
+vi.mock('../../hooks/useURLParams', () => ({
+  useURLParams: () => ({ setTimeFilter: mockSetTimeFilter }),
+}));
 
 // Mock BurgerMenu
 vi.mock('../../components/BurgerMenu', () => ({
   BurgerMenu: () => <div data-testid="burger-menu" />,
 }));
 
-// Mock LogActivityChart since it has complex rendering
+// Mock LogActivityChart – exposes onTimeRangeSelected so tests can simulate selections
 vi.mock('../../components/LogActivityChart', () => ({
-  LogActivityChart: ({ logLines }: { logLines: ParsedLogLine[] }) => (
-    <div data-testid="log-activity-chart">Lines: {logLines.length}</div>
-  ),
+  LogActivityChart: ({
+    logLines,
+    onTimeRangeSelected,
+  }: {
+    logLines: ParsedLogLine[];
+    onTimeRangeSelected?: (startUs: TimestampMicros, endUs: TimestampMicros) => void;
+  }) => {
+    capturedOnTimeRangeSelected = onTimeRangeSelected;
+    return <div data-testid="log-activity-chart">Lines: {logLines.length}</div>;
+  },
 }));
 
 // Mock TimeRangeSelector
@@ -44,6 +61,8 @@ function renderSummaryView() {
 describe('SummaryView', () => {
   beforeEach(() => {
     useLogStore.getState().clearData();
+    mockSetTimeFilter.mockClear();
+    capturedOnTimeRangeSelected = undefined;
   });
 
   describe('empty state', () => {
@@ -476,6 +495,142 @@ describe('SummaryView', () => {
 
       // Should render without errors and display the URI
       expect(screen.getByText('Summary')).toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Chart selection boundary keywords (start / end)
+  // ============================================================================
+
+  describe('chart selection boundary keywords', () => {
+    // Use deterministic timestamps
+    const BASE_US = 1_700_000_000_000_000 as TimestampMicros; // arbitrary base
+    const STEP_US = 5_000_000 as TimestampMicros; // 5 s per step
+    const minTime = BASE_US;
+    const maxTime = (BASE_US + STEP_US * 4) as TimestampMicros;
+    const midTime = (BASE_US + STEP_US * 2) as TimestampMicros;
+
+    function buildLogLines() {
+      return [0, 1, 2, 3, 4].map((i) =>
+        createParsedLogLine({
+          lineNumber: i,
+          timestampUs: (BASE_US + STEP_US * i) as TimestampMicros,
+        })
+      );
+    }
+
+    it('shows "start" label in Selected when selection begins at log start', async () => {
+      useLogStore.getState().setHttpRequests([], buildLogLines());
+      renderSummaryView();
+
+      // Simulate a chart selection starting at data min
+      await act(async () => {
+        capturedOnTimeRangeSelected?.(minTime, midTime);
+      });
+
+      // "Selected:" banner should be visible
+      const banner = screen.getByText(/Selected:/);
+      expect(banner.textContent).toMatch(/start/i);
+    });
+
+    it('shows "end" label in Selected when selection ends at log end', async () => {
+      useLogStore.getState().setHttpRequests([], buildLogLines());
+      renderSummaryView();
+
+      await act(async () => {
+        capturedOnTimeRangeSelected?.(midTime, maxTime);
+      });
+
+      const banner = screen.getByText(/Selected:/);
+      expect(banner.textContent).toMatch(/end/i);
+    });
+
+    it('shows both "start" and "end" labels when entire range is selected', async () => {
+      useLogStore.getState().setHttpRequests([], buildLogLines());
+      renderSummaryView();
+
+      await act(async () => {
+        capturedOnTimeRangeSelected?.(minTime, maxTime);
+      });
+
+      const banner = screen.getByText(/Selected:/);
+      expect(banner.textContent).toMatch(/start/i);
+      expect(banner.textContent).toMatch(/end/i);
+    });
+
+    it('shows raw timestamps when selection does not touch data edges', async () => {
+      useLogStore.getState().setHttpRequests([], buildLogLines());
+      renderSummaryView();
+
+      const innerStart = (BASE_US + STEP_US) as TimestampMicros;
+      const innerEnd = (BASE_US + STEP_US * 3) as TimestampMicros;
+
+      await act(async () => {
+        capturedOnTimeRangeSelected?.(innerStart, innerEnd);
+      });
+
+      const banner = screen.getByText(/Selected:/);
+      // Should NOT contain keyword tokens
+      expect(banner.textContent).not.toMatch(/\bstart\b/i);
+      expect(banner.textContent).not.toMatch(/\bend\b/i);
+    });
+
+    it('calls setTimeFilter("start", isoTimestamp) when applying start-edge selection', async () => {
+      useLogStore.getState().setHttpRequests([], buildLogLines());
+      renderSummaryView();
+
+      await act(async () => {
+        capturedOnTimeRangeSelected?.(minTime, midTime);
+      });
+
+      const applyBtn = screen.getByRole('button', { name: /apply/i });
+      await act(async () => {
+        fireEvent.click(applyBtn);
+      });
+
+      expect(mockSetTimeFilter).toHaveBeenCalledTimes(1);
+      const [startArg, endArg] = mockSetTimeFilter.mock.calls[0];
+      expect(startArg).toBe('start');
+      expect(typeof endArg).toBe('string');
+      expect(endArg).not.toBe('start');
+      expect(endArg).not.toBe('end');
+    });
+
+    it('calls setTimeFilter(isoTimestamp, "end") when applying end-edge selection', async () => {
+      useLogStore.getState().setHttpRequests([], buildLogLines());
+      renderSummaryView();
+
+      await act(async () => {
+        capturedOnTimeRangeSelected?.(midTime, maxTime);
+      });
+
+      const applyBtn = screen.getByRole('button', { name: /apply/i });
+      await act(async () => {
+        fireEvent.click(applyBtn);
+      });
+
+      expect(mockSetTimeFilter).toHaveBeenCalledTimes(1);
+      const [startArg, endArg] = mockSetTimeFilter.mock.calls[0];
+      expect(endArg).toBe('end');
+      expect(typeof startArg).toBe('string');
+      expect(startArg).not.toBe('start');
+      expect(startArg).not.toBe('end');
+    });
+
+    it('calls setTimeFilter(null, null) when entire range is applied (clears filter)', async () => {
+      useLogStore.getState().setHttpRequests([], buildLogLines());
+      renderSummaryView();
+
+      await act(async () => {
+        capturedOnTimeRangeSelected?.(minTime, maxTime);
+      });
+
+      const applyBtn = screen.getByRole('button', { name: /apply/i });
+      await act(async () => {
+        fireEvent.click(applyBtn);
+      });
+
+      expect(mockSetTimeFilter).toHaveBeenCalledWith(null, null);
     });
   });
 });

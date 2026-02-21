@@ -1,4 +1,4 @@
-import { useCallback, useState, type MouseEvent } from 'react';
+import { useCallback, useState, useEffect, type MouseEvent } from 'react';
 import { localPoint } from '@visx/event';
 import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_MILLISECOND } from '../types/time.types';
@@ -98,8 +98,15 @@ export function useChartInteraction<TBucket>({
     }
 
     // Apply time filter (values are in microseconds)
-    const startTime = Math.min(selectionStart.time, selectionEnd.time) as TimestampMicros;
-    const endTime = Math.max(selectionStart.time, selectionEnd.time) as TimestampMicros;
+    const rawStart = Math.min(selectionStart.time, selectionEnd.time) as TimestampMicros;
+    const rawEnd = Math.max(selectionStart.time, selectionEnd.time) as TimestampMicros;
+
+    // Snap to data edges when the selection boundary falls within one bucket's
+    // time span of min/maxTime (handles the case where the user drags to the
+    // first/last visible bar but the computed time is slightly inside the bucket).
+    const bucketTimeSpan = xMax > 0 ? (xScaleStep / xMax) * ((maxTime ?? 0) - (minTime ?? 0)) : 0;
+    const startTime = rawStart - (minTime ?? 0) < bucketTimeSpan ? (minTime as TimestampMicros) : rawStart;
+    const endTime = (maxTime ?? 0) - rawEnd < bucketTimeSpan ? (maxTime as TimestampMicros) : rawEnd;
 
     // Only apply if there's a meaningful range (> 100ms = 100,000 microseconds)
     if (endTime - startTime > 100 * MICROS_PER_MILLISECOND && onTimeRangeSelected) {
@@ -110,7 +117,21 @@ export function useChartInteraction<TBucket>({
     setIsSelecting(false);
     setSelectionStart(undefined);
     setSelectionEnd(undefined);
-  }, [isSelecting, selectionStart, selectionEnd, onTimeRangeSelected]);
+  }, [isSelecting, selectionStart, selectionEnd, onTimeRangeSelected, minTime, maxTime, xScaleStep, xMax]);
+
+  // Commit the selection even when the mouse is released outside the chart
+  useEffect(() => {
+    if (!isSelecting) return;
+
+    const onWindowMouseUp = () => {
+      handleMouseUp();
+    };
+
+    window.addEventListener('mouseup', onWindowMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', onWindowMouseUp);
+    };
+  }, [isSelecting, handleMouseUp]);
 
   const handleDoubleClick = useCallback(() => {
     if (onResetZoom) {
@@ -128,7 +149,11 @@ export function useChartInteraction<TBucket>({
 
       const x = point.x - marginLeft;
       if (x < 0 || x > xMax) {
-        if (!isSelecting) {
+        if (isSelecting) {
+          // Cursor left the chart during a drag — snap end to the nearest data boundary
+          const snapTime = x < 0 ? (minTime ?? 0) : (maxTime ?? 0);
+          setSelectionEnd({ x: point.x, time: snapTime });
+        } else {
           hideTooltip();
           setCursorX(undefined);
         }

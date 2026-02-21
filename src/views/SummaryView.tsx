@@ -6,7 +6,7 @@ import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
 import { HttpActivityChart, type HttpRequestWithTimestamp } from '../components/HttpActivityChart';
-import { calculateTimeRangeMicros } from '../utils/timeUtils';
+import { calculateTimeRangeMicros, formatTimestamp } from '../utils/timeUtils';
 import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
@@ -29,6 +29,27 @@ export function SummaryView() {
   const [localStartTime, setLocalStartTime] = useState<TimestampMicros | null>(null);
   const [localEndTime, setLocalEndTime] = useState<TimestampMicros | null>(null);
 
+  // Precompute min/max across ALL raw log lines (keyword anchor)
+  const fullDataRange = useMemo(() => {
+    if (rawLogLines.length === 0) return { minTime: 0, maxTime: 0 };
+    const times = rawLogLines.map((l) => l.timestampUs);
+    return { minTime: Math.min(...times), maxTime: Math.max(...times) };
+  }, [rawLogLines]);
+
+  /**
+   * Format a selection boundary for display.
+   * Returns 'start' / 'end' when the value aligns with the full data edge,
+   * otherwise returns a HH:MM:SS UTC string.
+   */
+  const formatSelectionBoundary = useCallback(
+    (us: TimestampMicros): string => {
+      if (Math.abs(us - fullDataRange.minTime) <= 1000) return 'start';
+      if (Math.abs(us - fullDataRange.maxTime) <= 1000) return 'end';
+      return formatTimestamp(us, 'HH:MM:SS');
+    },
+    [fullDataRange]
+  );
+
   // Clear local zoom when global filters change
   useEffect(() => {
     setLocalStartTime(null);
@@ -47,45 +68,56 @@ export function SummaryView() {
       setLocalEndTime(null);
     } else if (rawLogLines.length > 0 && startTime && endTime) {
       // No local selection - check if we can zoom out to full range
-      const times = rawLogLines.map((line) => line.timestampUs);
-      const fullMinTime = Math.min(...times);
-      const fullMaxTime = Math.max(...times);
-      const { startUs: currentStartUs, endUs: currentEndUs } = calculateTimeRangeMicros(startTime, endTime, fullMinTime, fullMaxTime);
+      const { startUs: currentStartUs, endUs: currentEndUs } = calculateTimeRangeMicros(startTime, endTime, fullDataRange.minTime, fullDataRange.maxTime);
       
       // Only zoom out if current range is narrower than full range (with 1000us = 1ms tolerance)
-      if (currentStartUs > fullMinTime + 1000 || currentEndUs < fullMaxTime - 1000) {
+      if (currentStartUs > fullDataRange.minTime + 1000 || currentEndUs < fullDataRange.maxTime - 1000) {
         // Set as local selection so Apply button appears
-        setLocalStartTime(fullMinTime);
-        setLocalEndTime(fullMaxTime);
+        setLocalStartTime(fullDataRange.minTime as TimestampMicros);
+        setLocalEndTime(fullDataRange.maxTime as TimestampMicros);
       }
     }
-  }, [localStartTime, localEndTime, rawLogLines, startTime, endTime]);
+  }, [localStartTime, localEndTime, rawLogLines, startTime, endTime, fullDataRange]);
 
   const handleApplyGlobally = useCallback(() => {
     if (localStartTime !== null && localEndTime !== null && rawLogLines.length > 0) {
-      const times = rawLogLines.map((line) => line.timestampUs);
-      const fullMinTime = Math.min(...times);
-      const fullMaxTime = Math.max(...times);
-      
-      // If selection matches full range (within 1000us = 1ms tolerance), clear the filter instead
-      if (Math.abs(localStartTime - fullMinTime) <= 1000 && Math.abs(localEndTime - fullMaxTime) <= 1000) {
+      const startMatchesFull = Math.abs(localStartTime - fullDataRange.minTime) <= 1000;
+      const endMatchesFull = Math.abs(localEndTime - fullDataRange.maxTime) <= 1000;
+
+      // If selection matches full range (within 1ms tolerance), clear the filter instead
+      if (startMatchesFull && endMatchesFull) {
         setTimeFilter(null, null);
       } else {
-        // Find the closest log lines to the selected timestamps and use their original timestamp strings
-        const startLine = rawLogLines.reduce((closest, line) => 
-          Math.abs(line.timestampUs - localStartTime) < Math.abs(closest.timestampUs - localStartTime) ? line : closest
-        );
-        const endLine = rawLogLines.reduce((closest, line) => 
-          Math.abs(line.timestampUs - localEndTime) < Math.abs(closest.timestampUs - localEndTime) ? line : closest
-        );
-        setTimeFilter(startLine.isoTimestamp, endLine.isoTimestamp);
+        // Use keywords when the selection boundary aligns with the data edge,
+        // otherwise find the closest log line and use its original timestamp string.
+        let startParam: string;
+        if (startMatchesFull) {
+          startParam = 'start';
+        } else {
+          const startLine = rawLogLines.reduce((closest, line) =>
+            Math.abs(line.timestampUs - localStartTime) < Math.abs(closest.timestampUs - localStartTime) ? line : closest
+          );
+          startParam = startLine.isoTimestamp;
+        }
+
+        let endParam: string;
+        if (endMatchesFull) {
+          endParam = 'end';
+        } else {
+          const endLine = rawLogLines.reduce((closest, line) =>
+            Math.abs(line.timestampUs - localEndTime) < Math.abs(closest.timestampUs - localEndTime) ? line : closest
+          );
+          endParam = endLine.isoTimestamp;
+        }
+
+        setTimeFilter(startParam, endParam);
       }
-      
+
       // Clear local selection state immediately
       setLocalStartTime(null);
       setLocalEndTime(null);
     }
-  }, [localStartTime, localEndTime, rawLogLines, setTimeFilter]);
+  }, [localStartTime, localEndTime, rawLogLines, fullDataRange, setTimeFilter]);
 
   // Check if local selection differs from current global filter
   const shouldShowApplyButton = useMemo(() => {
@@ -94,14 +126,11 @@ export function SummaryView() {
     // If no global filter, always show apply button
     if (!startTime || !endTime) return true;
     
-    const times = rawLogLines.map((line) => line.timestampUs);
-    const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
-    const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
-    const { startUs: globalStartUs, endUs: globalEndUs } = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
+    const { startUs: globalStartUs, endUs: globalEndUs } = calculateTimeRangeMicros(startTime, endTime, fullDataRange.minTime, fullDataRange.maxTime);
     
     // Show if selection differs from global filter (with 1000us = 1ms tolerance)
     return Math.abs(localStartTime - globalStartUs) > 1000 || Math.abs(localEndTime - globalEndUs) > 1000;
-  }, [localStartTime, localEndTime, startTime, endTime, rawLogLines]);
+  }, [localStartTime, localEndTime, startTime, endTime, fullDataRange]);
 
   // Calculate log statistics
   const stats = useMemo(() => {
@@ -376,7 +405,7 @@ export function SummaryView() {
           {shouldShowApplyButton && localStartTime !== null && localEndTime !== null && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                Selected: {new Date(localStartTime / 1000).toISOString().split('T')[1].split('.')[0]} - {new Date(localEndTime / 1000).toISOString().split('T')[1].split('.')[0]} UTC
+                Selected: {formatSelectionBoundary(localStartTime)} – {formatSelectionBoundary(localEndTime)} UTC
               </span>
               <button
                 onClick={handleResetZoom}
