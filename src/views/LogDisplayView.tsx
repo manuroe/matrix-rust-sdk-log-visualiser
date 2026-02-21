@@ -15,13 +15,14 @@ interface LogDisplayViewProps {
   defaultShowOnlyMatching?: boolean;
   defaultLineWrap?: boolean;
   onClose?: () => void;
+  onExpand?: () => void;
   onFilterChange?: (filter: string) => void;
   prevRequestLineRange?: { start: number; end: number };
   nextRequestLineRange?: { start: number; end: number };
   logLines?: ParsedLogLine[];
 }
 
-export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _defaultShowOnlyMatching = false, defaultLineWrap = false, onClose, onFilterChange, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
+export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _defaultShowOnlyMatching = false, defaultLineWrap = false, onClose, onExpand, onFilterChange, prevRequestLineRange, nextRequestLineRange, logLines }: LogDisplayViewProps) {
   const { rawLogLines } = useLogStore();
   
   // Use passed logLines if provided, otherwise use all raw log lines from store
@@ -363,15 +364,29 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
               disabled={!filterQuery.trim()}
             />
           </div>
-          {onClose && (
-            <button
-              className={`${styles.btnToolbar} ${styles.btnIcon} ${styles.closeIcon}`}
-              onClick={onClose}
-              aria-label="Close log viewer"
-              title="Close"
-            >
-              ×
-            </button>
+          {(onExpand || onClose) && (
+            <div className={styles.logToolbarActions}>
+              {onExpand && (
+                <button
+                  className={`${styles.btnToolbar} ${styles.btnIcon}`}
+                  onClick={() => onExpand()}
+                  aria-label="Open in Logs view"
+                  title="Open in Logs view"
+                >
+                  ⤢
+                </button>
+              )}
+              {onClose && (
+                <button
+                  className={`${styles.btnToolbar} ${styles.btnIcon} ${styles.closeIcon}`}
+                  onClick={onClose}
+                  aria-label="Close log viewer"
+                  title="Close"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

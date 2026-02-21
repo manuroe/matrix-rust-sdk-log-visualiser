@@ -317,3 +317,11 @@
     padding: 40px;
     color: var(--text-placeholder);
 }
+
+/* Expanded log viewer panel */
+.expandedLogViewer {
+    max-height: 500px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border-default);
+    flex-shrink: 0;
+}

@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
 import { useURLParams } from '../hooks/useURLParams';
 import { WaterfallTimeline } from './WaterfallTimeline';
@@ -118,6 +119,7 @@ export function RequestTable({
     setActiveRequest,
     uriFilter,
   } = useLogStore();
+  const navigate = useNavigate();
   const { setUriFilter } = useURLParams();
 
   const waterfallContainerRef = useRef<HTMLDivElement>(null);
@@ -331,7 +333,7 @@ export function RequestTable({
     } : undefined;
 
     return (
-      <div className="expanded-log-viewer">
+      <div className={styles.expandedLogViewer}>
         <LogDisplayView
           key={expandedRequestId}
           requestFilter={`"${expandedRequestId}"`}
@@ -343,6 +345,14 @@ export function RequestTable({
           }))}
           prevRequestLineRange={prevRequestLineRange}
           nextRequestLineRange={nextRequestLineRange}
+          onExpand={() => {
+            const params = new URLSearchParams();
+            params.set('filter', `"${expandedRequestId}"`);
+            const { startTime: storeStart, endTime: storeEnd } = useLogStore.getState();
+            if (storeStart) params.set('start', storeStart);
+            if (storeEnd) params.set('end', storeEnd);
+            void navigate(`/logs?${params.toString()}`);
+          }}
           onClose={() => {
             closeLogViewer(expandedRequestId);
             if (expandedRows.has(expandedRequestId)) {

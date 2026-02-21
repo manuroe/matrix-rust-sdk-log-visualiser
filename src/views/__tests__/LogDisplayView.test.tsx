@@ -608,3 +608,45 @@ describe('LogDisplayView requestFilter prop sync', () => {
     expect(getLineContainer(15)).toBeInTheDocument();
   });
 });
+
+describe('LogDisplayView expand button', () => {
+  beforeEach(() => {
+    useLogStore.getState().clearData();
+  });
+
+  it('renders expand button when onExpand is provided', () => {
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(5, []) });
+    const onExpand = vi.fn();
+    render(<LogDisplayView onExpand={onExpand} />);
+    expect(screen.getByRole('button', { name: 'Open in Logs view' })).toBeInTheDocument();
+  });
+
+  it('does not render expand button when onExpand is not provided', () => {
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(5, []) });
+    render(<LogDisplayView />);
+    expect(screen.queryByRole('button', { name: 'Open in Logs view' })).toBeNull();
+  });
+
+  it('calls onExpand when expand button is clicked', async () => {
+    const user = userEvent.setup();
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(10, [3, 7]) });
+    const onExpand = vi.fn();
+    render(<LogDisplayView requestFilter="MATCH" onExpand={onExpand} />);
+
+    await user.click(screen.getByRole('button', { name: 'Open in Logs view' }));
+
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes updated lineWrap in onExpand call after user toggles it', async () => {
+    const user = userEvent.setup();
+    useLogStore.setState({ rawLogLines: createLogsWithMatches(10, [3, 7]) });
+    const onExpand = vi.fn();
+    render(<LogDisplayView requestFilter="MATCH" onExpand={onExpand} />);
+
+    await user.click(screen.getByLabelText(/Line wrap/i));
+    await user.click(screen.getByRole('button', { name: 'Open in Logs view' }));
+
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+});

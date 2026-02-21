@@ -75,7 +75,6 @@
 }
 
 .closeIcon {
-    margin-left: 8px;
     font-weight: 700;
 }
 
@@ -83,6 +82,13 @@
     background: var(--bg-hover);
     border-color: var(--border-medium);
     color: var(--text-primary);
+}
+
+.logToolbarActions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
 }
 
 .logToolbarContextGroup {
