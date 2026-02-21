@@ -73,6 +73,7 @@ interface PRData {
   reviews?: ReviewBody[];
   comments?: GeneralComment[];
   reviewComments?: ReviewCommentApi[];
+  resolvedCommentIds?: Set<number>;
 }
 
 function parseJson<T>(value: string): T {
@@ -119,6 +120,66 @@ function checkGHCLI(): void {
 }
 
 /**
+ * Fetch which comment IDs belong to resolved review threads via GraphQL.
+ */
+function fetchResolvedCommentIds(owner: string, repo: string, prNumber: number): Set<number> {
+  const resolvedIds = new Set<number>();
+  let cursor: string | null = null;
+
+  do {
+    const cursorArg: string = cursor ? `, after: "${cursor}"` : '';
+    const query: string = `{
+      repository(owner: "${owner}", name: "${repo}") {
+        pullRequest(number: ${prNumber}) {
+          reviewThreads(first: 100${cursorArg}) {
+            nodes {
+              isResolved
+              comments(first: 100) { nodes { databaseId } }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    }`;
+    const output: string = execSync(`gh api graphql -f query='${query}'`, { encoding: 'utf-8' });
+    const result = parseJson<{
+      data: {
+        repository: {
+          pullRequest: {
+            reviewThreads: {
+              nodes: Array<{
+                isResolved: boolean;
+                comments: { nodes: Array<{ databaseId: number }> };
+              }>;
+              pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            };
+          };
+        };
+      };
+    }>(output);
+
+    const threads: {
+      nodes: Array<{
+        isResolved: boolean;
+        comments: { nodes: Array<{ databaseId: number }> };
+      }>;
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    } = result.data.repository.pullRequest.reviewThreads;
+    for (const thread of threads.nodes) {
+      if (thread.isResolved) {
+        for (const comment of thread.comments.nodes) {
+          resolvedIds.add(comment.databaseId);
+        }
+      }
+    }
+
+    cursor = threads.pageInfo.hasNextPage ? threads.pageInfo.endCursor : null;
+  } while (cursor !== null);
+
+  return resolvedIds;
+}
+
+/**
  * Fetch PR data using GitHub CLI
  */
 function fetchPRData(prNumber?: string): PRData {
@@ -139,6 +200,9 @@ function fetchPRData(prNumber?: string): PRData {
     
     // Add review comments to the PR data
     prData.reviewComments = reviewComments;
+    
+    // Fetch resolved state via GraphQL
+    prData.resolvedCommentIds = fetchResolvedCommentIds(owner, repo, prData.number);
     
     return prData;
   } catch (error: unknown) {
@@ -163,6 +227,8 @@ function extractComments(prData: PRData): FormattedComment[] {
   if (prData.reviewComments) {
     for (const comment of prData.reviewComments) {
       if (comment.body && comment.body.trim()) {
+        const id = comment.id ? Number(comment.id) : NaN;
+        const isResolved = prData.resolvedCommentIds?.has(id) ?? false;
         comments.push({
           id: String(comment.id),
           author: comment.user?.login || 'unknown',
@@ -170,7 +236,7 @@ function extractComments(prData: PRData): FormattedComment[] {
           file: comment.path,
           line: comment.line || comment.original_line,
           startLine: comment.start_line || comment.original_start_line,
-          isResolved: false, // API doesn't provide this directly
+          isResolved,
           createdAt: comment.created_at || '',
         });
       }

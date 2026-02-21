@@ -12,6 +12,7 @@
     "bench": "sh -c 'mkdir -p $(dirname \"$1\") && BENCHMARK_OUTPUT=\"$1\" vitest bench --run && tsx scripts/profileBenchmarks.ts \"$1\"' --",
     "bench:report": "node scripts/buildBenchmarksReport.js",
     "pr:comments": "tsx scripts/fetchPRComments.ts",
+    "pr:reply": "tsx scripts/replyPRComment.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
