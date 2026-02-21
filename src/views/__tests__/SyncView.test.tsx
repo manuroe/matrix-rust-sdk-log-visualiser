@@ -4,6 +4,7 @@ import { SyncView } from '../SyncView';
 import { useLogStore } from '../../stores/logStore';
 import { createSyncRequests, createSyncRequest } from '../../test/fixtures';
 import type { SyncRequest } from '../../types/log.types';
+import { act } from '@testing-library/react';
 
 // Mock dependencies
 vi.mock('react-router-dom', () => ({
@@ -15,6 +16,83 @@ vi.mock('react-router-dom', () => ({
     return [new URLSearchParams(queryString), vi.fn()];
   },
 }));
+
+describe('SyncView - header controls', () => {
+  beforeEach(() => {
+    // suppress act() warnings for these synchronous render tests
+    HTMLElement.prototype.scrollTo = vi.fn();
+  });
+
+  it('renders the conn-id dropdown', () => {
+    const requests = [
+      createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, connId: 'room-list' }),
+      createSyncRequest({ requestId: 'S-2', sendLineNumber: 2, connId: 'encryption' }),
+    ];
+    useLogStore.setState({
+      allRequests: requests,
+      filteredRequests: requests,
+      connectionIds: ['room-list', 'encryption'],
+      selectedConnId: '',
+    });
+
+    act(() => { render(<SyncView />); });
+
+    const connSelect = document.getElementById('conn-filter') as HTMLSelectElement;
+    expect(connSelect).not.toBeNull();
+    const options = Array.from(connSelect.options).map(o => o.value);
+    expect(options).toContain('room-list');
+    expect(options).toContain('encryption');
+  });
+
+  it('renders the timeout dropdown when requests have timeout values', () => {
+    const requests = [
+      createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, timeout: 0 }),
+      createSyncRequest({ requestId: 'S-2', sendLineNumber: 2, timeout: 30000 }),
+    ];
+    useLogStore.setState({
+      allRequests: requests,
+      filteredRequests: requests,
+    });
+
+    act(() => { render(<SyncView />); });
+
+    const timeoutSelect = document.getElementById('timeout-filter') as HTMLSelectElement;
+    expect(timeoutSelect).not.toBeNull();
+    const options = Array.from(timeoutSelect.options).map(o => o.value);
+    expect(options).toContain('0');
+    expect(options).toContain('30000');
+  });
+
+  it('renders the timeout dropdown when there is only one timeout value', () => {
+    const requests = [
+      createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, timeout: 30000 }),
+      createSyncRequest({ requestId: 'S-2', sendLineNumber: 2, timeout: 30000 }),
+    ];
+    useLogStore.setState({
+      allRequests: requests,
+      filteredRequests: requests,
+    });
+
+    act(() => { render(<SyncView />); });
+
+    expect(document.getElementById('timeout-filter')).not.toBeNull();
+  });
+
+  it('does not render the /sync filter checkbox', () => {
+    const requests = createSyncRequests(3);
+    useLogStore.setState({
+      allRequests: requests,
+      filteredRequests: requests,
+    });
+
+    act(() => { render(<SyncView />); });
+
+    const labels = screen.queryAllByText('/sync');
+    // The page title "/sync requests" contains /sync — we want no checkbox label
+    const checkboxLabels = labels.filter(el => el.closest('label'));
+    expect(checkboxLabels).toHaveLength(0);
+  });
+});
 
 describe('SyncView - ID Parameter Deep Linking', () => {
   let mockScrollTo: ReturnType<typeof vi.fn>;

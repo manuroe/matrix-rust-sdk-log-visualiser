@@ -64,6 +64,8 @@ export interface RequestTableProps {
   rowSelector?: string;
   /** Whether to show the URI filter (default: true) */
   showUriFilter?: boolean;
+  /** Whether to show the /sync filter checkbox (default: true). Set to false in SyncView where all requests are already sync. */
+  showSyncFilter?: boolean;
   /**
    * Optional override for the bar background color.
    * Receives the request and the default computed color; return a CSS color string.
@@ -103,6 +105,7 @@ export function RequestTable({
   headerSlot,
   emptyMessage = 'No requests found',
   showUriFilter = true,
+  showSyncFilter = true,
   getBarColor,
   renderBarOverlay,
 }: RequestTableProps) {
@@ -362,14 +365,16 @@ export function RequestTable({
         <div className="header-center">
           {headerSlot}
 
-          <label className="checkbox-compact">
-            <input
-              type="checkbox"
-              checked={showSyncRequests}
-              onChange={(e) => setShowSyncRequests(e.target.checked)}
-            />
-            /sync
-          </label>
+          {showSyncFilter && (
+            <label className="checkbox-compact">
+              <input
+                type="checkbox"
+                checked={showSyncRequests}
+                onChange={(e) => setShowSyncRequests(e.target.checked)}
+              />
+              /sync
+            </label>
+          )}
 
           <label className="checkbox-compact">
             <input

@@ -4,6 +4,7 @@ import { HttpRequestsView } from '../HttpRequestsView';
 import { useLogStore } from '../../stores/logStore';
 import { createHttpRequests, createHttpRequest } from '../../test/fixtures';
 import type { HttpRequest } from '../../types/log.types';
+import { act } from '@testing-library/react';
 
 // Mock dependencies
 vi.mock('react-router-dom', () => ({
@@ -15,6 +16,41 @@ vi.mock('react-router-dom', () => ({
     return [new URLSearchParams(queryString), vi.fn()];
   },
 }));
+
+describe('HttpRequestsView - header controls', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollTo = vi.fn();
+  });
+
+  it('renders the /sync filter checkbox', () => {
+    const requests = createHttpRequests(5);
+    useLogStore.setState({
+      allHttpRequests: requests,
+      filteredHttpRequests: requests,
+    });
+
+    act(() => { render(<HttpRequestsView />); });
+
+    const labels = screen.getAllByText('/sync');
+    const checkboxLabel = labels.find(el => el.closest('label'));
+    expect(checkboxLabel).not.toBeUndefined();
+    const checkbox = checkboxLabel!.closest('label')!.querySelector('input[type="checkbox"]');
+    expect(checkbox).not.toBeNull();
+  });
+
+  it('does not render the conn-id or timeout dropdowns', () => {
+    const requests = createHttpRequests(5);
+    useLogStore.setState({
+      allHttpRequests: requests,
+      filteredHttpRequests: requests,
+    });
+
+    act(() => { render(<HttpRequestsView />); });
+
+    expect(document.getElementById('conn-filter')).toBeNull();
+    expect(document.getElementById('timeout-filter')).toBeNull();
+  });
+});
 
 describe('HttpRequestsView - ID Parameter Deep Linking', () => {
   let mockScrollTo: ReturnType<typeof vi.fn>;

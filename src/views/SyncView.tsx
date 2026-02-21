@@ -128,7 +128,7 @@ export function SyncView() {
           </option>
         ))}
       </select>
-      {availableTimeouts.length > 1 && (
+      {availableTimeouts.length >= 1 && (
         <select
           id="timeout-filter"
           value={selectedTimeout ?? ''}
@@ -165,6 +165,7 @@ export function SyncView() {
       emptyMessage="No sync requests found in log file"
       rowSelector=".sync-view"
       showUriFilter={false}
+      showSyncFilter={false}
       renderBarOverlay={renderBarOverlay}
     />
   );

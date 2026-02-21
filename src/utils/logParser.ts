@@ -214,10 +214,22 @@ export function parseLogFile(logContent: string): LogParserResult {
     if (httpReq.uri.includes('/sync')) {
       const metadata = syncMetadataMap.get(httpReq.requestId);
       const connId = metadata?.connId || '';
+
+      // Extract timeout from span metadata first, fall back to URI query param.
+      // The URI may contain ?timeout=30000 as a query parameter even when the
+      // span attributes are not on the same log line as the /sync URI.
+      let timeout = metadata?.timeout;
+      if (timeout === undefined) {
+        const uriTimeoutMatch = httpReq.uri.match(/[?&]timeout=(\d+(?:\.\d+)?)/);
+        if (uriTimeoutMatch) {
+          timeout = Number(uriTimeoutMatch[1]);
+        }
+      }
+
       syncRequests.push({
         ...httpReq,
         connId,
-        timeout: metadata?.timeout,
+        timeout,
       });
     }
   }
