@@ -197,8 +197,8 @@
   --http-504: #9333ea;
   --http-5xx: #a855f7;
 
-  /* Pending/Unknown */
-  --http-pending: #6c757d;
+   /* Pending/Unknown (cancelled catchup variation) */
+   --http-pending: #7b8667;
 
   /* -------------------------------------------------------------------------
      Row Backgrounds (used for zebra striping)
@@ -311,7 +311,7 @@
   --http-504: #a855f7;
   --http-5xx: #c084fc;
 
-  --http-pending: #9e9e9e;
+   --http-pending: #8d9878;
 }
 
 /* Auto dark mode (respects system preference when no explicit theme is set) */
@@ -414,7 +414,7 @@
     --http-504: #a855f7;
     --http-5xx: #c084fc;
 
-    --http-pending: #9e9e9e;
+      --http-pending: #8d9878;
   }
 }
 

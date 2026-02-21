@@ -154,6 +154,7 @@ export function SummaryView() {
         }>,
         syncRequestsByConnection: [] as Array<{ connId: string; count: number }>,
         httpRequestsWithTimestamps: [] as HttpRequestWithTimestamp[],
+        pendingRequestCount: 0,
         chartTimeRange: { minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros },
       };
     }
@@ -207,7 +208,7 @@ export function SummaryView() {
     }
 
     // Create HTTP requests with resolved timestamps for the chart
-    const httpRequestsWithTimestamps: HttpRequestWithTimestamp[] = filteredHttpRequests
+    const completedRequestsWithTimestamps: HttpRequestWithTimestamp[] = filteredHttpRequests
       .filter(req => req.responseLineNumber)
       .map(req => {
         const timestampUs = lineNumberToTimestamp.get(req.responseLineNumber) ?? (0 as TimestampMicros);
@@ -220,6 +221,25 @@ export function SummaryView() {
         };
       })
       .filter(req => req.timestampUs > 0);
+
+    // Add pending requests (no response yet) using their send timestamp
+    const pendingRequestsWithTimestamps: HttpRequestWithTimestamp[] = allHttpRequests
+      .filter(req => !req.status)
+      .filter(req => {
+        if (!timeRangeUs) return true;
+        if (!req.sendLineNumber) return false;
+        const timestampUs = lineNumberToTimestamp.get(req.sendLineNumber);
+        if (!timestampUs) return false;
+        return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
+      })
+      .map(req => ({
+        requestId: req.requestId,
+        status: '',
+        timestampUs: lineNumberToTimestamp.get(req.sendLineNumber) ?? (0 as TimestampMicros),
+      }))
+      .filter(req => req.timestampUs > 0);
+
+    const httpRequestsWithTimestamps = [...completedRequestsWithTimestamps, ...pendingRequestsWithTimestamps];
 
     // Filter sync requests by time range
     const filteredSyncRequests = allRequests.filter((req) => {
@@ -368,6 +388,7 @@ export function SummaryView() {
       slowestHttpRequests,
       syncRequestsByConnection,
       httpRequestsWithTimestamps,
+      pendingRequestCount: pendingRequestsWithTimestamps.length,
       chartTimeRange: { minTime: chartMinTime, maxTime: chartMaxTime },
     };
   }, [rawLogLines, allHttpRequests, allRequests, connectionIds, startTime, endTime, localStartTime, localEndTime]);
@@ -548,7 +569,7 @@ export function SummaryView() {
         {/* HTTP Requests Activity Chart */}
         {stats.httpRequestsWithTimestamps.length > 0 && (
           <section className={styles.summarySection}>
-            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests</h2>
+            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests{stats.pendingRequestCount > 0 ? ` (${stats.pendingRequestCount} pending)` : ''}</h2>
             <div className={styles.activityChartContainer}>
               <HttpActivityChart
                 httpRequests={stats.httpRequestsWithTimestamps}

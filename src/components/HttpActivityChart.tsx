@@ -182,7 +182,7 @@ export function HttpActivityChart({
                   display: 'inline-block',
                   width: '6px',
                   height: '6px',
-                  backgroundColor: getHttpStatusColor(code),
+                  backgroundColor: getBucketColor(code),
                   borderRadius: '1px',
                 }}
               />
