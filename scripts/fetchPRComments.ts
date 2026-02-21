@@ -194,9 +194,18 @@ function fetchPRData(prNumber?: string): PRData {
     // These are separate from review bodies
     const owner = execSync('gh repo view --json owner -q .owner.login', { encoding: 'utf-8' }).trim();
     const repo = execSync('gh repo view --json name -q .name', { encoding: 'utf-8' }).trim();
-    const reviewCommentsCmd = `gh api repos/${owner}/${repo}/pulls/${prData.number}/comments`;
-    const reviewCommentsOutput = execSync(reviewCommentsCmd, { encoding: 'utf-8' });
-    const reviewComments = parseJson<ReviewCommentApi[]>(reviewCommentsOutput);
+
+    // Paginate through all review comments (default page size is 30; PRs can have many more)
+    const reviewComments: ReviewCommentApi[] = [];
+    let page = 1;
+    while (true) {
+      const reviewCommentsCmd = `gh api 'repos/${owner}/${repo}/pulls/${prData.number}/comments?per_page=100&page=${page}'`;
+      const reviewCommentsOutput = execSync(reviewCommentsCmd, { encoding: 'utf-8' });
+      const pageComments = parseJson<ReviewCommentApi[]>(reviewCommentsOutput);
+      reviewComments.push(...pageComments);
+      if (pageComments.length < 100) break;
+      page++;
+    }
     
     // Add review comments to the PR data
     prData.reviewComments = reviewComments;
