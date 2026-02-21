@@ -24,6 +24,14 @@ export function TimeRangeSelector() {
   const [error, setError] = useState<ValidationError | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Sync custom inputs when store values change (but not while the user is editing them)
+  useEffect(() => {
+    if (!showCustom) {
+      setCustomStart(startTime || '');
+      setCustomEnd(endTime || '');
+    }
+  }, [startTime, endTime, showCustom]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

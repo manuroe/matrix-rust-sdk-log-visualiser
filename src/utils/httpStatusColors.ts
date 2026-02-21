@@ -113,7 +113,16 @@ export function getHttpStatusCategory(status: string | number): 'success' | 'red
  * Useful for building chart legends.
  */
 export function getStatusCodeLegend(statusCodes: string[]): Array<{ code: string; color: string }> {
-  const unique = [...new Set(statusCodes)].sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+  const unique = [...new Set(statusCodes)].sort((a, b) => {
+    const numA = parseInt(a, 10);
+    const numB = parseInt(b, 10);
+    const aIsNum = !Number.isNaN(numA);
+    const bIsNum = !Number.isNaN(numB);
+    if (!aIsNum && bIsNum) return 1;
+    if (aIsNum && !bIsNum) return -1;
+    if (!aIsNum && !bIsNum) return 0;
+    return numA - numB;
+  });
   return unique.map(code => ({
     code,
     color: getHttpStatusColor(code),

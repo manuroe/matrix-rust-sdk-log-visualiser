@@ -53,13 +53,13 @@ export function LogsView() {
   // For LogsView, define prev/next boundaries as the edges of filtered logs
   // This allows users to expand gaps to/from the start and end of the filtered set
   const prevRequestLineRange = filteredLines.length > 0 ? {
-    start: 0,
-    end: 0
+    start: filteredLines[0].lineNumber ?? 0,
+    end: filteredLines[0].lineNumber ?? 0,
   } : undefined;
 
   const nextRequestLineRange = filteredLines.length > 0 ? {
-    start: rawLogLines.length - 1,
-    end: rawLogLines.length - 1
+    start: filteredLines[filteredLines.length - 1].lineNumber ?? (rawLogLines.length - 1),
+    end: filteredLines[filteredLines.length - 1].lineNumber ?? (rawLogLines.length - 1),
   } : undefined;
 
   // Memoize transformed log lines to avoid rebuilding on every render

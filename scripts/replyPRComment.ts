@@ -37,10 +37,11 @@ function main() {
 
   const owner = execSync('gh repo view --json owner -q .owner.login', { encoding: 'utf-8' }).trim();
   const repo = execSync('gh repo view --json name -q .name', { encoding: 'utf-8' }).trim();
+  const prNumber = execSync('gh pr view --json number -q .number', { encoding: 'utf-8' }).trim();
 
   execSync(
-    `gh api repos/${owner}/${repo}/pulls/comments/${commentId}/replies -f body=${JSON.stringify(message)}`,
-    { stdio: 'inherit' },
+    `gh api repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies -f body=${JSON.stringify(message)}`,
+    { stdio: 'pipe', env: { ...process.env, GH_PAGER: 'cat' } },
   );
 
   // eslint-disable-next-line no-console

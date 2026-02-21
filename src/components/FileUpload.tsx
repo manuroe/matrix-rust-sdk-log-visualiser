@@ -196,7 +196,7 @@ export function FileUpload() {
               <ErrorDisplay
                 key={idx}
                 error={warning}
-                onDismiss={() => setValidationWarnings(validationWarnings.filter((_, i) => i !== idx))}
+                onDismiss={() => setValidationWarnings(prev => prev.filter((_, i) => i !== idx))}
               />
             ))}
           </div>

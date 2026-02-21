@@ -21,7 +21,7 @@ export interface MatchNavigationResult {
 /**
  * Hook for navigating through a list of matches with circular wrap-around.
  *
- * Automatically resets to the first match when the matches array content changes.
+ * Automatically resets to the first match when the number of matches changes.
  *
  * @param matchesArray - Sorted array of match indices or values
  * @returns Navigation controls and current position

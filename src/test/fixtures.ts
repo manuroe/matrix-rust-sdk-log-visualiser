@@ -17,7 +17,7 @@ export function createParsedLogLine(
   overrides: Partial<ParsedLogLine> & { lineNumber: number }
 ): ParsedLogLine {
   const lineNumber = overrides.lineNumber;
-  const timestamp = overrides.timestampUs
+  const timestamp = overrides.timestampUs !== undefined
     ? new Date(overrides.timestampUs / MICROS_PER_MS)
     : new Date(DEFAULT_BASE_TIME.getTime() + lineNumber * 1000);
 

@@ -14,7 +14,6 @@ import { describe, bench } from 'vitest';
 import {
   generateLogLines,
   PERF_TEST_SCALES,
-  getMemorySnapshot,
 } from '../../test/performanceFixtures';
 import {
   computeFilteredLines,
@@ -83,20 +82,4 @@ describe('LogsView Performance', () => {
     });
   });
 
-  describe('Baseline Memory Snapshots', () => {
-    bench('capture baseline - before filtering', () => {
-      const startTime = '10:00';
-      const endTime = '11:00';
-      const logLines = generateLogLines(PERF_TEST_SCALES.medium);
-
-      const before = getMemorySnapshot();
-      computeFilteredLines(logLines, startTime, endTime);
-      const after = getMemorySnapshot();
-
-      console.log(
-        `Filtering delta: heap ${(after.heapUsed - before.heapUsed).toFixed(2)}MB, ` +
-          `total ${(after.heapTotal - before.heapTotal).toFixed(2)}MB`,
-      );
-    });
-  });
 });
