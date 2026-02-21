@@ -4,10 +4,9 @@ A web-app viewer for [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust
 
 Available at https://manuroe.github.io/matrix-rust-sdk-log-visualiser/.
 
-Or locally:
-
+Or locally using:
 ```bash
-python3 -m http.server 8000
+npm install
+npm start
 ```
-
-Then open your browser at `http://localhost:8000`
+And open http://localhost:5173/#/

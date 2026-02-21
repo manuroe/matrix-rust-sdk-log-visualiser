@@ -1,0 +1,21 @@
+/* TimelineScaleSelector Component Styles */
+.container {
+    composes: container from './Dropdown.module.css';
+}
+
+.button {
+    composes: button from './Dropdown.module.css';
+}
+
+.dropdown {
+    composes: dropdown from './Dropdown.module.css';
+    min-width: 120px;
+}
+
+.option {
+    composes: option from './Dropdown.module.css';
+}
+
+.active {
+    composes: optionActive from './Dropdown.module.css';
+}

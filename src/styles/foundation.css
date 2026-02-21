@@ -1,0 +1,495 @@
+/* ==========================================================================
+   Foundation CSS - Design Tokens & Global Styles
+   ==========================================================================
+   This file contains CSS custom properties (design tokens) and global styles.
+   Import this in main.tsx as the first CSS import.
+   ========================================================================== */
+
+/* ==========================================================================
+   Design Tokens - Light Theme (default)
+   ========================================================================== */
+
+:root {
+  /* Color Scheme */
+  color-scheme: light dark;
+
+  /* -------------------------------------------------------------------------
+     Primary Colors
+     ------------------------------------------------------------------------- */
+  --color-primary: #0066cc;
+  --color-primary-hover: #0052a3;
+  --color-primary-light: #e8f4ff;
+  --color-primary-muted: rgba(0, 102, 204, 0.1);
+
+  /* -------------------------------------------------------------------------
+     Semantic Colors
+     ------------------------------------------------------------------------- */
+  --color-success: #28a745;
+  --color-success-bg: #d4edda;
+  --color-success-text: #155724;
+
+  --color-error: #dc3545;
+  --color-error-bg: #f8d7da;
+  --color-error-text: #721c24;
+  --color-error-light: #fee;
+
+  --color-warning: #ff9800;
+  --color-warning-bg: #fff3cd;
+  --color-warning-text: #856404;
+
+  --color-info: #007acc;
+  --color-info-bg: #e3f2fd;
+  --color-info-text: #1565c0;
+
+  /* -------------------------------------------------------------------------
+     Text Colors
+     ------------------------------------------------------------------------- */
+  --text-primary: #333;
+  --text-secondary: #555;
+  --text-tertiary: #666;
+  --text-muted: #888;
+  --text-placeholder: #999;
+
+  /* -------------------------------------------------------------------------
+     Background Colors
+     ------------------------------------------------------------------------- */
+  --bg-primary: #fff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #fafafa;
+  --bg-input: #fff;
+  --bg-hover: #f5f5f5;
+  --bg-selected: #e8f4ff;
+  --bg-code: #f6f8fa;
+
+  /* -------------------------------------------------------------------------
+     Border Colors
+     ------------------------------------------------------------------------- */
+  --border-light: #ddd;
+  --border-default: #ccc;
+  --border-medium: #bbb;
+  --border-dark: #999;
+  --border-code: #e1e4e8;
+
+  /* -------------------------------------------------------------------------
+     Log Viewer Colors (dark by design)
+     ------------------------------------------------------------------------- */
+  --log-bg: #1e1e1e;
+  --log-text: #d4d4d4;
+  --log-text-muted: #858585;
+  --log-scrollbar: #424242;
+  --log-scrollbar-hover: #4e4e4e;
+
+  /* Log Level Colors */
+  --log-level-trace: #808080;
+  --log-level-debug: #569cd6;
+  --log-level-debug-text: #b5cea8;
+  --log-level-info: #4ec9b0;
+  --log-level-warn: #ff9800;
+  --log-level-warn-text: #dcdcaa;
+  --log-level-error: #f44336;
+  --log-level-error-text: #f48771;
+  --log-timestamp: #9cdcfe;
+  --log-search-highlight: #ffeb3b;
+  --log-match-bg: rgba(255, 255, 0, 0.1);
+  --log-current-match-bg: rgba(255, 165, 0, 0.2);
+
+  /* -------------------------------------------------------------------------
+     Typography
+     ------------------------------------------------------------------------- */
+  --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* Font Sizes */
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-base: 12px;
+  --font-size-md: 13px;
+  --font-size-lg: 14px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 18px;
+  --font-size-3xl: 20px;
+  --font-size-4xl: 24px;
+  --font-size-5xl: 28px;
+
+  /* -------------------------------------------------------------------------
+     Spacing & Layout
+     ------------------------------------------------------------------------- */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 12px;
+
+  /* -------------------------------------------------------------------------
+     Shadows
+     ------------------------------------------------------------------------- */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+
+  /* -------------------------------------------------------------------------
+     Transitions
+     ------------------------------------------------------------------------- */
+  --transition-fast: 0.1s;
+  --transition-default: 0.15s;
+  --transition-slow: 0.2s;
+
+  /* -------------------------------------------------------------------------
+     Z-Index Scale
+     ------------------------------------------------------------------------- */
+  --z-dropdown: 1000;
+  --z-modal: 1100;
+  --z-tooltip: 1200;
+
+  /* -------------------------------------------------------------------------
+     Waterfall / Timeline Colors
+     ------------------------------------------------------------------------- */
+  --waterfall-success: #28a745;
+  --waterfall-pending: #ff9800;
+  --waterfall-error: #dc3545;
+  --waterfall-default: #0066cc;
+  --waterfall-timeout-exceeded: #e65100;
+
+  /* -------------------------------------------------------------------------
+     Sync Request Colors
+     Distinct colors for /sync request types in the waterfall view.
+     ------------------------------------------------------------------------- */
+  --sync-catchup-success: #84cc16;     /* Yellow-green: catchup = app speed indicator */
+  --sync-longpoll-success: #64748b;    /* Slate blue-gray: long-poll = background request */
+
+  /* -------------------------------------------------------------------------
+     HTTP Status Code Colors
+     A distinct palette for visualizing HTTP status codes in charts/tables.
+     ------------------------------------------------------------------------- */
+  /* 2xx Success (greens) */
+  --http-200: #28a745;
+  --http-201: #2ecc71;
+  --http-202: #27ae60;
+  --http-204: #1abc9c;
+  --http-2xx: #28a745;
+
+  /* 3xx Redirect (blues/cyans) */
+  --http-301: #17a2b8;
+  --http-302: #20c997;
+  --http-304: #6610f2;
+  --http-307: #0dcaf0;
+  --http-308: #0d6efd;
+  --http-3xx: #17a2b8;
+
+  /* 4xx Client Error (reds) */
+  --http-400: #ef4444;
+  --http-401: #dc2626;
+  --http-403: #f87171;
+  --http-404: #dc2626;
+  --http-405: #b91c1c;
+  --http-408: #991b1b;
+  --http-409: #ef4444;
+  --http-410: #b91c1c;
+  --http-422: #dc2626;
+  --http-429: #f87171;
+  --http-4xx: #ef4444;
+
+  /* 5xx Server Error (purples) */
+  --http-500: #a855f7;
+  --http-501: #9333ea;
+  --http-502: #a855f7;
+  --http-503: #7c3aed;
+  --http-504: #9333ea;
+  --http-5xx: #a855f7;
+
+  /* Pending/Unknown */
+  --http-pending: #6c757d;
+
+  /* -------------------------------------------------------------------------
+     Row Backgrounds (used for zebra striping)
+     ------------------------------------------------------------------------- */
+  --row-bg-odd: #fafafa;
+  --row-bg-even: #ffffff;
+  --row-bg-hover: #e8f4fd;
+  --row-bg-expanded: #d4e8f7;
+}
+
+/* ==========================================================================
+   Dark Theme
+   ========================================================================== */
+
+[data-theme="dark"] {
+  /* Primary Colors */
+  --color-primary: #4da3ff;
+  --color-primary-hover: #6bb3ff;
+  --color-primary-light: #1a3a5c;
+  --color-primary-muted: rgba(77, 163, 255, 0.15);
+
+  /* Semantic Colors */
+  --color-success: #4caf50;
+  --color-success-bg: #1b3d20;
+  --color-success-text: #81c784;
+
+  --color-error: #f44336;
+  --color-error-bg: #3d1a1a;
+  --color-error-text: #ef9a9a;
+  --color-error-light: #2d1a1a;
+
+  --color-warning: #ffb74d;
+  --color-warning-bg: #3d3020;
+  --color-warning-text: #ffe082;
+
+  --color-info: #29b6f6;
+  --color-info-bg: #1a3a4d;
+  --color-info-text: #81d4fa;
+
+  /* Text Colors */
+  --text-primary: #e0e0e0;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #909090;
+  --text-muted: #707070;
+  --text-placeholder: #606060;
+
+  /* Background Colors */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252525;
+  --bg-tertiary: #2d2d2d;
+  --bg-input: #2d2d2d;
+  --bg-hover: #3d3d3d;
+  --bg-selected: #1a3a5c;
+  --bg-code: #2d2d2d;
+
+  /* Border Colors */
+  --border-light: #3d3d3d;
+  --border-default: #4d4d4d;
+  --border-medium: #5d5d5d;
+  --border-dark: #6d6d6d;
+  --border-code: #4d4d4d;
+
+  /* Shadows (more subtle in dark mode) */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* Row Backgrounds */
+  --row-bg-odd: #252525;
+  --row-bg-even: #1e1e1e;
+  --row-bg-hover: #2a3d4d;
+  --row-bg-expanded: #1a3a5c;
+
+  /* Sync Request Colors */
+  --sync-catchup-success: #a3e635;     /* Brighter lime for dark mode visibility */
+  --sync-longpoll-success: #94a3b8;    /* Brighter slate for dark mode visibility */
+
+  /* HTTP Status Code Colors (dark theme - brighter for visibility) */
+  --http-200: #4caf50;
+  --http-201: #66bb6a;
+  --http-202: #43a047;
+  --http-204: #26a69a;
+  --http-2xx: #4caf50;
+
+  --http-301: #29b6f6;
+  --http-302: #4dd0e1;
+  --http-304: #7c4dff;
+  --http-307: #00e5ff;
+  --http-308: #448aff;
+  --http-3xx: #29b6f6;
+
+  /* 4xx Client Error (reds - brighter for dark mode) */
+  --http-400: #f87171;
+  --http-401: #ef4444;
+  --http-403: #fca5a5;
+  --http-404: #ef4444;
+  --http-405: #dc2626;
+  --http-408: #f87171;
+  --http-409: #f87171;
+  --http-410: #dc2626;
+  --http-422: #ef4444;
+  --http-429: #fca5a5;
+  --http-4xx: #f87171;
+
+  /* 5xx Server Error (purples - brighter for dark mode) */
+  --http-500: #c084fc;
+  --http-501: #a855f7;
+  --http-502: #c084fc;
+  --http-503: #9333ea;
+  --http-504: #a855f7;
+  --http-5xx: #c084fc;
+
+  --http-pending: #9e9e9e;
+}
+
+/* Auto dark mode (respects system preference when no explicit theme is set) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Primary Colors */
+    --color-primary: #4da3ff;
+    --color-primary-hover: #6bb3ff;
+    --color-primary-light: #1a3a5c;
+    --color-primary-muted: rgba(77, 163, 255, 0.15);
+
+    /* Semantic Colors */
+    --color-success: #4caf50;
+    --color-success-bg: #1b3d20;
+    --color-success-text: #81c784;
+
+    --color-error: #f44336;
+    --color-error-bg: #3d1a1a;
+    --color-error-text: #ef9a9a;
+    --color-error-light: #2d1a1a;
+
+    --color-warning: #ffb74d;
+    --color-warning-bg: #3d3020;
+    --color-warning-text: #ffe082;
+
+    --color-info: #29b6f6;
+    --color-info-bg: #1a3a4d;
+    --color-info-text: #81d4fa;
+
+    /* Text Colors */
+    --text-primary: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-tertiary: #909090;
+    --text-muted: #707070;
+    --text-placeholder: #606060;
+
+    /* Background Colors */
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #252525;
+    --bg-tertiary: #2d2d2d;
+    --bg-input: #2d2d2d;
+    --bg-hover: #3d3d3d;
+    --bg-selected: #1a3a5c;
+    --bg-code: #2d2d2d;
+
+    /* Border Colors */
+    --border-light: #3d3d3d;
+    --border-default: #4d4d4d;
+    --border-medium: #5d5d5d;
+    --border-dark: #6d6d6d;
+    --border-code: #4d4d4d;
+
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    /* Row Backgrounds */
+    --row-bg-odd: #252525;
+    --row-bg-even: #1e1e1e;
+    --row-bg-hover: #2a3d4d;
+    --row-bg-expanded: #1a3a5c;
+
+    /* Sync Request Colors */
+    --sync-catchup-success: #a3e635;
+    --sync-longpoll-success: #94a3b8;
+
+    /* HTTP Status Code Colors (dark theme - brighter for visibility) */
+    --http-200: #4caf50;
+    --http-201: #66bb6a;
+    --http-202: #43a047;
+    --http-204: #26a69a;
+    --http-2xx: #4caf50;
+
+    --http-301: #29b6f6;
+    --http-302: #4dd0e1;
+    --http-304: #7c4dff;
+    --http-307: #00e5ff;
+    --http-308: #448aff;
+    --http-3xx: #29b6f6;
+
+    /* 4xx Client Error (reds - brighter for dark mode) */
+    --http-400: #f87171;
+    --http-401: #ef4444;
+    --http-403: #fca5a5;
+    --http-404: #ef4444;
+    --http-405: #dc2626;
+    --http-408: #f87171;
+    --http-409: #f87171;
+    --http-410: #dc2626;
+    --http-422: #ef4444;
+    --http-429: #fca5a5;
+    --http-4xx: #f87171;
+
+    /* 5xx Server Error (purples - brighter for dark mode) */
+    --http-500: #c084fc;
+    --http-501: #a855f7;
+    --http-502: #c084fc;
+    --http-503: #9333ea;
+    --http-504: #a855f7;
+    --http-5xx: #c084fc;
+
+    --http-pending: #9e9e9e;
+  }
+}
+
+/* ==========================================================================
+   Global Reset & Base Styles
+   ========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-system);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  margin: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Shared Component Base Styles
+   ========================================================================== */
+
+/* Buttons */
+.btn-primary,
+.btn-secondary {
+  padding: 8px 16px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-default);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: var(--font-size-base);
+}
+
+/* Input Focus States */
+input:focus,
+select:focus,
+button:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-muted);
+}
