@@ -9,6 +9,8 @@ export interface HttpRequestWithTimestamp {
   requestId: string;
   status: string;
   timestampUs: TimestampMicros;
+  /** timeout in ms if this is a /sync request; 0=catchup, ≥30000=long-poll */
+  timeout?: number;
 }
 
 interface HttpActivityChartProps {
@@ -25,20 +27,60 @@ interface HttpBucket extends ActivityBucket {
   counts: Record<string, number>;
 }
 
-/** Sort status codes: 5xx first (top of stack), then 4xx, 3xx, 2xx, pending last */
+/** Synthetic status keys for sync request sub-types */
+const SYNC_CATCHUP_KEY = 'sync-catchup';
+const SYNC_LONGPOLL_KEY = 'sync-longpoll';
+
+/** Resolve the chart bucket key for an HTTP request (handles sync subtypes) */
+function getBucketKey(req: HttpRequestWithTimestamp): string {
+  const statusCode = req.status ? req.status.split(' ')[0] : 'pending';
+  const is2xx = statusCode.startsWith('2');
+  if (is2xx && req.timeout !== undefined) {
+    if (req.timeout === 0) return SYNC_CATCHUP_KEY;
+    if (req.timeout >= 30000) return SYNC_LONGPOLL_KEY;
+  }
+  return statusCode;
+}
+
+/** Color for a chart status key (handles synthetic sync keys) */
+function getBucketColor(code: string): string {
+  if (code === SYNC_CATCHUP_KEY) return 'var(--sync-catchup-success)';
+  if (code === SYNC_LONGPOLL_KEY) return 'var(--sync-longpoll-success)';
+  return getHttpStatusColor(code);
+}
+
+/** Human-readable label for a chart status key */
+function getBucketLabel(code: string): string {
+  if (code === SYNC_CATCHUP_KEY) return 'sync catchup';
+  if (code === SYNC_LONGPOLL_KEY) return 'sync long-poll';
+  return code;
+}
+
+/** Sort status codes for stacking order (first = bottom of bar, last = top):
+ *  1. sync-catchup (bottom - baseline background activity)
+ *  2. sync-longpoll (above catchup)
+ *  3. all other codes: 5xx → 4xx → 3xx → 2xx → pending (top)
+ */
 function sortStatusCodes(codes: string[]): string[] {
   return [...codes].sort((a, b) => {
+    // Sync subtypes always come first (bottom of stack)
+    const syncOrder = (c: string) =>
+      c === SYNC_CATCHUP_KEY ? 0 : c === SYNC_LONGPOLL_KEY ? 1 : 2;
+    const aSyncOrder = syncOrder(a);
+    const bSyncOrder = syncOrder(b);
+    if (aSyncOrder !== bSyncOrder) return aSyncOrder - bSyncOrder;
+
+    // Within regular codes: higher codes first (5xx below 2xx visually)
     const aNum = parseInt(a, 10);
     const bNum = parseInt(b, 10);
     const aIsNum = !isNaN(aNum);
     const bIsNum = !isNaN(bNum);
 
-    // Non-numeric (pending) goes last
+    // Non-numeric (pending) goes last (top)
     if (!aIsNum && bIsNum) return 1;
     if (aIsNum && !bIsNum) return -1;
     if (!aIsNum && !bIsNum) return 0;
 
-    // Higher status codes first (5xx on top)
     return bNum - aNum;
   });
 }
@@ -104,8 +146,8 @@ export function HttpActivityChart({
 
       const bucket = bucketMap.get(bucketKey);
       if (bucket) {
-        // Use status code directly (e.g., "200", "404") or "pending" if empty
-        const statusCode = req.status ? req.status.split(' ')[0] : 'pending';
+        // Resolve to bucket key (sync subtypes get synthetic keys)
+        const statusCode = getBucketKey(req);
         allStatusCodes.add(statusCode);
         bucket.counts[statusCode] = (bucket.counts[statusCode] || 0) + 1;
         bucket.total++;
@@ -122,7 +164,7 @@ export function HttpActivityChart({
     return { buckets: dataBuckets, maxCount: dataMaxCount, minTime, maxTime, statusCodes: sortedStatusCodes };
   }, [httpRequests, timeRange, formatTime]);
 
-  const getCategoryColor = useCallback((code: string) => getHttpStatusColor(code), []);
+  const getCategoryColor = useCallback((code: string) => getBucketColor(code), []);
 
   const getCategoryCount = useCallback((bucket: HttpBucket, code: string) => bucket.counts[code] || 0, []);
 
@@ -130,7 +172,7 @@ export function HttpActivityChart({
     (bucket: HttpBucket) => (
       <>
         <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '10px' }}>{bucket.timeLabel}</div>
-        {chartData.statusCodes.map((code) => {
+        {[...chartData.statusCodes].reverse().map((code) => {
           const count = bucket.counts[code] || 0;
           if (count === 0) return null;
           return (
@@ -145,7 +187,7 @@ export function HttpActivityChart({
                 }}
               />
               <span style={{ fontSize: '9px' }}>
-                {code}: {count}
+                {getBucketLabel(code)}: {count}
               </span>
             </div>
           );

@@ -71,7 +71,7 @@ describe('renderTimeoutExceededOverlay', () => {
     expect(result.props.style.background).toBe('var(--waterfall-timeout-exceeded)');
   });
 
-  it('renders full bar as overflow for timeout=0', () => {
+  it('returns null for timeout=0 (catchup requests always use their status color)', () => {
     const req = createRequest({ requestDurationMs: 15_000 });
 
     const result = renderTimeoutExceededOverlay(
@@ -83,12 +83,6 @@ describe('renderTimeoutExceededOverlay', () => {
       () => 0,
     );
 
-    expect(isValidElement(result)).toBe(true);
-    if (!isValidElement<{ style: Record<string, string> }>(result)) {
-      return;
-    }
-
-    expect(result.props.style.left).toBe('0px');
-    expect(result.props.style.width).toBe('150px');
+    expect(result).toBeNull();
   });
 });

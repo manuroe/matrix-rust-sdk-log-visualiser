@@ -7,6 +7,7 @@ import { extractRelativeUri, findCommonUriPrefix, stripCommonPrefix } from '../u
 import { extractAvailableStatusCodes } from '../utils/statusCodeUtils';
 import type { HttpRequest } from '../types/log.types';
 import { renderTimeoutExceededOverlay } from '../utils/waterfallTimeoutOverlay';
+import { getSyncRequestBarColor } from '../utils/syncRequestColors';
 
 /**
  * HTTP Requests view - displays all HTTP requests in a timeline with waterfall visualization.
@@ -95,6 +96,19 @@ export function HttpRequestsView() {
   }, [allRequests]);
 
   /**
+   * Apply sync-specific bar colors for /sync requests (catchup vs long-poll).
+   * HttpRequest objects don't carry timeout directly, so we enrich from the map.
+   */
+  const getBarColor = useCallback(
+    (req: HttpRequest, defaultColor: string) => {
+      const timeout = timeoutByRequestId.get(req.requestId);
+      const enriched = timeout !== undefined ? { ...req, timeout } : req;
+      return getSyncRequestBarColor(enriched, defaultColor);
+    },
+    [timeoutByRequestId]
+  );
+
+  /**
    * Render timeout-exceeded segment for sync long-poll requests.
    * For requests with timeout metadata, the overflow after timeout is highlighted.
    */
@@ -128,6 +142,7 @@ export function HttpRequestsView() {
       availableStatusCodes={availableStatusCodes}
       emptyMessage="No HTTP requests found in log file"
       renderBarOverlay={renderBarOverlay}
+      getBarColor={getBarColor}
     />
   );
 }

@@ -169,15 +169,25 @@ export function SummaryView() {
       return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
     });
 
+    // Build timeout lookup from sync requests (requestId → timeout ms)
+    const timeoutByRequestId = new Map<string, number>();
+    for (const req of allRequests) {
+      if (req.timeout !== undefined) {
+        timeoutByRequestId.set(req.requestId, req.timeout);
+      }
+    }
+
     // Create HTTP requests with resolved timestamps for the chart
     const httpRequestsWithTimestamps: HttpRequestWithTimestamp[] = filteredHttpRequests
       .filter(req => req.responseLineNumber)
       .map(req => {
         const timestampUs = lineNumberToTimestamp.get(req.responseLineNumber) ?? (0 as TimestampMicros);
+        const timeout = timeoutByRequestId.get(req.requestId);
         return {
           requestId: req.requestId,
           status: req.status,
           timestampUs,
+          ...(timeout !== undefined && { timeout }),
         };
       })
       .filter(req => req.timestampUs > 0);

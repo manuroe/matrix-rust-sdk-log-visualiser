@@ -151,6 +151,13 @@
   --waterfall-timeout-exceeded: #e65100;
 
   /* -------------------------------------------------------------------------
+     Sync Request Colors
+     Distinct colors for /sync request types in the waterfall view.
+     ------------------------------------------------------------------------- */
+  --sync-catchup-success: #84cc16;     /* Yellow-green: catchup = app speed indicator */
+  --sync-longpoll-success: #64748b;    /* Slate blue-gray: long-poll = background request */
+
+  /* -------------------------------------------------------------------------
      HTTP Status Code Colors
      A distinct palette for visualizing HTTP status codes in charts/tables.
      ------------------------------------------------------------------------- */
@@ -169,26 +176,26 @@
   --http-308: #0d6efd;
   --http-3xx: #17a2b8;
 
-  /* 4xx Client Error (oranges/ambers) */
-  --http-400: #fd7e14;
-  --http-401: #e65100;
-  --http-403: #ff5722;
-  --http-404: #f39c12;
-  --http-405: #e67e22;
-  --http-408: #d35400;
-  --http-409: #f57c00;
-  --http-410: #ef6c00;
-  --http-422: #ff8f00;
-  --http-429: #ff6f00;
-  --http-4xx: #fd7e14;
+  /* 4xx Client Error (reds) */
+  --http-400: #ef4444;
+  --http-401: #dc2626;
+  --http-403: #f87171;
+  --http-404: #dc2626;
+  --http-405: #b91c1c;
+  --http-408: #991b1b;
+  --http-409: #ef4444;
+  --http-410: #b91c1c;
+  --http-422: #dc2626;
+  --http-429: #f87171;
+  --http-4xx: #ef4444;
 
-  /* 5xx Server Error (reds) */
-  --http-500: #dc3545;
-  --http-501: #c0392b;
-  --http-502: #e74c3c;
-  --http-503: #b71c1c;
-  --http-504: #d32f2f;
-  --http-5xx: #dc3545;
+  /* 5xx Server Error (purples) */
+  --http-500: #a855f7;
+  --http-501: #9333ea;
+  --http-502: #a855f7;
+  --http-503: #7c3aed;
+  --http-504: #9333ea;
+  --http-5xx: #a855f7;
 
   /* Pending/Unknown */
   --http-pending: #6c757d;
@@ -265,6 +272,10 @@
   --row-bg-hover: #2a3d4d;
   --row-bg-expanded: #1a3a5c;
 
+  /* Sync Request Colors */
+  --sync-catchup-success: #a3e635;     /* Brighter lime for dark mode visibility */
+  --sync-longpoll-success: #94a3b8;    /* Brighter slate for dark mode visibility */
+
   /* HTTP Status Code Colors (dark theme - brighter for visibility) */
   --http-200: #4caf50;
   --http-201: #66bb6a;
@@ -279,24 +290,26 @@
   --http-308: #448aff;
   --http-3xx: #29b6f6;
 
-  --http-400: #ffa726;
-  --http-401: #ff7043;
-  --http-403: #ff8a65;
-  --http-404: #ffca28;
-  --http-405: #ffb74d;
-  --http-408: #ff9800;
-  --http-409: #ffab40;
-  --http-410: #ffa000;
-  --http-422: #ffc107;
-  --http-429: #ff9100;
-  --http-4xx: #ffa726;
+  /* 4xx Client Error (reds - brighter for dark mode) */
+  --http-400: #f87171;
+  --http-401: #ef4444;
+  --http-403: #fca5a5;
+  --http-404: #ef4444;
+  --http-405: #dc2626;
+  --http-408: #f87171;
+  --http-409: #f87171;
+  --http-410: #dc2626;
+  --http-422: #ef4444;
+  --http-429: #fca5a5;
+  --http-4xx: #f87171;
 
-  --http-500: #f44336;
-  --http-501: #ef5350;
-  --http-502: #ff5252;
-  --http-503: #e53935;
-  --http-504: #ff1744;
-  --http-5xx: #f44336;
+  /* 5xx Server Error (purples - brighter for dark mode) */
+  --http-500: #c084fc;
+  --http-501: #a855f7;
+  --http-502: #c084fc;
+  --http-503: #9333ea;
+  --http-504: #a855f7;
+  --http-5xx: #c084fc;
 
   --http-pending: #9e9e9e;
 }
@@ -362,6 +375,10 @@
     --row-bg-hover: #2a3d4d;
     --row-bg-expanded: #1a3a5c;
 
+    /* Sync Request Colors */
+    --sync-catchup-success: #a3e635;
+    --sync-longpoll-success: #94a3b8;
+
     /* HTTP Status Code Colors (dark theme - brighter for visibility) */
     --http-200: #4caf50;
     --http-201: #66bb6a;
@@ -376,24 +393,26 @@
     --http-308: #448aff;
     --http-3xx: #29b6f6;
 
-    --http-400: #ffa726;
-    --http-401: #ff7043;
-    --http-403: #ff8a65;
-    --http-404: #ffca28;
-    --http-405: #ffb74d;
-    --http-408: #ff9800;
-    --http-409: #ffab40;
-    --http-410: #ffa000;
-    --http-422: #ffc107;
-    --http-429: #ff9100;
-    --http-4xx: #ffa726;
+    /* 4xx Client Error (reds - brighter for dark mode) */
+    --http-400: #f87171;
+    --http-401: #ef4444;
+    --http-403: #fca5a5;
+    --http-404: #ef4444;
+    --http-405: #dc2626;
+    --http-408: #f87171;
+    --http-409: #f87171;
+    --http-410: #dc2626;
+    --http-422: #ef4444;
+    --http-429: #fca5a5;
+    --http-4xx: #f87171;
 
-    --http-500: #f44336;
-    --http-501: #ef5350;
-    --http-502: #ff5252;
-    --http-503: #e53935;
-    --http-504: #ff1744;
-    --http-5xx: #f44336;
+    /* 5xx Server Error (purples - brighter for dark mode) */
+    --http-500: #c084fc;
+    --http-501: #a855f7;
+    --http-502: #c084fc;
+    --http-503: #9333ea;
+    --http-504: #a855f7;
+    --http-5xx: #c084fc;
 
     --http-pending: #9e9e9e;
   }

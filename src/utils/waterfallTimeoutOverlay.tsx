@@ -20,7 +20,7 @@ export function renderTimeoutExceededOverlay(
 ): ReactNode {
   const timeoutMs = resolveTimeout(req);
 
-  if (timeoutMs === undefined || req.requestDurationMs <= timeoutMs) {
+  if (timeoutMs === undefined || timeoutMs === 0 || req.requestDurationMs <= timeoutMs) {
     return null;
   }
 

@@ -7,6 +7,7 @@ import { extractAvailableStatusCodes } from '../utils/statusCodeUtils';
 import type { SyncRequest, HttpRequest } from '../types/log.types';
 import { useURLParams } from '../hooks/useURLParams';
 import { renderTimeoutExceededOverlay } from '../utils/waterfallTimeoutOverlay';
+import { getSyncRequestBarColor } from '../utils/syncRequestColors';
 
 /**
  * Sync Requests view - displays /sync requests in a timeline with waterfall visualization.
@@ -72,6 +73,17 @@ export function SyncView() {
       getValue: (req) => req.responseSize || '-',
     },
   ], [getDisplayTime]);
+
+  /**
+   * Override waterfall bar color based on sync request type:
+   * - Catchup (timeout=0) + 2xx → yellow-green highlight
+   * - Long-poll (timeout≥30s) + 2xx → muted slate (background request)
+   * - Everything else → standard HTTP status color
+   */
+  const getBarColor = useCallback(
+    (req: HttpRequest, defaultColor: string) => getSyncRequestBarColor(req, defaultColor),
+    []
+  );
 
   /**
    * Render the timeout-exceeded segment inside the bar.
@@ -167,6 +179,7 @@ export function SyncView() {
       showUriFilter={false}
       showSyncFilter={false}
       renderBarOverlay={renderBarOverlay}
+      getBarColor={getBarColor}
     />
   );
 }
