@@ -34,6 +34,8 @@ function parseArgs(): { commentId: string; message: string } {
 
 function main() {
   const { commentId, message } = parseArgs();
+  const env = { ...process.env };
+  env['GH_PAGER'] = 'cat';
 
   const owner = execSync('gh repo view --json owner -q .owner.login', { encoding: 'utf-8' }).trim();
   const repo = execSync('gh repo view --json name -q .name', { encoding: 'utf-8' }).trim();
@@ -41,7 +43,7 @@ function main() {
 
   execSync(
     `gh api repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies -f body=${JSON.stringify(message)}`,
-    { stdio: 'pipe', env: { ...process.env, GH_PAGER: 'cat' } },
+    { stdio: 'pipe', env },
   );
 
   // eslint-disable-next-line no-console
