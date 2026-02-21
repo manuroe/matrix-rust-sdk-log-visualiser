@@ -212,7 +212,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
     }, { timeout: 2000 });
   });
 
-  it('removes id parameter from URL when clicking different request', async () => {
+  it('removes id parameter and preserves other URL params when clicking different request', async () => {
     const requests = createSyncRequests(5);
     
     useLogStore.setState({
@@ -220,7 +220,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
       filteredRequests: requests,
     });
 
-    window.location.hash = '#/sync?request_id=SYNC-2';
+    window.location.hash = '#/sync?request_id=SYNC-2&scale=50';
     
     const { container, unmount } = render(<SyncView />);
 
@@ -243,7 +243,7 @@ describe('SyncView - ID Parameter Deep Linking', () => {
 
     // URL should no longer have the id parameter
     expect(window.location.hash).not.toContain('request_id=SYNC-2');
-    expect(window.location.hash).toBe('#/sync');
+    expect(window.location.hash).toBe('#/sync?scale=50');
     
     // Cleanup to prevent async errors
     unmount();

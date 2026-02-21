@@ -215,15 +215,19 @@ export function RequestTable({
 
   /** Handle click on request ID - toggle expansion or open log viewer */
   const handleRequestClick = useCallback((requestId: string, req?: HttpRequest) => {
-    // Remove request_id parameter from URL if clicking a different request
-    const hash = window.location.hash;
-    const match = hash.match(/request_id=([^&]+)/);
-    if (match) {
-      const urlId = decodeURIComponent(match[1]);
-      if (urlId !== requestId) {
-        const newHash = hash.replace(/[?&]request_id=[^&]+/, '').replace(/\?&/, '?').replace(/\?$/, '');
-        window.location.hash = newHash;
-      }
+    // Remove request_id parameter from URL if clicking a different request,
+    // while preserving all other query params (e.g., scale, timeout, status).
+    const hashValue = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : window.location.hash;
+    const [hashPath, hashQuery = ''] = hashValue.split('?');
+    const hashParams = new URLSearchParams(hashQuery);
+    const urlId = hashParams.get('request_id');
+
+    if (urlId && urlId !== requestId) {
+      hashParams.delete('request_id');
+      const newQuery = hashParams.toString();
+      window.location.hash = newQuery ? `${hashPath}?${newQuery}` : hashPath;
     }
 
     // If clicking the same request that's already open, close it
