@@ -54,9 +54,21 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Fetch PR review comments (unresolved only): `npm run pr:comments` (auto-detects current branch) or `npm run pr:comments -- --pr <number>`
 - Reply to a PR review comment: `npm run pr:reply -- --comment-id <id> --message "<text>"`
 
+## Pre-Commit Checklist (for Agents)
+
+Before committing **any** code change (new feature, bug fix, PR comment fix, refactor, etc.), always run the following commands and resolve all errors before proceeding:
+
+```sh
+npm run build   # must produce no errors
+npm run lint    # must produce no warnings or errors
+npm test -- --run  # all tests must pass
+```
+
+Do not commit if any of these steps fail. Fix the issue first, then re-run the full checklist before committing.
+
 ## PR Review Workflow (for Agents)
 
-When prompted **"Review PR comments"**: run `npm run pr:comments`, read `pr-comments-for-agent.md` (only unresolved comments are shown), create todo list, fix each systematically, commit after each logical fix, then reply to every addressed comment: `npm run pr:reply -- --comment-id <id> --message "Fixed in $(git rev-parse --short HEAD)"`.
+When prompted **"Review PR comments"**: run `npm run pr:comments`, read `pr-comments-for-agent.md` (only unresolved comments are shown), create todo list, fix each systematically, run the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) before each commit, then reply to every addressed comment: `npm run pr:reply -- --comment-id <id> --message "Fixed in $(git rev-parse --short HEAD)"`.
 
 ## Architecture (Conceptual)
 1. Parse log text into structured records once.
@@ -90,6 +102,7 @@ CI runs benchmarks on PRs, generates `benchmark/baseline.json` directly, and bui
 - Avoid embedding parsing logic directly in components.
 - Prefer additive changes over refactors unless necessary.
 - Keep documentation high-level; link to code for implementation specifics.
+- Always pass the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) (`npm run build`, `npm run lint`, `npm test -- --run`) before committing.
 
 ## Reference Files (Entry Points)
 - Routing: [docs/APP_ROUTING.md](docs/APP_ROUTING.md)
