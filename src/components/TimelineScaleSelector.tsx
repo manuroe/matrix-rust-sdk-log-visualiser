@@ -9,6 +9,9 @@ const TIMELINE_SCALE_OPTIONS = [
   { value: 25, label: '1px = 25ms' },
   { value: 50, label: '1px = 50ms' },
   { value: 100, label: '1px = 100ms' },
+  { value: 250, label: '1px = 25ms' },
+  { value: 500, label: '1px = 500ms' },
+  { value: 1000, label: '1px = 1000ms' },
 ];
 
 interface TimelineScaleSelectorProps {
