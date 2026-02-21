@@ -26,7 +26,7 @@ export function msToMinPixels(durationMs: number, msPerPixel = DEFAULT_MS_PER_PI
  */
 export function calculateTimelineWidth(
   containerWidth: number,
-  visibleTimes: number[],
+  _visibleTimes: number[],
   minTime: number,
   maxTime: number,
   msPerPixel = DEFAULT_MS_PER_PIXEL
@@ -34,17 +34,13 @@ export function calculateTimelineWidth(
   const availableWaterfallWidth = Math.max(300, containerWidth);
   const totalDuration = Math.max(1, maxTime - minTime);
 
-  // Scale timeline to fit first visible requests in available width
-  const visibleMin = visibleTimes.length > 0 ? Math.min(...visibleTimes) : minTime;
-  const visibleMax = visibleTimes.length > 0 ? Math.max(...visibleTimes) : maxTime;
-  const visibleDuration = Math.max(1, visibleMax - visibleMin);
-
-  const pixelsPerMs = availableWaterfallWidth / visibleDuration;
-  const calculatedWidth = Math.max(availableWaterfallWidth, totalDuration * pixelsPerMs);
-  
-  // Apply configurable minimum scaling
-  const dynamicMinWidth = msToMinPixels(totalDuration, msPerPixel);
-  const timelineWidth = Math.max(calculatedWidth, dynamicMinWidth);
+  // Drive timeline width directly from msPerPixel so the scale selector always has effect.
+  // Previously an auto-fit calculation (fitting visible requests to the container) was used as
+  // a base, then clamped up by dynamicMinWidth. That meant zooming out (high msPerPixel →
+  // small dynamicMinWidth) had no effect because the auto-fit width was always larger.
+  const dynamicWidth = msToMinPixels(totalDuration, msPerPixel);
+  const timelineWidth = Math.max(availableWaterfallWidth, dynamicWidth);
+  const pixelsPerMs = timelineWidth / totalDuration;
 
   return { timelineWidth, pixelsPerMs };
 }
