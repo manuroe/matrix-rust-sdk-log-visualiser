@@ -1,0 +1,135 @@
+/* BurgerMenu Component Styles */
+.burgerMenu {
+    position: relative;
+}
+
+.burgerButton {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    font-size: var(--font-size-3xl);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-default);
+}
+
+.burgerButton:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-dark);
+}
+
+.burgerDropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    min-width: 200px;
+    z-index: var(--z-dropdown);
+    padding: 4px 0;
+}
+
+.burgerItem {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--transition-default);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.burgerItem:hover {
+    background: var(--bg-hover);
+}
+
+.burgerItem.active,
+.active {
+    background: var(--bg-selected);
+    color: var(--color-primary);
+    font-weight: 500;
+}
+
+.burgerDivider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 0;
+}
+
+.burgerSectionTitle {
+    padding: 8px 16px 4px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.themeButtons {
+    display: flex;
+    gap: 2px;
+    padding: 6px 16px;
+    justify-content: center;
+    width: 100%;
+}
+
+.themeButton {
+    flex: 1;
+    padding: 2px 4px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-size: var(--font-size-lg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    position: relative;
+}
+
+.themeButton:hover {
+    color: var(--text-primary);
+    border-color: var(--border-medium);
+}
+
+.themeButton:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    pointer-events: none;
+    margin-top: 4px;
+    border: 1px solid var(--border-medium);
+    box-shadow: var(--shadow-sm);
+    z-index: 1000;
+}
+
+.themeButton.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+    font-weight: 600;
+}

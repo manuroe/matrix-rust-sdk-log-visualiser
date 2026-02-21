@@ -1,0 +1,189 @@
+import { useCallback, useState, type MouseEvent } from 'react';
+import { localPoint } from '@visx/event';
+import type { TimestampMicros } from '../types/time.types';
+import { MICROS_PER_MILLISECOND } from '../types/time.types';
+
+interface SelectionPoint {
+  x: number;
+  time: number;
+}
+
+interface ChartInteractionState {
+  cursorX: number | undefined;
+  cursorTimeLabel: string | undefined;
+  isSelecting: boolean;
+  selectionStart: SelectionPoint | undefined;
+  selectionEnd: SelectionPoint | undefined;
+}
+
+interface ChartInteractionHandlers<TBucket> {
+  handleMouseDown: (event: MouseEvent<SVGRectElement>) => void;
+  handleMouseUp: () => void;
+  handleMouseMove: (event: MouseEvent<SVGRectElement>, showTooltipFn: (params: { tooltipData: TBucket; tooltipLeft: number; tooltipTop: number }) => void) => void;
+  handleMouseLeave: () => void;
+  handleDoubleClick: () => void;
+}
+
+interface UseChartInteractionOptions<TBucket> {
+  marginLeft: number;
+  xMax: number;
+  minTime: TimestampMicros;
+  maxTime: TimestampMicros;
+  formatTime: (timestampUs: number) => string;
+  hideTooltip: () => void;
+  onTimeRangeSelected?: (startUs: TimestampMicros, endUs: TimestampMicros) => void;
+  onResetZoom?: () => void;
+  getBucketAtIndex: (index: number) => TBucket | undefined;
+  xScaleStep: number;
+  bucketCount: number;
+}
+
+export interface ChartInteractionResult<TBucket> {
+  state: ChartInteractionState;
+  handlers: ChartInteractionHandlers<TBucket>;
+}
+
+/**
+ * Shared hook for chart mouse interaction (selection, cursor, tooltips).
+ * Used by LogActivityChart and HttpActivityChart.
+ */
+export function useChartInteraction<TBucket>({
+  marginLeft,
+  xMax,
+  minTime,
+  maxTime,
+  formatTime,
+  hideTooltip,
+  onTimeRangeSelected,
+  onResetZoom,
+  getBucketAtIndex,
+  xScaleStep,
+  bucketCount,
+}: UseChartInteractionOptions<TBucket>): ChartInteractionResult<TBucket> {
+  const [cursorX, setCursorX] = useState<number | undefined>();
+  const [cursorTimeLabel, setCursorTimeLabel] = useState<string | undefined>();
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<SelectionPoint | undefined>();
+  const [selectionEnd, setSelectionEnd] = useState<SelectionPoint | undefined>();
+
+  const handleMouseDown = useCallback(
+    (event: MouseEvent<SVGRectElement>) => {
+      const point = localPoint(event);
+      if (!point) return;
+
+      const x = point.x - marginLeft;
+      if (x < 0 || x > xMax) return;
+
+      // Calculate time at click position
+      const progress = x / xMax;
+      const timeRange = (maxTime ?? 0) - (minTime ?? 0);
+      const clickTime = (minTime ?? 0) + progress * timeRange;
+
+      // Start selection mode
+      setIsSelecting(true);
+      setSelectionStart({ x: point.x, time: clickTime });
+      setSelectionEnd({ x: point.x, time: clickTime });
+
+      // Hide tooltip during selection
+      hideTooltip();
+      setCursorX(undefined);
+    },
+    [marginLeft, xMax, minTime, maxTime, hideTooltip]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    if (!isSelecting || !selectionStart || !selectionEnd) {
+      setIsSelecting(false);
+      return;
+    }
+
+    // Apply time filter (values are in microseconds)
+    const startTime = Math.min(selectionStart.time, selectionEnd.time) as TimestampMicros;
+    const endTime = Math.max(selectionStart.time, selectionEnd.time) as TimestampMicros;
+
+    // Only apply if there's a meaningful range (> 100ms = 100,000 microseconds)
+    if (endTime - startTime > 100 * MICROS_PER_MILLISECOND && onTimeRangeSelected) {
+      onTimeRangeSelected(startTime, endTime);
+    }
+
+    // Clear selection and return to normal mode
+    setIsSelecting(false);
+    setSelectionStart(undefined);
+    setSelectionEnd(undefined);
+  }, [isSelecting, selectionStart, selectionEnd, onTimeRangeSelected]);
+
+  const handleDoubleClick = useCallback(() => {
+    if (onResetZoom) {
+      onResetZoom();
+    }
+  }, [onResetZoom]);
+
+  const handleMouseMove = useCallback(
+    (
+      event: MouseEvent<SVGRectElement>,
+      showTooltipFn: (params: { tooltipData: TBucket; tooltipLeft: number; tooltipTop: number }) => void
+    ) => {
+      const point = localPoint(event);
+      if (!point) return;
+
+      const x = point.x - marginLeft;
+      if (x < 0 || x > xMax) {
+        if (!isSelecting) {
+          hideTooltip();
+          setCursorX(undefined);
+        }
+        return;
+      }
+
+      // Calculate actual cursor time based on position
+      const progress = x / xMax;
+      const timeRange = (maxTime ?? 0) - (minTime ?? 0);
+      const cursorTime = (minTime ?? 0) + progress * timeRange;
+
+      if (isSelecting) {
+        // Selection mode: update end cursor position
+        setSelectionEnd({ x: point.x, time: cursorTime });
+      } else {
+        // Normal mode: show tooltip
+        const index = Math.floor(x / xScaleStep);
+
+        if (index >= 0 && index < bucketCount) {
+          const bucket = getBucketAtIndex(index);
+
+          if (bucket) {
+            setCursorX(point.x);
+            setCursorTimeLabel(formatTime(cursorTime));
+            showTooltipFn({
+              tooltipData: bucket,
+              tooltipLeft: event.clientX,
+              tooltipTop: event.clientY,
+            });
+          }
+        }
+      }
+    },
+    [xScaleStep, bucketCount, xMax, marginLeft, minTime, maxTime, formatTime, hideTooltip, isSelecting, getBucketAtIndex]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    hideTooltip();
+    setCursorX(undefined);
+  }, [hideTooltip]);
+
+  return {
+    state: {
+      cursorX,
+      cursorTimeLabel,
+      isSelecting,
+      selectionStart,
+      selectionEnd,
+    },
+    handlers: {
+      handleMouseDown,
+      handleMouseUp,
+      handleMouseMove,
+      handleMouseLeave,
+      handleDoubleClick,
+    },
+  };
+}

@@ -1,0 +1,94 @@
+/* Shared Card Component Styles */
+
+/* Basic card container - minimal styling for dev tools */
+.card {
+    padding: 8px 0;
+}
+
+/* Card with centered text (e.g., stat cards) */
+.cardCentered {
+    composes: card;
+    text-align: center;
+}
+
+/* Card with less padding (e.g., charts) */
+.cardCompact {
+    composes: card;
+    padding: 4px 0;
+}
+
+/* Section container - flat, minimal headers */
+.section {
+    margin-bottom: 16px;
+}
+
+/* Section headings */
+.sectionTitle {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.sectionSubtitle {
+    font-size: var(--font-size-sm);
+    margin-bottom: 6px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+/* Grid layout for cards */
+.cardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+/* Two-column grid with vertical separator */
+.twoColumnGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 16px;
+}
+
+.twoColumnGrid > *:first-child {
+    padding-right: 24px;
+    border-right: 1px solid var(--border-light);
+}
+
+@media (max-width: 1024px) {
+    .twoColumnGrid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .twoColumnGrid > *:first-child {
+        padding-right: 0;
+        border-right: none;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-light);
+    }
+}
+
+/* Card value display (large number) */
+.cardValue {
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    margin: 2px 0;
+}
+
+/* Card label (description text) */
+.cardLabel {
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+    margin: 2px 0;
+}
+
+/* Card subtext (smaller detail) */
+.cardSubtext {
+    font-size: var(--font-size-xs);
+    color: var(--text-placeholder);
+    margin: 1px 0;
+}
