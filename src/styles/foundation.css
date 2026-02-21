@@ -145,7 +145,7 @@
      Waterfall / Timeline Colors
      ------------------------------------------------------------------------- */
   --waterfall-success: #28a745;
-  --waterfall-pending: #ff9800;
+  --waterfall-incomplete: #ff9800;
   --waterfall-error: #dc3545;
   --waterfall-default: #0066cc;
   --waterfall-timeout-exceeded: #e65100;
@@ -197,8 +197,8 @@
   --http-504: #9333ea;
   --http-5xx: #a855f7;
 
-   /* Pending/Unknown (cancelled catchup variation) */
-   --http-pending: #7b8667;
+   /* Incomplete/Unknown (cancelled catchup variation) */
+   --http-incomplete: #7b8667;
 
   /* -------------------------------------------------------------------------
      Row Backgrounds (used for zebra striping)
@@ -311,7 +311,7 @@
   --http-504: #a855f7;
   --http-5xx: #c084fc;
 
-   --http-pending: #8d9878;
+   --http-incomplete: #8d9878;
 }
 
 /* Auto dark mode (respects system preference when no explicit theme is set) */
@@ -414,7 +414,7 @@
     --http-504: #a855f7;
     --http-5xx: #c084fc;
 
-      --http-pending: #8d9878;
+      --http-incomplete: #8d9878;
   }
 }
 

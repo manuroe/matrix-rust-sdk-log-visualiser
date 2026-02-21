@@ -372,12 +372,12 @@ describe('SyncView - stats-compact with active time window', () => {
   });
 
   /**
-   * Regression: when a time window is active, pending sync requests (responseLineNumber === 0)
+   * Regression: when a time window is active, incomplete sync requests (responseLineNumber === 0)
    * were excluded from totalCount but included in the shown count, producing
    * e.g. "31 / 10" where numerator > denominator.
-   * After the fix the denominator includes pending items when showPending is true.
+   * After the fix the denominator includes incomplete items when showIncomplete is true.
    */
-  it('shown count never exceeds total count when pending is enabled and a time window is set', () => {
+  it('shown count never exceeds total count when incomplete is enabled and a time window is set', () => {
     const rawLogLines = createParsedLogLines(10);
 
     // 3 completed sync requests whose responses land within the window T+0..T+4
@@ -392,13 +392,13 @@ describe('SyncView - stats-compact with active time window', () => {
       createSyncRequest({ requestId: 'SYNC-OUT', sendLineNumber: 6, responseLineNumber: 8, status: '200', connId: 'conn-1' }),
     ];
 
-    // 2 pending requests (responseLineNumber === 0, no status)
-    const pendingRequests = [
+    // 2 incomplete requests (responseLineNumber === 0, no status)
+    const incompleteRequests = [
       createSyncRequest({ requestId: 'SYNC-P1', sendLineNumber: 5, responseLineNumber: 0, status: '', connId: 'conn-1' }),
       createSyncRequest({ requestId: 'SYNC-P2', sendLineNumber: 7, responseLineNumber: 0, status: '', connId: 'conn-1' }),
     ];
 
-    const allRequests = [...completedInWindow, ...completedOutOfWindow, ...pendingRequests];
+    const allRequests = [...completedInWindow, ...completedOutOfWindow, ...incompleteRequests];
 
     const startTime = rawLogLines[0].isoTimestamp;
     const endTime = rawLogLines[4].isoTimestamp;
@@ -408,7 +408,7 @@ describe('SyncView - stats-compact with active time window', () => {
       rawLogLines,
       startTime,
       endTime,
-      showPending: true,
+      showIncomplete: true,
       selectedConnId: '',
       connectionIds: ['conn-1'],
     });
@@ -426,23 +426,23 @@ describe('SyncView - stats-compact with active time window', () => {
 
     // Shown must never exceed total
     expect(shown).toBeLessThanOrEqual(total);
-    // 3 completed in window + 2 pending = 5 shown, 5 total
+    // 3 completed in window + 2 incomplete = 5 shown, 5 total
     expect(shown).toBe(5);
     expect(total).toBe(5);
   });
 
-  it('total count matches shown count when pending is disabled and a time window is set', () => {
+  it('total count matches shown count when incomplete is disabled and a time window is set', () => {
     const rawLogLines = createParsedLogLines(10);
 
     const completedInWindow = [
       createSyncRequest({ requestId: 'SYNC-C1', sendLineNumber: 0, responseLineNumber: 1, status: '200', connId: 'conn-1' }),
       createSyncRequest({ requestId: 'SYNC-C2', sendLineNumber: 2, responseLineNumber: 3, status: '200', connId: 'conn-1' }),
     ];
-    const pendingRequests = [
+    const incompleteRequests = [
       createSyncRequest({ requestId: 'SYNC-P1', sendLineNumber: 5, responseLineNumber: 0, status: '', connId: 'conn-1' }),
     ];
 
-    const allRequests = [...completedInWindow, ...pendingRequests];
+    const allRequests = [...completedInWindow, ...incompleteRequests];
     const startTime = rawLogLines[0].isoTimestamp;
     const endTime = rawLogLines[4].isoTimestamp;
 
@@ -451,7 +451,7 @@ describe('SyncView - stats-compact with active time window', () => {
       rawLogLines,
       startTime,
       endTime,
-      showPending: false,
+      showIncomplete: false,
       selectedConnId: '',
       connectionIds: ['conn-1'],
     });
@@ -464,7 +464,7 @@ describe('SyncView - stats-compact with active time window', () => {
     const shown = parseInt(shownEl!.textContent ?? '', 10);
     const total = parseInt(totalEl!.textContent ?? '', 10);
 
-    // Pending is off: shown = 2 completed in window; total = 2 completed + 1 pending
+    // Incomplete is off: shown = 2 completed in window; total = 2 completed + 1 incomplete
     expect(shown).toBe(2);
     expect(total).toBe(3);
   });

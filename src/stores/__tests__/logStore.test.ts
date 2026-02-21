@@ -41,8 +41,8 @@ describe('logStore', () => {
 
       expect(state.expandedRows.size).toBe(0);
       expect(state.openLogViewerIds.size).toBe(0);
-      expect(state.showPending).toBe(false);
-      expect(state.showPendingHttp).toBe(false);
+      expect(state.showIncomplete).toBe(false);
+      expect(state.showIncompleteHttp).toBe(false);
     });
   });
 
@@ -87,7 +87,7 @@ describe('logStore', () => {
       useLogStore.getState().setRequests(requests, connIds, []);
       const state = useLogStore.getState();
 
-      // With showPending=false (default), completed request should be included
+      // With showIncomplete=false (default), completed request should be included
       expect(state.filteredRequests).toHaveLength(1);
     });
   });
@@ -107,13 +107,13 @@ describe('logStore', () => {
     it('triggers filterHttpRequests after setting data', () => {
       const requests = [
         createHttpRequest({ status: '200' }),
-        createHttpRequest({ status: '' }), // Pending
+        createHttpRequest({ status: '' }), // Incomplete
       ];
 
       useLogStore.getState().setHttpRequests(requests, []);
       const state = useLogStore.getState();
 
-      // With showPendingHttp=false (default), only completed requests
+      // With showIncompleteHttp=false (default), only completed requests
       expect(state.filteredHttpRequests).toHaveLength(1);
       expect(state.filteredHttpRequests[0].status).toBe('200');
     });
@@ -121,18 +121,18 @@ describe('logStore', () => {
 
   describe('filterRequests', () => {
     beforeEach(() => {
-      // Reset store to ensure clean default state (showPending=false, etc.)
+      // Reset store to ensure clean default state (showIncomplete=false, etc.)
       useLogStore.getState().clearData();
-      // Note: clearData doesn't reset showPending to default, so we need a full reset
+      // Note: clearData doesn't reset showIncomplete to default, so we need a full reset
       // This tests with fresh store state plus our test data
       useLogStore.setState({
-        showPending: false,
-        showPendingHttp: false,
+        showIncomplete: false,
+        showIncompleteHttp: false,
       });
       
       const requests = [
         createSyncRequest({ requestId: 'REQ-1', status: '200', connId: 'room-list' }),
-        createSyncRequest({ requestId: 'REQ-2', status: '', connId: 'room-list' }), // Pending
+        createSyncRequest({ requestId: 'REQ-2', status: '', connId: 'room-list' }), // Incomplete
         createSyncRequest({ requestId: 'REQ-3', status: '200', connId: 'encryption' }),
         createSyncRequest({ requestId: 'REQ-4', status: '401', connId: 'room-list' }),
       ];
@@ -140,7 +140,7 @@ describe('logStore', () => {
     });
 
     it('filters by connection ID', () => {
-      useLogStore.getState().setShowPending(true);
+      useLogStore.getState().setShowIncomplete(true);
       useLogStore.getState().setSelectedConnId('encryption');
       const state = useLogStore.getState();
 
@@ -148,8 +148,8 @@ describe('logStore', () => {
       expect(state.filteredRequests[0].requestId).toBe('REQ-3');
     });
 
-    it('filters out pending requests when showPending is false', () => {
-      // Default showPending=false, selected is room-list by default
+    it('filters out incomplete requests when showIncomplete is false', () => {
+      // Default showIncomplete=false, selected is room-list by default
       const state = useLogStore.getState();
 
       // Room-list requests with status: REQ-1 (200), REQ-4 (401)
@@ -157,15 +157,15 @@ describe('logStore', () => {
       expect(state.filteredRequests.every(r => r.status !== '')).toBe(true);
     });
 
-    it('includes pending requests when showPending is true', () => {
-      useLogStore.getState().setShowPending(true);
+    it('includes incomplete requests when showIncomplete is true', () => {
+      useLogStore.getState().setShowIncomplete(true);
       const state = useLogStore.getState();
 
       expect(state.filteredRequests).toHaveLength(3); // All room-list requests
     });
 
     it('filters by status code filter', () => {
-      useLogStore.getState().setShowPending(true);
+      useLogStore.getState().setShowIncomplete(true);
       useLogStore.getState().setStatusCodeFilter(new Set(['401']));
       const state = useLogStore.getState();
 
@@ -173,9 +173,9 @@ describe('logStore', () => {
       expect(state.filteredRequests[0].status).toBe('401');
     });
 
-    it('includes pending requests when status filter includes Pending', () => {
-      useLogStore.getState().setStatusCodeFilter(new Set(['Pending']));
-      useLogStore.getState().setShowPending(true);
+    it('includes incomplete requests when status filter includes Incomplete', () => {
+      useLogStore.getState().setStatusCodeFilter(new Set(['Incomplete']));
+      useLogStore.getState().setShowIncomplete(true);
       const state = useLogStore.getState();
 
       expect(state.filteredRequests).toHaveLength(1);
@@ -188,28 +188,28 @@ describe('logStore', () => {
       // Reset store to ensure clean default state
       useLogStore.getState().clearData();
       useLogStore.setState({
-        showPending: false,
-        showPendingHttp: false,
+        showIncomplete: false,
+        showIncompleteHttp: false,
       });
       
       const requests = [
         createHttpRequest({ requestId: 'REQ-1', status: '200' }),
-        createHttpRequest({ requestId: 'REQ-2', status: '' }), // Pending
+        createHttpRequest({ requestId: 'REQ-2', status: '' }), // Incomplete
         createHttpRequest({ requestId: 'REQ-3', status: '404' }),
         createHttpRequest({ requestId: 'REQ-4', status: '500' }),
       ];
       useLogStore.getState().setHttpRequests(requests, []);
     });
 
-    it('filters out pending requests when showPendingHttp is false', () => {
+    it('filters out incomplete requests when showIncompleteHttp is false', () => {
       const state = useLogStore.getState();
 
       expect(state.filteredHttpRequests).toHaveLength(3);
       expect(state.filteredHttpRequests.every(r => r.status !== '')).toBe(true);
     });
 
-    it('includes pending requests when showPendingHttp is true', () => {
-      useLogStore.getState().setShowPendingHttp(true);
+    it('includes incomplete requests when showIncompleteHttp is true', () => {
+      useLogStore.getState().setShowIncompleteHttp(true);
       const state = useLogStore.getState();
 
       expect(state.filteredHttpRequests).toHaveLength(4);

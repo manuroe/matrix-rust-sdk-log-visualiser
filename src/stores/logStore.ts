@@ -10,17 +10,17 @@ interface LogStore {
   filteredRequests: SyncRequest[];
   connectionIds: string[];
   selectedConnId: string;
-  showPending: boolean;
+  showIncomplete: boolean;
   /** null = show all timeout values; number = show only requests with that timeout */
   selectedTimeout: number | null;
   
   // HTTP requests state (all requests, not just sync)
   allHttpRequests: HttpRequest[];
   filteredHttpRequests: HttpRequest[];
-  showPendingHttp: boolean;
+  showIncompleteHttp: boolean;
   
   // Status code filter (null = all enabled, Set = specific codes enabled)
-  // Special value 'Pending' represents requests without a status
+  // Special value 'Incomplete' represents requests without a status
   statusCodeFilter: Set<string> | null;
   
   // URI filter for HTTP requests (null = no filter, string = substring match)
@@ -47,13 +47,13 @@ interface LogStore {
   // Sync-specific actions
   setRequests: (requests: SyncRequest[], connIds: string[], rawLines: ParsedLogLine[]) => void;
   setSelectedConnId: (connId: string) => void;
-  setShowPending: (show: boolean) => void;
+  setShowIncomplete: (show: boolean) => void;
   setSelectedTimeout: (timeout: number | null) => void;
   filterRequests: () => void;
   
   // HTTP requests actions
   setHttpRequests: (requests: HttpRequest[], rawLines: ParsedLogLine[]) => void;
-  setShowPendingHttp: (show: boolean) => void;
+  setShowIncompleteHttp: (show: boolean) => void;
   setStatusCodeFilter: (filter: Set<string> | null) => void;
   setUriFilter: (filter: string | null) => void;
   filterHttpRequests: () => void;
@@ -87,13 +87,13 @@ export const useLogStore = create<LogStore>((set, get) => ({
   filteredRequests: [],
   connectionIds: [],
   selectedConnId: '',
-  showPending: false,
+  showIncomplete: false,
   selectedTimeout: null,
   
   // HTTP requests state
   allHttpRequests: [],
   filteredHttpRequests: [],
-  showPendingHttp: false,
+  showIncompleteHttp: false,
   
   // Status code filter (null = all enabled)
   statusCodeFilter: null,
@@ -138,8 +138,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
     get().filterRequests();
   },
 
-  setShowPending: (show) => {
-    set({ showPending: show });
+  setShowIncomplete: (show) => {
+    set({ showIncomplete: show });
     get().filterRequests();
   },
 
@@ -156,8 +156,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
     get().filterHttpRequests();
   },
   
-  setShowPendingHttp: (show) => {
-    set({ showPendingHttp: show });
+  setShowIncompleteHttp: (show) => {
+    set({ showIncompleteHttp: show });
     get().filterHttpRequests();
   },
   
@@ -206,7 +206,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   filterRequests: () => {
-    const { allRequests, rawLogLines, selectedConnId, showPending, selectedTimeout, statusCodeFilter, startTime, endTime } = get();
+    const { allRequests, rawLogLines, selectedConnId, showIncomplete, selectedTimeout, statusCodeFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set (in microseconds)
     let timeRangeUs: { startUs: number; endUs: number } | null = null;
@@ -227,12 +227,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
       // Timeout filter
       if (selectedTimeout !== null && r.timeout !== selectedTimeout) return false;
       
-      // Pending filter
-      if (!showPending && !r.status) return false;
+      // Incomplete filter
+      if (!showIncomplete && !r.status) return false;
       
       // Status code filter (null = all enabled)
       if (statusCodeFilter !== null) {
-        const statusKey = r.status || 'Pending';
+        const statusKey = r.status || 'Incomplete';
         if (!statusCodeFilter.has(statusKey)) return false;
       }
       
@@ -252,7 +252,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   
   filterHttpRequests: () => {
-    const { allHttpRequests, rawLogLines, showPendingHttp, statusCodeFilter, uriFilter, startTime, endTime } = get();
+    const { allHttpRequests, rawLogLines, showIncompleteHttp, statusCodeFilter, uriFilter, startTime, endTime } = get();
     
     // Calculate time range if filters are set (in microseconds)
     let timeRangeUs: { startUs: number; endUs: number } | null = null;
@@ -267,12 +267,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
     }
     
     const filtered = allHttpRequests.filter((r) => {
-      // Pending filter
-      if (!showPendingHttp && !r.status) return false;
+      // Incomplete filter
+      if (!showIncompleteHttp && !r.status) return false;
       
       // Status code filter (null = all enabled)
       if (statusCodeFilter !== null) {
-        const statusKey = r.status || 'Pending';
+        const statusKey = r.status || 'Incomplete';
         if (!statusCodeFilter.has(statusKey)) return false;
       }
       

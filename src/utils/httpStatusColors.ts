@@ -18,7 +18,7 @@ const KNOWN_CODES = new Set([
 export function getHttpStatusColorVar(status: string | number): string {
   const code = typeof status === 'string' ? parseInt(status, 10) : status;
 
-  if (isNaN(code)) return '--http-pending';
+  if (isNaN(code)) return '--http-incomplete';
 
   if (KNOWN_CODES.has(code)) {
     return `--http-${code}`;
@@ -30,7 +30,7 @@ export function getHttpStatusColorVar(status: string | number): string {
   if (code >= 300) return '--http-3xx';
   if (code >= 200) return '--http-2xx';
 
-  return '--http-pending';
+  return '--http-incomplete';
 }
 
 // Fallback colors matching foundation.css light theme (using Map for eslint compliance)
@@ -67,7 +67,7 @@ const categoryFallbackColors = new Map<string, string>([
   ['redirect', '#17a2b8'],
   ['clientError', '#fd7e14'],
   ['serverError', '#dc3545'],
-  ['pending', '#6c757d'],
+  ['incomplete', '#6c757d'],
 ]);
 
 /**
@@ -96,16 +96,16 @@ export function getHttpStatusColor(status: string | number): string {
 /**
  * Get status category for an HTTP status code.
  */
-export function getHttpStatusCategory(status: string | number): 'success' | 'redirect' | 'clientError' | 'serverError' | 'pending' {
+export function getHttpStatusCategory(status: string | number): 'success' | 'redirect' | 'clientError' | 'serverError' | 'incomplete' {
   const code = typeof status === 'string' ? parseInt(status, 10) : status;
 
-  if (isNaN(code)) return 'pending';
+  if (isNaN(code)) return 'incomplete';
   if (code >= 500) return 'serverError';
   if (code >= 400) return 'clientError';
   if (code >= 300) return 'redirect';
   if (code >= 200) return 'success';
 
-  return 'pending';
+  return 'incomplete';
 }
 
 /**
@@ -137,7 +137,7 @@ export function getStatusCodeLegend(statusCodes: string[]): Array<{ code: string
 export function getHttpStatusBadgeClass(status: string | number): string {
   const code = typeof status === 'string' ? parseInt(status, 10) : status;
 
-  if (isNaN(code)) return 'Pending';
+  if (isNaN(code)) return 'Incomplete';
 
   if (KNOWN_CODES.has(code)) {
     return `Http${code}`;
@@ -149,5 +149,5 @@ export function getHttpStatusBadgeClass(status: string | number): string {
   if (code >= 300) return 'Http3xx';
   if (code >= 200) return 'Http2xx';
 
-  return 'Pending';
+  return 'Incomplete';
 }

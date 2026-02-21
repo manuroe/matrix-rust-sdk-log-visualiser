@@ -33,7 +33,7 @@ const SYNC_LONGPOLL_KEY = 'sync-longpoll';
 
 /** Resolve the chart bucket key for an HTTP request (handles sync subtypes) */
 function getBucketKey(req: HttpRequestWithTimestamp): string {
-  const statusCode = req.status ? req.status.split(' ')[0] : 'pending';
+  const statusCode = req.status ? req.status.split(' ')[0] : 'incomplete';
   const is2xx = statusCode.startsWith('2');
   if (is2xx && req.timeout !== undefined) {
     if (req.timeout === 0) return SYNC_CATCHUP_KEY;
@@ -59,7 +59,7 @@ function getBucketLabel(code: string): string {
 /** Sort status codes for stacking order (first = bottom of bar, last = top):
  *  1. sync-catchup (bottom - baseline background activity)
  *  2. sync-longpoll (above catchup)
- *  3. all other codes: 5xx → 4xx → 3xx → 2xx → pending (top)
+ *  3. all other codes: 5xx → 4xx → 3xx → 2xx → incomplete (top)
  */
 function sortStatusCodes(codes: string[]): string[] {
   return [...codes].sort((a, b) => {
@@ -76,7 +76,7 @@ function sortStatusCodes(codes: string[]): string[] {
     const aIsNum = !isNaN(aNum);
     const bIsNum = !isNaN(bNum);
 
-    // Non-numeric (pending) goes last (top)
+    // Non-numeric (incomplete) goes last (top)
     if (!aIsNum && bIsNum) return 1;
     if (aIsNum && !bIsNum) return -1;
     if (!aIsNum && !bIsNum) return 0;
@@ -158,7 +158,7 @@ export function HttpActivityChart({
     const dataBuckets = Array.from(bucketMap.values()).sort((a, b) => a.timestamp - b.timestamp);
     const dataMaxCount = Math.max(...dataBuckets.map((b) => b.total), 1);
 
-    // Sort status codes: 5xx first (top of stack), then 4xx, 3xx, 2xx, pending last
+    // Sort status codes: 5xx first (top of stack), then 4xx, 3xx, 2xx, incomplete last
     const sortedStatusCodes = sortStatusCodes(Array.from(allStatusCodes));
 
     return { buckets: dataBuckets, maxCount: dataMaxCount, minTime, maxTime, statusCodes: sortedStatusCodes };

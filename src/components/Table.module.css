@@ -83,8 +83,8 @@
     color: var(--color-warning-text);
 }
 
-.badgePending {
-    background: var(--http-pending);
+.badgeIncomplete {
+    background: var(--http-incomplete);
     color: white;
 }
 

@@ -59,8 +59,8 @@ function createProps(overrides: Partial<RequestTableProps> = {}): RequestTablePr
     columns: defaultColumns,
     filteredRequests: [],
     totalCount: 0,
-    showPending: false,
-    onShowPendingChange: vi.fn(),
+    showIncomplete: false,
+    onShowIncompleteChange: vi.fn(),
     msPerPixel: 10,
     availableStatusCodes: ['200', '404', '500'],
     ...overrides,
@@ -98,10 +98,10 @@ describe('RequestTable', () => {
       expect(screen.getByText('Status')).toBeInTheDocument();
     });
 
-    it('renders the pending checkbox', () => {
-      renderWithRouter(<RequestTable {...createProps({ showPending: true })} />);
+    it('renders the incomplete checkbox', () => {
+      renderWithRouter(<RequestTable {...createProps({ showIncomplete: true })} />);
 
-      const checkbox = screen.getByRole('checkbox', { name: /pending/i });
+      const checkbox = screen.getByRole('checkbox', { name: /incomplete/i });
       expect(checkbox).toBeInTheDocument();
       expect(checkbox).toBeChecked();
     });
@@ -156,17 +156,17 @@ describe('RequestTable', () => {
   });
 
   describe('interactions', () => {
-    it('calls onShowPendingChange when checkbox is toggled', () => {
-      const onShowPendingChange = vi.fn();
+    it('calls onShowIncompleteChange when checkbox is toggled', () => {
+      const onShowIncompleteChange = vi.fn();
       renderWithRouter(<RequestTable {...createProps({ 
-        showPending: true,
-        onShowPendingChange
+        showIncomplete: true,
+        onShowIncompleteChange
       })} />);
 
-      const checkbox = screen.getByRole('checkbox', { name: /pending/i });
+      const checkbox = screen.getByRole('checkbox', { name: /incomplete/i });
       fireEvent.click(checkbox);
 
-      expect(onShowPendingChange).toHaveBeenCalledWith(false);
+      expect(onShowIncompleteChange).toHaveBeenCalledWith(false);
     });
 
     it('hides /sync requests when /sync checkbox is unchecked', () => {
@@ -314,25 +314,25 @@ describe('RequestTable', () => {
       expect(screen.getByText('POST')).toBeInTheDocument();
     });
 
-    it('renders requests without status as pending', () => {
+    it('renders requests without status as incomplete', () => {
       const requests = [
         createHttpRequest({ requestId: 'REQ-1', status: '' }),
       ];
       const rawLines = [createParsedLogLine({ lineNumber: 0 })];
       useLogStore.getState().setHttpRequests(requests, rawLines);
       
-      // Custom column that shows "Pending" for empty status
-      const columnsWithPendingDisplay: ColumnDef[] = [
-        { id: 'status', label: 'Status', getValue: (r) => r.status || 'Pending' },
+      // Custom column that shows "Incomplete" for empty status
+      const columnsWithIncompleteDisplay: ColumnDef[] = [
+        { id: 'status', label: 'Status', getValue: (r) => r.status || 'Incomplete' },
       ];
 
       renderWithRouter(<RequestTable {...createProps({ 
-        columns: columnsWithPendingDisplay,
+        columns: columnsWithIncompleteDisplay,
         filteredRequests: requests, 
         totalCount: 1 
       })} />);
 
-      expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Incomplete').length).toBeGreaterThan(0);
     });
   });
 

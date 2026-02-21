@@ -301,23 +301,23 @@ describe('countRequestsForTimeRange', () => {
 
   it('returns all requests when no filter is active', () => {
     const rawLogLines = makeLines(10);
-    const requests = [makeReq(1), makeReq(3), makeReq(0), makeReq(0)]; // 2 pending
+    const requests = [makeReq(1), makeReq(3), makeReq(0), makeReq(0)]; // 2 incomplete
     expect(countRequestsForTimeRange(requests, rawLogLines, null, null)).toBe(4);
   });
 
-  it('counts only completed requests in range + all pending when a filter is set', () => {
+  it('counts only completed requests in range + all incomplete when a filter is set', () => {
     const rawLogLines = makeLines(10);
-    // 2 completed inside window (lines 1, 3), 1 outside (line 7), 2 pending
+    // 2 completed inside window (lines 1, 3), 1 outside (line 7), 2 incomplete
     const requests = [makeReq(1), makeReq(3), makeReq(7), makeReq(0), makeReq(0)];
     const start = isoAt(0); // line 0
     const end   = isoAt(4); // line 4
-    // Expected: 2 in-range + 2 pending = 4
+    // Expected: 2 in-range + 2 incomplete = 4
     expect(countRequestsForTimeRange(requests, rawLogLines, start, end)).toBe(4);
   });
 
-  it('includes all pending requests even when no completed request falls in window', () => {
+  it('includes all incomplete requests even when no completed request falls in window', () => {
     const rawLogLines = makeLines(10);
-    // 1 completed outside window, 3 pending
+    // 1 completed outside window, 3 incomplete
     const requests = [makeReq(8), makeReq(0), makeReq(0), makeReq(0)];
     const start = isoAt(0);
     const end   = isoAt(2);
@@ -329,7 +329,7 @@ describe('countRequestsForTimeRange', () => {
     expect(countRequestsForTimeRange([], rawLogLines, isoAt(0), isoAt(4))).toBe(0);
   });
 
-  it('returns length when no filter even if all are pending', () => {
+  it('returns length when no filter even if all are incomplete', () => {
     const rawLogLines = makeLines(5);
     const requests = [makeReq(0), makeReq(0), makeReq(0)];
     expect(countRequestsForTimeRange(requests, rawLogLines, null, null)).toBe(3);

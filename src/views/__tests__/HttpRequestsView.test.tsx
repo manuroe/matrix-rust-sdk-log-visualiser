@@ -331,12 +331,12 @@ describe('HttpRequestsView - stats-compact with active time window', () => {
   });
 
   /**
-   * Regression: when a time window is active, pending requests (responseLineNumber === 0)
+   * Regression: when a time window is active, incomplete requests (responseLineNumber === 0)
    * were not included in totalCount (denominator) but were included in the shown count
    * (numerator), producing e.g. "31 / 10" where numerator > denominator.
-   * After the fix the denominator includes pending items when showPendingHttp is true.
+   * After the fix the denominator includes incomplete items when showIncompleteHttp is true.
    */
-  it('shown count never exceeds total count when pending is enabled and a time window is set', () => {
+  it('shown count never exceeds total count when incomplete is enabled and a time window is set', () => {
     // 10 log lines spanning T+0s..T+9s
     const rawLogLines = createParsedLogLines(10);
 
@@ -352,13 +352,13 @@ describe('HttpRequestsView - stats-compact with active time window', () => {
       createHttpRequest({ requestId: 'COMP-OUT', sendLineNumber: 6, responseLineNumber: 8, status: '200' }),
     ];
 
-    // 2 pending requests (responseLineNumber === 0, no status)
-    const pendingRequests = [
+    // 2 incomplete requests (responseLineNumber === 0, no status)
+    const incompleteRequests = [
       createHttpRequest({ requestId: 'PEND-1', sendLineNumber: 5, responseLineNumber: 0, status: '' }),
       createHttpRequest({ requestId: 'PEND-2', sendLineNumber: 7, responseLineNumber: 0, status: '' }),
     ];
 
-    const allRequests = [...completedInWindow, ...completedOutOfWindow, ...pendingRequests];
+    const allRequests = [...completedInWindow, ...completedOutOfWindow, ...incompleteRequests];
 
     // Use ISO strings that exactly bracket T+0..T+4 (rawLogLines[0]..rawLogLines[4])
     const startTime = rawLogLines[0].isoTimestamp;
@@ -370,7 +370,7 @@ describe('HttpRequestsView - stats-compact with active time window', () => {
       rawLogLines,
       startTime,
       endTime,
-      showPendingHttp: true,
+      showIncompleteHttp: true,
     });
     useLogStore.getState().filterHttpRequests();
 
@@ -386,23 +386,23 @@ describe('HttpRequestsView - stats-compact with active time window', () => {
 
     // Shown must never exceed total
     expect(shown).toBeLessThanOrEqual(total);
-    // 3 completed in window + 2 pending = 5 shown, 5 total
+    // 3 completed in window + 2 incomplete = 5 shown, 5 total
     expect(shown).toBe(5);
     expect(total).toBe(5);
   });
 
-  it('total count matches shown count when pending is disabled and a time window is set', () => {
+  it('total count matches shown count when incomplete is disabled and a time window is set', () => {
     const rawLogLines = createParsedLogLines(10);
 
     const completedInWindow = [
       createHttpRequest({ requestId: 'COMP-1', sendLineNumber: 0, responseLineNumber: 1, status: '200' }),
       createHttpRequest({ requestId: 'COMP-2', sendLineNumber: 2, responseLineNumber: 3, status: '200' }),
     ];
-    const pendingRequests = [
+    const incompleteRequests = [
       createHttpRequest({ requestId: 'PEND-1', sendLineNumber: 5, responseLineNumber: 0, status: '' }),
     ];
 
-    const allRequests = [...completedInWindow, ...pendingRequests];
+    const allRequests = [...completedInWindow, ...incompleteRequests];
     const startTime = rawLogLines[0].isoTimestamp;
     const endTime = rawLogLines[4].isoTimestamp;
 
@@ -411,7 +411,7 @@ describe('HttpRequestsView - stats-compact with active time window', () => {
       rawLogLines,
       startTime,
       endTime,
-      showPendingHttp: false,
+      showIncompleteHttp: false,
     });
     useLogStore.getState().filterHttpRequests();
 
@@ -422,7 +422,7 @@ describe('HttpRequestsView - stats-compact with active time window', () => {
     const shown = parseInt(shownEl!.textContent ?? '', 10);
     const total = parseInt(totalEl!.textContent ?? '', 10);
 
-    // Pending is off: shown = 2 completed in window; total = 2 completed + 1 pending
+    // Incomplete is off: shown = 2 completed in window; total = 2 completed + 1 incomplete
     expect(shown).toBe(2);
     expect(total).toBe(3);
   });

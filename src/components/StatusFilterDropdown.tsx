@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useLogStore } from '../stores/logStore';
 import { useURLParams } from '../hooks/useURLParams';
-import { PENDING_STATUS_KEY } from '../utils/statusCodeUtils';
+import { INCOMPLETE_STATUS_KEY } from '../utils/statusCodeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
 import styles from './StatusFilterDropdown.module.css';
 
@@ -73,7 +73,7 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
 
   /** Get color for status code */
   const getStatusColor = (code: string) => {
-    return getHttpStatusColor(code === PENDING_STATUS_KEY ? 'pending' : code);
+    return getHttpStatusColor(code === INCOMPLETE_STATUS_KEY ? 'incomplete' : code);
   };
 
   /** Get label for the dropdown button */

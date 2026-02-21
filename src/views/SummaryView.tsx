@@ -154,7 +154,7 @@ export function SummaryView() {
         }>,
         syncRequestsByConnection: [] as Array<{ connId: string; count: number }>,
         httpRequestsWithTimestamps: [] as HttpRequestWithTimestamp[],
-        pendingRequestCount: 0,
+        incompleteRequestCount: 0,
         chartTimeRange: { minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros },
       };
     }
@@ -222,8 +222,8 @@ export function SummaryView() {
       })
       .filter(req => req.timestampUs > 0);
 
-    // Add pending requests (no response yet) using their send timestamp
-    const pendingRequestsWithTimestamps: HttpRequestWithTimestamp[] = allHttpRequests
+    // Add incomplete requests (no response yet) using their send timestamp
+    const incompleteRequestsWithTimestamps: HttpRequestWithTimestamp[] = allHttpRequests
       .filter(req => !req.status)
       .filter(req => {
         if (!timeRangeUs) return true;
@@ -239,7 +239,7 @@ export function SummaryView() {
       }))
       .filter(req => req.timestampUs > 0);
 
-    const httpRequestsWithTimestamps = [...completedRequestsWithTimestamps, ...pendingRequestsWithTimestamps];
+    const httpRequestsWithTimestamps = [...completedRequestsWithTimestamps, ...incompleteRequestsWithTimestamps];
 
     // Filter sync requests by time range
     const filteredSyncRequests = allRequests.filter((req) => {
@@ -388,7 +388,7 @@ export function SummaryView() {
       slowestHttpRequests,
       syncRequestsByConnection,
       httpRequestsWithTimestamps,
-      pendingRequestCount: pendingRequestsWithTimestamps.length,
+      incompleteRequestCount: incompleteRequestsWithTimestamps.length,
       chartTimeRange: { minTime: chartMinTime, maxTime: chartMaxTime },
     };
   }, [rawLogLines, allHttpRequests, allRequests, connectionIds, startTime, endTime, localStartTime, localEndTime]);
@@ -569,7 +569,7 @@ export function SummaryView() {
         {/* HTTP Requests Activity Chart */}
         {stats.httpRequestsWithTimestamps.length > 0 && (
           <section className={styles.summarySection}>
-            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests{stats.pendingRequestCount > 0 ? ` (${stats.pendingRequestCount} pending)` : ''}</h2>
+            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests{stats.incompleteRequestCount > 0 ? ` (${stats.incompleteRequestCount} incomplete)` : ''}</h2>
             <div className={styles.activityChartContainer}>
               <HttpActivityChart
                 httpRequests={stats.httpRequestsWithTimestamps}
@@ -739,7 +739,7 @@ export function SummaryView() {
                     }
                     const commonPrefix = getCommonPrefix(uris);
                     return filtered.map((req) => {
-                      const badgeClass = req.status ? `badge${getHttpStatusBadgeClass(req.status)}` : 'badgePending';
+                      const badgeClass = req.status ? `badge${getHttpStatusBadgeClass(req.status)}` : 'badgeIncomplete';
                       return (
                       <tr key={req.id}>
                         <td>
@@ -764,7 +764,7 @@ export function SummaryView() {
                         </td>
                         <td>
                           <span className={`${tableStyles.badge} ${tableStyles[badgeClass]}`}>
-                            {req.status || 'pending'}
+                            {req.status || 'incomplete'}
                           </span>
                         </td>
                       </tr>

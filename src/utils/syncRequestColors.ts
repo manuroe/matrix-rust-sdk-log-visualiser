@@ -9,7 +9,7 @@ import { getHttpStatusColor } from './httpStatusColors';
  *   to highlight how quickly the app caught up.
  * - Long-poll requests (timeout≥30000ms) with a 2xx response use a muted slate
  *   color, signaling they are routine background activity.
- * - All other status codes (4xx, 5xx, pending, …) fall back to the standard
+ * - All other status codes (4xx, 5xx, incomplete, …) fall back to the standard
  *   HTTP status color so errors and failures remain prominent.
  */
 export function getSyncRequestBarColor(req: HttpRequest, defaultColor: string): string {
@@ -26,6 +26,6 @@ export function getSyncRequestBarColor(req: HttpRequest, defaultColor: string): 
     }
   }
 
-  // Pending or non-2xx: use the standard HTTP status color
+  // Incomplete or non-2xx: use the standard HTTP status color
   return defaultColor ?? getHttpStatusColor(statusCode);
 }

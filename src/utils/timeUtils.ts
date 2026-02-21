@@ -453,14 +453,14 @@ export function isInTimeRangeMicros(
  * @returns Filtered requests within the time range
  */
 /**
- * Count the total number of requests for a time window, always including pending
+ * Count the total number of requests for a time window, always including incomplete
  * items (responseLineNumber === 0) in the count regardless of whether callers
  * choose to display them.
  *
  * This is the canonical denominator for the "X / Y" stats display.
- * - No filter → all requests (pending already included).
+ * - No filter → all requests (incomplete already included).
  * - Filter active → completed requests whose response falls in the window +
- *                   all pending requests (they have no response timestamp to
+ *                   all incomplete requests (they have no response timestamp to
  *                   compare, so they are treated as always in-scope).
  *
  * Centralising this here prevents the bug where two views each computed the
@@ -473,9 +473,9 @@ export function countRequestsForTimeRange<T extends { responseLineNumber: number
   endFilter: TimeFilterValue | null
 ): number {
   if (!startFilter && !endFilter) return requests.length;
-  const pendingCount = requests.filter(r => !r.responseLineNumber).length;
+  const incompleteCount = requests.filter(r => !r.responseLineNumber).length;
   const completedInRange = applyTimeRangeFilterMicros(requests, rawLogLines, startFilter, endFilter).length;
-  return completedInRange + pendingCount;
+  return completedInRange + incompleteCount;
 }
 
 export function applyTimeRangeFilterMicros<T extends { responseLineNumber: number }>(

@@ -183,7 +183,7 @@
     font-weight: 600;
 }
 
-.pending {
+.incomplete {
     opacity: 0.6;
 }
 
@@ -218,7 +218,7 @@
     color: var(--color-success-text);
 }
 
-.statusPending {
+.statusIncomplete {
     background: var(--color-warning-bg);
     color: var(--color-warning-text);
 }

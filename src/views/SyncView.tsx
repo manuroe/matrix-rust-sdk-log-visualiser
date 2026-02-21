@@ -20,14 +20,14 @@ export function SyncView() {
     connectionIds,
     selectedConnId,
     selectedTimeout,
-    showPending,
+    showIncomplete,
     startTime,
     endTime,
     timelineScale,
     rawLogLines,
     getDisplayTime,
     setSelectedConnId,
-    setShowPending,
+    setShowIncomplete,
     setSelectedTimeout,
   } = useLogStore();
 
@@ -40,7 +40,7 @@ export function SyncView() {
     return countRequestsForTimeRange(connFilteredRequests, rawLogLines, startTime, endTime);
   }, [allRequests, selectedConnId, rawLogLines, startTime, endTime]);
 
-  // Compute available status codes from all requests (including Pending)
+  // Compute available status codes from all requests (including Incomplete)
   const availableStatusCodes = useMemo(
     () => extractAvailableStatusCodes(allRequests),
     [allRequests]
@@ -168,8 +168,8 @@ export function SyncView() {
       containerClassName="sync-view"
       filteredRequests={filteredRequests}
       totalCount={totalCount}
-      showPending={showPending}
-      onShowPendingChange={setShowPending}
+      showIncomplete={showIncomplete}
+      onShowIncompleteChange={setShowIncomplete}
       msPerPixel={timelineScale}
       availableStatusCodes={availableStatusCodes}
       headerSlot={connectionSelector}

@@ -18,13 +18,13 @@ export function HttpRequestsView() {
     allHttpRequests,
     allRequests,
     filteredHttpRequests,
-    showPendingHttp,
+    showIncompleteHttp,
     startTime,
     endTime,
     timelineScale,
     rawLogLines,
     getDisplayTime,
-    setShowPendingHttp,
+    setShowIncompleteHttp,
   } = useLogStore();
 
   const totalCount = useMemo(
@@ -32,7 +32,7 @@ export function HttpRequestsView() {
     [allHttpRequests, rawLogLines, startTime, endTime]
   );
 
-  // Compute available status codes from all requests (including Pending)
+  // Compute available status codes from all requests (including Incomplete)
   const availableStatusCodes = useMemo(
     () => extractAvailableStatusCodes(allHttpRequests),
     [allHttpRequests]
@@ -135,8 +135,8 @@ export function HttpRequestsView() {
       columns={columns}
       filteredRequests={filteredHttpRequests}
       totalCount={totalCount}
-      showPending={showPendingHttp}
-      onShowPendingChange={setShowPendingHttp}
+      showIncomplete={showIncompleteHttp}
+      onShowIncompleteChange={setShowIncompleteHttp}
       msPerPixel={timelineScale}
       availableStatusCodes={availableStatusCodes}
       emptyMessage="No HTTP requests found in log file"

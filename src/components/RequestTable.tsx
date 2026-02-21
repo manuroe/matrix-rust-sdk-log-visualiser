@@ -49,13 +49,13 @@ export interface RequestTableProps {
   filteredRequests: HttpRequest[];
   /** Total count to display (pre-calculated by the view) */
   totalCount: number;
-  /** Whether to show pending requests */
-  showPending: boolean;
-  /** Callback when pending checkbox changes */
-  onShowPendingChange: (value: boolean) => void;
+  /** Whether to show incomplete requests */
+  showIncomplete: boolean;
+  /** Callback when incomplete checkbox changes */
+  onShowIncompleteChange: (value: boolean) => void;
   /** Timeline scale (ms per pixel) */
   msPerPixel: number;
-  /** Available status codes for filtering (including 'Pending' if applicable) */
+  /** Available status codes for filtering (including 'Incomplete' if applicable) */
   availableStatusCodes: string[];
   /** Optional additional header controls before the checkbox (e.g., connection dropdown) */
   headerSlot?: ReactNode;
@@ -99,8 +99,8 @@ export function RequestTable({
   containerClassName = '',
   filteredRequests,
   totalCount,
-  showPending,
-  onShowPendingChange,
+  showIncomplete,
+  onShowIncompleteChange,
   msPerPixel,
   availableStatusCodes,
   headerSlot,
@@ -389,10 +389,10 @@ export function RequestTable({
           <label className="checkbox-compact">
             <input
               type="checkbox"
-              checked={showPending}
-              onChange={(e) => onShowPendingChange(e.target.checked)}
+              checked={showIncomplete}
+              onChange={(e) => onShowIncompleteChange(e.target.checked)}
             />
-            Pending
+            Incomplete
           </label>
 
           <div className="stats-compact">
@@ -450,7 +450,7 @@ export function RequestTable({
                     <div
                       key={`sticky-${req.requestId}`}
                       data-row-id={`sticky-${req.requestId}`}
-                      className={`${styles.requestRow} ${openLogViewerIds.has(req.requestId) ? styles.selected : ''} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${!req.status ? styles.pending : ''}`}
+                      className={`${styles.requestRow} ${openLogViewerIds.has(req.requestId) ? styles.selected : ''} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${!req.status ? styles.incomplete : ''}`}
                       style={{ minHeight: '28px', cursor: 'pointer' }}
                       onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                       onMouseLeave={() => handleRowMouseLeave(req.requestId)}
@@ -502,17 +502,17 @@ export function RequestTable({
                         timelineWidth,
                         msPerPixel
                       );
-                      const status = req.status ? req.status : 'Pending';
-                      const isPending = !req.status;
+                      const status = req.status ? req.status : 'Incomplete';
+                      const isIncomplete = !req.status;
                       const statusCode = req.status ? req.status.split(' ')[0] : '';
-                      const defaultBarColor = isPending ? 'var(--http-pending)' : getHttpStatusColor(statusCode);
+                      const defaultBarColor = isIncomplete ? 'var(--http-incomplete)' : getHttpStatusColor(statusCode);
                       const barColor = getBarColor ? getBarColor(req, defaultBarColor) : defaultBarColor;
 
                       return (
                         <div
                           key={`waterfall-${req.requestId}`}
                           data-row-id={`waterfall-${req.requestId}`}
-                          className={`${styles.requestRow} ${openLogViewerIds.has(req.requestId) ? styles.selected : ''} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${isPending ? styles.pending : ''}`}
+                          className={`${styles.requestRow} ${openLogViewerIds.has(req.requestId) ? styles.selected : ''} ${(expandedRows.has(req.requestId) && openLogViewerIds.has(req.requestId)) ? styles.expanded : ''} ${isIncomplete ? styles.incomplete : ''}`}
                           style={{ minHeight: '28px', cursor: 'pointer' }}
                           onMouseEnter={() => handleRowMouseEnter(req.requestId)}
                           onMouseLeave={() => handleRowMouseLeave(req.requestId)}
@@ -535,12 +535,12 @@ export function RequestTable({
                                   width: `${barWidth}px`,
                                   background: barColor,
                                 }}
-                                title={isPending ? 'Pending' : status}
+                                title={isIncomplete ? 'Incomplete' : status}
                               >
-                                {!isPending && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
+                                {!isIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
                               </div>
-                              <span className={styles.waterfallDuration} title={isPending ? 'Pending' : status}>
-                                {isPending ? '...' : statusCode === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
+                              <span className={styles.waterfallDuration} title={isIncomplete ? 'Incomplete' : status}>
+                                {isIncomplete ? '...' : statusCode === '200' ? `${req.requestDurationMs}ms` : `${status} - ${req.requestDurationMs}ms`}
                               </span>
                             </div>
                           </div>

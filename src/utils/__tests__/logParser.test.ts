@@ -39,7 +39,7 @@ describe('logParser', () => {
         expect(result.httpRequests[0].requestDurationMs).toBe(360); // 359.998542ms rounded
       });
 
-      it('parses send-only requests (pending)', () => {
+      it('parses send-only requests (incomplete)', () => {
         const result = parseAllHttpRequests(SEND_LINE);
 
         expect(result.httpRequests).toHaveLength(1);
