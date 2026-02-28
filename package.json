@@ -13,6 +13,7 @@
     "bench:report": "node scripts/buildBenchmarksReport.js",
     "pr:comments": "tsx scripts/fetchPRComments.ts",
     "pr:reply": "tsx scripts/replyPRComment.ts",
+    "screenshots": "tsx scripts/screenshots.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.58.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.0",
