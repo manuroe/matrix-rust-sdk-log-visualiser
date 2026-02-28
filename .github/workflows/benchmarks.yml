@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, poc]
   pull_request:
-    branches: [main, poc]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
