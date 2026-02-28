@@ -1,5 +1,7 @@
 # Matrix Rust SDK Log Visualiser
 
+[![codecov](https://codecov.io/gh/manuroe/matrix-rust-sdk-log-visualiser/graph/badge.svg)](https://codecov.io/gh/manuroe/matrix-rust-sdk-log-visualiser)
+
 A web viewer for [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) logs. **All processing runs locally in your browser** — no data is sent anywhere.
 
 Live at **https://manuroe.github.io/matrix-rust-sdk-log-visualiser/**
