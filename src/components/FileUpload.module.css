@@ -61,13 +61,25 @@
     z-index: calc(var(--z-dropdown) + 1);
 }
 
-.dropZoneFooter a {
+.dropZoneFooter a,
+.dropZoneFooter button {
     color: var(--color-primary);
     text-decoration: none;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
 }
 
-.dropZoneFooter a:hover {
+.dropZoneFooter a:hover,
+.dropZoneFooter button:hover:not(:disabled) {
     text-decoration: underline;
+}
+
+.dropZoneFooter button:disabled {
+    opacity: 0.5;
+    cursor: default;
 }
 
 .dropZoneError {
