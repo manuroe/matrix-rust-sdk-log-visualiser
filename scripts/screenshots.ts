@@ -7,8 +7,11 @@
  */
 import { chromium } from '@playwright/test';
 import { spawnSync, spawn } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import pixelmatch from 'pixelmatch';
+import { PNG } from 'pngjs';
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirPath = dirname(currentFilePath);
@@ -68,9 +71,55 @@ async function main(): Promise<void> {
     await page.waitForTimeout(300);
   }
 
+  function arePngsVisuallyEqual(existingPng: Buffer, nextPng: Buffer): boolean {
+    const existingImage = PNG.sync.read(existingPng);
+    const nextImage = PNG.sync.read(nextPng);
+
+    if (
+      existingImage.width !== nextImage.width ||
+      existingImage.height !== nextImage.height
+    ) {
+      return false;
+    }
+
+    const differentPixels = pixelmatch(
+      existingImage.data,
+      nextImage.data,
+      undefined,
+      existingImage.width,
+      existingImage.height,
+      { threshold: 0 },
+    );
+
+    return differentPixels === 0;
+  }
+
   async function shot(name: string): Promise<void> {
-    await page.screenshot({ path: `${OUT_DIR}/screenshot-${name}.png` });
-    console.warn(`✓ screenshot-${name}.png`);
+    const outputPath = resolve(OUT_DIR, `screenshot-${name}.png`);
+    const nextPng = await page.screenshot({ type: 'png' });
+
+    try {
+      const existingPng = await readFile(outputPath);
+      const hasVisualChanges = !arePngsVisuallyEqual(existingPng, nextPng);
+      if (!hasVisualChanges) {
+        console.warn(`↺ screenshot-${name}.png unchanged (no visual diff)`);
+        return;
+      }
+    } catch (error: unknown) {
+      if (
+        !(
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === 'ENOENT'
+        )
+      ) {
+        throw error;
+      }
+    }
+
+    await writeFile(outputPath, nextPng);
+    console.warn(`✓ screenshot-${name}.png updated`);
   }
 
   // Landing page
@@ -89,6 +138,8 @@ async function main(): Promise<void> {
   await demoTrigger.click();
   await page.waitForURL(/\/#\/summary/, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
+  // Extra wait for charts to finish rendering after navigation
+  await page.waitForTimeout(600);
 
   // Summary
   await shot('summary-light');

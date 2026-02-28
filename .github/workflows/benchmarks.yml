@@ -2,9 +2,8 @@ name: CodSpeed Benchmarks
 
 on:
   push:
-    branches: [main, poc]
+    branches: [main]
   pull_request:
-    branches: [main, poc]
   workflow_dispatch:
 
 concurrency:
