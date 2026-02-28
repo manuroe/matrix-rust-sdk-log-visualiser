@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "bench": "vitest bench --run --environment node",
+    "bench": "vitest bench --run --environment node --pool forks --minWorkers 1 --maxWorkers 1",
     "pr:comments": "tsx scripts/fetchPRComments.ts",
     "pr:reply": "tsx scripts/replyPRComment.ts",
     "screenshots": "tsx scripts/screenshots.ts",
