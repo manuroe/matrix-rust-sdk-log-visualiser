@@ -1,12 +1,31 @@
 # Matrix Rust SDK Log Visualiser
 
-A web-app viewer for [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) logs. This tool helps visualize and logs, starting with /sync requests.”
+A web viewer for [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) logs. **All processing runs locally in your browser** — no data is sent anywhere.
 
-Available at https://manuroe.github.io/matrix-rust-sdk-log-visualiser/.
+Live at **https://manuroe.github.io/matrix-rust-sdk-log-visualiser/**
 
-Or locally using:
+![Summary view](public/demo/screenshot-summary-light.png#gh-light-mode-only)
+![Summary view](public/demo/screenshot-summary-dark.png#gh-dark-mode-only)
+
+![Logs view](public/demo/screenshot-logs-light.png#gh-light-mode-only)
+![Logs view](public/demo/screenshot-logs-dark.png#gh-dark-mode-only)
+
+![Sync waterfall](public/demo/screenshot-sync-light.png#gh-light-mode-only)
+![Sync waterfall](public/demo/screenshot-sync-dark.png#gh-dark-mode-only)
+
+## Demo mode
+
+Click **"Try with demo logs"** on the landing page to explore the app without a real log file.
+
+## Run locally
+
 ```bash
 npm install
 npm start
 ```
-And open http://localhost:5173/#/
+
+Open http://localhost:5173
+
+## Contributing
+
+See [AGENTS.MD](AGENTS.MD) for architecture notes and agent/contributor guidance.
