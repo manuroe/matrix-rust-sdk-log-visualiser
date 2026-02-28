@@ -6,11 +6,11 @@ A web viewer for [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk
 
 Live at **https://manuroe.github.io/matrix-rust-sdk-log-visualiser/**
 
-![Summary view](public/demo/screenshot-summary-light.png#gh-light-mode-only)
-![Summary view](public/demo/screenshot-summary-dark.png#gh-dark-mode-only)
-
 ![Logs view](public/demo/screenshot-logs-light.png#gh-light-mode-only)
 ![Logs view](public/demo/screenshot-logs-dark.png#gh-dark-mode-only)
+
+![Summary view](public/demo/screenshot-summary-light.png#gh-light-mode-only)
+![Summary view](public/demo/screenshot-summary-dark.png#gh-dark-mode-only)
 
 ![Sync waterfall](public/demo/screenshot-sync-light.png#gh-light-mode-only)
 ![Sync waterfall](public/demo/screenshot-sync-dark.png#gh-dark-mode-only)
