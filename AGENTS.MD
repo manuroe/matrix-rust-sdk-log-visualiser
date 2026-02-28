@@ -97,11 +97,18 @@ CI runs benchmarks on PRs, generates `benchmark/baseline.json` directly, and bui
 
 **Local Development**: Run `npm run bench benchmark/local/report.json` and `npm run bench:report benchmark/local/report.json -- --output benchmark/local/report.md` to inspect benchmark reports locally. The `benchmark/local/` folder is gitignored for local-only artifacts.
 
+## Demo Log File
+
+A hand-crafted demo log lives at [`public/demo/demo.log`](public/demo/demo.log). It is served as a static asset and loaded by the **"Try with demo logs"** link on the landing page, letting users explore the app without a real log file.
+
+**When adding a new feature**, extend `public/demo/demo.log` so the feature is visible and exercisable in the demo. The log must remain a valid, parseable Matrix Rust SDK log that exercises all existing app capabilities as well as the new one.
+
 ## Contribution Guidelines
 - Use camelCase for identifiers (lint enforced).
 - Avoid embedding parsing logic directly in components.
 - Prefer additive changes over refactors unless necessary.
 - Keep documentation high-level; link to code for implementation specifics.
+- Every new feature must be represented in [`public/demo/demo.log`](public/demo/demo.log).
 - Always pass the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) (`npm run build`, `npm run lint`, `npm test -- --run`) before committing.
 
 ## Reference Files (Entry Points)
@@ -111,4 +118,5 @@ CI runs benchmarks on PRs, generates `benchmark/baseline.json` directly, and bui
 - Parser: [src/utils/logParser.ts](src/utils/logParser.ts)
 - Time utilities: [src/utils/timeUtils.ts](src/utils/timeUtils.ts)
 - Log views: [src/views](src/views)
+- Demo log: [public/demo/demo.log](public/demo/demo.log)
 
