@@ -20,6 +20,22 @@ export default mergeConfig(
       benchmark: {
         include: ['**/*.perf.test.ts'],
       },
+      coverage: {
+        provider: 'istanbul',
+        all: true,
+        include: ['src/**/*.{ts,tsx}'],
+        reporter: ['text', 'html', 'lcov'],
+        reportsDirectory: './coverage',
+        exclude: [
+          'src/test/**',
+          '**/__tests__/**',
+          '**/*.test.ts',
+          '**/*.test.tsx',
+          'scripts/**',
+          'vite.config.ts',
+          'eslint.config.js',
+        ],
+      },
     },
   })
 );
