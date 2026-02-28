@@ -17,24 +17,24 @@ import { computeChartData, extractTimes } from '../../test/benchmarkHelpers';
 
 describe('LogActivityChart Performance', () => {
   describe('Data aggregation (chartData useMemo)', () => {
-    bench('small (1K lines)', () => {
+    bench('LogActivityChart: chart data aggregation 1K lines', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.small);
       computeChartData(logLines);
     });
 
-    bench('medium (10K lines)', () => {
+    bench('LogActivityChart: chart data aggregation 10K lines', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.medium);
       computeChartData(logLines);
     });
   });
 
   describe('Time extraction (timeToMs calls)', () => {
-    bench('extract 1K timestamps', () => {
+    bench('LogActivityChart: time extraction 1K lines', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.small);
       extractTimes(logLines);
     });
 
-    bench('extract 10K timestamps', () => {
+    bench('LogActivityChart: time extraction 10K lines', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.medium);
       extractTimes(logLines);
     });

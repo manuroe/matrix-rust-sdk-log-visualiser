@@ -13,24 +13,24 @@ import {
 
 describe('logParser Performance', () => {
   describe('parseAllHttpRequests', () => {
-    bench('small (1K lines)', () => {
+    bench('logParser: parseAllHttpRequests 1K lines', () => {
       const content = generateLogContent(PERF_TEST_SCALES.small, 10);
       parseAllHttpRequests(content);
     });
 
-    bench('medium (10K lines)', () => {
+    bench('logParser: parseAllHttpRequests 10K lines', () => {
       const content = generateLogContent(PERF_TEST_SCALES.medium, 100);
       parseAllHttpRequests(content);
     });
   });
 
   describe('parseLogFile', () => {
-    bench('small (1K lines)', () => {
+    bench('logParser: parseLogFile 1K lines', () => {
       const content = generateLogContent(PERF_TEST_SCALES.small, 10);
       parseLogFile(content);
     });
 
-    bench('medium (10K lines)', () => {
+    bench('logParser: parseLogFile 10K lines', () => {
       const content = generateLogContent(PERF_TEST_SCALES.medium, 100);
       parseLogFile(content);
     });
