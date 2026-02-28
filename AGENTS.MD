@@ -47,10 +47,8 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Preview build: `npm run preview`
 - Lint: `npm run lint`
 - Unit tests: `npm test -- --run` (exits after completion; omit `-- --run` for watch mode)
-- Performance benchmarks: `npm run bench <output-path>`
-  - Example: `npm run bench benchmark/local/report.json`
-- Build benchmark report: `npm run bench:report <json-path> [-- --output <md-path>] [-- --baseline <baseline-path>]`
-  - Local: `npm run bench:report benchmark/local/report.json -- --output benchmark/local/report.md`
+- Performance benchmarks: `npm run bench`
+  - Runs `.perf.test.ts` suites in Node runtime and reports results through CodSpeed in CI
 - Fetch PR review comments (unresolved only): `npm run pr:comments` (auto-detects current branch) or `npm run pr:comments -- --pr <number>`
 - Reply to a PR review comment: `npm run pr:reply -- --comment-id <id> --message "<text>"`
 
@@ -93,9 +91,9 @@ When prompted **"Review PR comments"**: run `npm run pr:comments`, read `pr-comm
 - Storing cross-view filters in local component state.
 
 ## Performance Regression Detection
-CI runs benchmarks on PRs, generates `benchmark/baseline.json` directly, and builds baseline reports. The workflow fetches the main baseline for comparison in the PR comment, then commits `benchmark/baseline.json` and `benchmark/baseline.md` back to the PR branch.
+CI runs benchmark suites via CodSpeed and publishes performance tracking/results on codspeed.io and GitHub checks.
 
-**Local Development**: Run `npm run bench benchmark/local/report.json` and `npm run bench:report benchmark/local/report.json -- --output benchmark/local/report.md` to inspect benchmark reports locally. The `benchmark/local/` folder is gitignored for local-only artifacts.
+**Local Development**: Run `npm run bench` to execute the same benchmark suites locally (timing output only).
 
 ## Demo Log File
 
