@@ -82,16 +82,11 @@ async function main(): Promise<void> {
   await setTheme('dark');
   await shot('landing-dark');
 
-  // Load demo data. Use evaluate-click to avoid Playwright visibility checks on
-  // fixed-position element after a programmatic theme change.
+  // Load demo data.
   await setTheme('light');
-  await page.evaluate(() => {
-    const link = Array.from(document.querySelectorAll('a')).find(
-      (a) => a.textContent?.includes('Try with demo logs')
-    );
-    if (!link) throw new Error('Demo link not found');
-    link.click();
-  });
+  const demoTrigger = page.locator('button, a', { hasText: 'Try with demo logs' }).first();
+  await demoTrigger.waitFor({ state: 'visible', timeout: 15_000 });
+  await demoTrigger.click();
   await page.waitForURL(/\/#\/summary/, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
 
