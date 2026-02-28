@@ -2,7 +2,7 @@
  * Performance benchmarks for LogActivityChart.tsx
  * Measures render time and data aggregation performance across different log sizes.
  *
- * Run with: npm run test src/components/__tests__/LogActivityChart.perf.test.ts -- --mode=bench
+ * Run with: npm run bench
  *
  * NOTE: This tests the pure computation (bucket aggregation, time formatting),
  * not the React render cycle with DOM manipulation. See LogActivityChart.render.perf.test.ts

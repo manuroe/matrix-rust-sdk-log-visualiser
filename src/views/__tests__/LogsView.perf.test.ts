@@ -2,7 +2,7 @@
  * Performance benchmarks for LogsView.tsx
  * Measures time filtering and log line transformation performance.
  *
- * Run with: npm run test src/views/__tests__/LogsView.perf.test.ts -- --mode=bench
+ * Run with: npm run bench
  *
  * NOTE: This tests the pure filtering logic (useMemo in LogsView),
  * not the React render cycle. Focuses on:

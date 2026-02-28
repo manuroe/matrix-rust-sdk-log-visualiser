@@ -9,8 +9,7 @@
     "build": "tsc -b && vite build",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "bench": "sh -c 'mkdir -p $(dirname \"$1\") && BENCHMARK_OUTPUT=\"$1\" vitest bench --run && tsx scripts/profileBenchmarks.ts \"$1\"' --",
-    "bench:report": "node scripts/buildBenchmarksReport.js",
+    "bench": "vitest bench --run --environment node",
     "pr:comments": "tsx scripts/fetchPRComments.ts",
     "pr:reply": "tsx scripts/replyPRComment.ts",
     "screenshots": "tsx scripts/screenshots.ts",
@@ -33,6 +32,7 @@
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@codspeed/vitest-plugin": "^5.2.0",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.58.2",
     "@testing-library/dom": "^10.4.1",
@@ -52,6 +52,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^2.0.5"
+    "vitest": "^3.2.4"
   }
 }

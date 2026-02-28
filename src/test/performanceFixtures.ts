@@ -221,45 +221,6 @@ export function generateLogContent(
 }
 
 /**
- * Memory profiler helper: takes a snapshot before and after an operation.
- * Returns memory usage delta in MB.
- */
-export function profileMemoryUsage(fn: () => void): {
-  heapUsedDelta: number;
-  externalDelta: number;
-  arrayBuffersDelta: number;
-} {
-  // Force garbage collection before baseline if available
-  if (global.gc) {
-    global.gc();
-  }
-
-  const before = process.memoryUsage();
-  fn();
-  const after = process.memoryUsage();
-
-  return {
-    heapUsedDelta: (after.heapUsed - before.heapUsed) / 1024 / 1024, // MB
-    externalDelta: (after.external - before.external) / 1024 / 1024,
-    arrayBuffersDelta: (after.arrayBuffers - before.arrayBuffers) / 1024 / 1024,
-  };
-}
-
-/**
- * Get current memory usage snapshot in MB.
- */
-export function getMemorySnapshot() {
-  const mem = process.memoryUsage();
-  return {
-    heapUsed: mem.heapUsed / 1024 / 1024,
-    heapTotal: mem.heapTotal / 1024 / 1024,
-    external: mem.external / 1024 / 1024,
-    arrayBuffers: mem.arrayBuffers / 1024 / 1024,
-    rss: mem.rss / 1024 / 1024,
-  };
-}
-
-/**
  * Test data scale presets for consistent benchmarking.
  */
 export const PERF_TEST_SCALES = {

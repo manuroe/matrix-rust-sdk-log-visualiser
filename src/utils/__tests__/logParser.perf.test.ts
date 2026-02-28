@@ -1,9 +1,8 @@
 /**
  * Performance benchmarks for logParser.ts
- * Measures parse time and memory usage across different log file sizes.
+ * Measures parse time across different log file sizes.
  *
- * Run with: npm run test src/utils/__tests__/logParser.perf.test.ts -- --mode=bench
- * Or add --no-coverage to skip coverage reporting
+ * Run with: npm run bench
  */
 import { describe, bench } from 'vitest';
 import { parseAllHttpRequests, parseLogFile } from '../logParser';
