@@ -22,6 +22,8 @@ export default mergeConfig(
       },
       coverage: {
         provider: 'istanbul',
+        all: true,
+        include: ['src/**/*.{ts,tsx}'],
         reporter: ['text', 'html', 'lcov'],
         reportsDirectory: './coverage',
         exclude: [
