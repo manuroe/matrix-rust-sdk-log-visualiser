@@ -13,15 +13,16 @@ export function LandingPage() {
   const setRequests = useLogStore((state) => state.setRequests);
   const setHttpRequests = useLogStore((state) => state.setHttpRequests);
   const [demoError, setDemoError] = useState<AppError | null>(null);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const prNumber = import.meta.env.VITE_PR_NUMBER;
   const githubUrl = prNumber
     ? `https://github.com/manuroe/matrix-rust-sdk-log-visualiser/pull/${prNumber}`
     : 'https://github.com/manuroe/matrix-rust-sdk-log-visualiser';
 
-  const handleLoadDemo = async (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleLoadDemo = async () => {
     setDemoError(null);
+    setDemoLoading(true);
     try {
       const response = await fetch(`${import.meta.env.BASE_URL}demo/demo.log`);
       if (!response.ok) {
@@ -35,6 +36,8 @@ export function LandingPage() {
       void navigate('/summary');
     } catch (error) {
       setDemoError(wrapError(error, 'Failed to load demo. Please try again.'));
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -47,9 +50,9 @@ export function LandingPage() {
         className={uploadStyles.dropZoneError}
       />
       <div className={uploadStyles.dropZoneFooter}>
-        <a href="#" onClick={(e) => { void handleLoadDemo(e); }}>
+        <button type="button" onClick={() => { void handleLoadDemo(); }} disabled={demoLoading}>
           Try with demo logs
-        </a>
+        </button>
         {' · '}
         <a href={githubUrl} target="_blank" rel="noopener noreferrer">
           View on GitHub

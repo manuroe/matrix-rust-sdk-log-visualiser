@@ -46,7 +46,7 @@ describe('LandingPage', () => {
     renderLandingPage();
 
     expect(screen.getByTestId('file-upload')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /try with demo logs/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try with demo logs/i })).toBeInTheDocument();
   });
 
   it('renders the GitHub link', () => {
@@ -62,7 +62,7 @@ describe('LandingPage', () => {
 
     renderLandingPage();
 
-    fireEvent.click(screen.getByRole('link', { name: /try with demo logs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId('summary-view')).toBeInTheDocument();
@@ -74,14 +74,14 @@ describe('LandingPage', () => {
 
     renderLandingPage();
 
-    fireEvent.click(screen.getByRole('link', { name: /try with demo logs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/failed to load demo/i)).toBeInTheDocument();
     });
 
-    // Link should be re-enabled after error
-    expect(screen.getByRole('link', { name: /try with demo logs/i })).toBeInTheDocument();
+    // Button should be re-enabled after error
+    expect(screen.getByRole('button', { name: /try with demo logs/i })).not.toBeDisabled();
   });
 
   it('shows an error message when the server returns a non-ok response', async () => {
@@ -89,7 +89,7 @@ describe('LandingPage', () => {
 
     renderLandingPage();
 
-    fireEvent.click(screen.getByRole('link', { name: /try with demo logs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/failed to load demo/i)).toBeInTheDocument();

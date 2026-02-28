@@ -49,7 +49,7 @@ async function waitForServer(url: string, timeoutMs = 15_000): Promise<void> {
 
 const server = spawn(VITE_BIN, ['preview', '--port', String(PORT), '--base', '/'], {
   cwd: ROOT,
-  stdio: 'pipe',
+  stdio: 'inherit',
 });
 
 async function main(): Promise<void> {
