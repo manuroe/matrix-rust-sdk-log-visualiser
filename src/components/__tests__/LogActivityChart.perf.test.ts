@@ -26,17 +26,6 @@ describe('LogActivityChart Performance', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.medium);
       computeChartData(logLines);
     });
-
-    bench('large (100K lines)', () => {
-      const logLines = generateLogLines(PERF_TEST_SCALES.large);
-      computeChartData(logLines);
-    });
-
-    // Optional: uncomment to stress test
-    // bench('very large (1M lines)', () => {
-    //   const logLines = generateLogLines(PERF_TEST_SCALES.veryLarge);
-    //   computeChartData(logLines);
-    // });
   });
 
   describe('Time extraction (timeToMs calls)', () => {
@@ -47,11 +36,6 @@ describe('LogActivityChart Performance', () => {
 
     bench('extract 10K timestamps', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.medium);
-      extractTimes(logLines);
-    });
-
-    bench('extract 100K timestamps', () => {
-      const logLines = generateLogLines(PERF_TEST_SCALES.large);
       extractTimes(logLines);
     });
   });

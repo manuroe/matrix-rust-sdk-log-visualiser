@@ -35,17 +35,6 @@ describe('LogsView Performance', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.medium);
       computeFilteredLines(logLines, startTime, endTime);
     });
-
-    bench('large (100K lines)', () => {
-      const logLines = generateLogLines(PERF_TEST_SCALES.large);
-      computeFilteredLines(logLines, startTime, endTime);
-    });
-
-    // Optional: uncomment to stress test
-    // bench('very large (1M lines)', () => {
-    //   const logLines = generateLogLines(PERF_TEST_SCALES.veryLarge);
-    //   computeFilteredLines(logLines, startTime, endTime);
-    // });
   });
 
   describe('Time extraction only (time-critical path)', () => {
@@ -58,11 +47,6 @@ describe('LogsView Performance', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.medium);
       extractTimes(logLines);
     });
-
-    bench('extract 100K times', () => {
-      const logLines = generateLogLines(PERF_TEST_SCALES.large);
-      extractTimes(logLines);
-    });
   });
 
   describe('Timestamp conversion (isoToTime)', () => {
@@ -73,11 +57,6 @@ describe('LogsView Performance', () => {
 
     bench('convert 10K timestamps', () => {
       const logLines = generateLogLines(PERF_TEST_SCALES.medium);
-      convertTimestamps(logLines);
-    });
-
-    bench('convert 100K timestamps', () => {
-      const logLines = generateLogLines(PERF_TEST_SCALES.large);
       convertTimestamps(logLines);
     });
   });

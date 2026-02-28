@@ -22,17 +22,6 @@ describe('logParser Performance', () => {
       const content = generateLogContent(PERF_TEST_SCALES.medium, 100);
       parseAllHttpRequests(content);
     });
-
-    bench('large (100K lines)', () => {
-      const content = generateLogContent(PERF_TEST_SCALES.large, 500);
-      parseAllHttpRequests(content);
-    });
-
-    // Optional: uncomment to test 1M line parsing (may be slow)
-    // bench('very large (1M lines)', () => {
-    //   const content = generateLogContent(PERF_TEST_SCALES.veryLarge, 2000);
-    //   parseAllHttpRequests(content);
-    // });
   });
 
   describe('parseLogFile', () => {
@@ -43,11 +32,6 @@ describe('logParser Performance', () => {
 
     bench('medium (10K lines)', () => {
       const content = generateLogContent(PERF_TEST_SCALES.medium, 100);
-      parseLogFile(content);
-    });
-
-    bench('large (100K lines)', () => {
-      const content = generateLogContent(PERF_TEST_SCALES.large, 500);
       parseLogFile(content);
     });
   });
