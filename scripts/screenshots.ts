@@ -89,6 +89,8 @@ async function main(): Promise<void> {
   await demoTrigger.click();
   await page.waitForURL(/\/#\/summary/, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
+  // Extra wait for charts to finish rendering after navigation
+  await page.waitForTimeout(600);
 
   // Summary
   await shot('summary-light');
