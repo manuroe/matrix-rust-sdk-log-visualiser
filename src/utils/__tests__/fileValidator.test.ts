@@ -91,6 +91,13 @@ describe('fileValidator', () => {
       expect(decoded).toBe('test');
     });
 
+    it('strips UTF-16 BOM before decoding', () => {
+      // 0xFF 0xFE = UTF-16 LE BOM, followed by plain ASCII bytes decodable as UTF-8
+      const bomBytes = new Uint8Array([0xff, 0xfe, ...new TextEncoder().encode('test')]);
+      const decoded = decodeTextBytes(bomBytes, 'utf-8');
+      expect(decoded).toBe('test');
+    });
+
     it('handles lenient UTF-8 decode on error', () => {
       const invalidUtf8 = new Uint8Array([0x74, 0x65, 0x73, 0x74, 0xff, 0xfe]);
       const decoded = decodeTextBytes(invalidUtf8, 'utf-8');
