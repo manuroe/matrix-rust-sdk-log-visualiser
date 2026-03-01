@@ -50,8 +50,6 @@ export function useUrlRequestAutoScroll(
         const requestIndex = filteredRequests.findIndex(r => r.requestId === reqId);
         const request = filteredRequests.find(r => r.requestId === reqId);
 
-        if (requestIndex === -1) return;
-
         const checkAndScroll = () => {
           const leftPanel = leftPanelRef.current;
 

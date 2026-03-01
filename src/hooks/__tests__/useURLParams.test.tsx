@@ -46,6 +46,11 @@ describe('parseStatusParam', () => {
     const result = parseStatusParam('400,,500');
     expect(result).toEqual(new Set(['400', '500']));
   });
+
+  it('returns null when all segments are empty after trimming', () => {
+    const result = parseStatusParam(',  ,');
+    expect(result).toBeNull();
+  });
 });
 
 describe('useURLParams', () => {
@@ -82,6 +87,22 @@ describe('useURLParams', () => {
       });
 
       expect(result.current.scale).toBe(50);
+    });
+
+    it('falls back to default scale when scale param is zero', () => {
+      const { result } = renderHook(() => useURLParams(), {
+        wrapper: createWrapper(['/?scale=0']),
+      });
+
+      expect(result.current.scale).toBe(10); // DEFAULT_MS_PER_PIXEL
+    });
+
+    it('falls back to default scale when scale param is negative', () => {
+      const { result } = renderHook(() => useURLParams(), {
+        wrapper: createWrapper(['/?scale=-5']),
+      });
+
+      expect(result.current.scale).toBe(10); // DEFAULT_MS_PER_PIXEL
     });
 
     it('reads status param as Set', () => {
@@ -255,6 +276,56 @@ describe('useURLParams', () => {
       expect(result.current.start).toBe('2025-01-01');
       expect(result.current.filter).toBe('sync');
       expect(result.current.scale).toBe(50);
+    });
+
+    it('setTimeoutFilter sets timeout param', () => {
+      const { result } = renderHook(() => useURLParams(), {
+        wrapper: createWrapper(['/']),
+      });
+
+      act(() => {
+        result.current.setTimeoutFilter(30000);
+      });
+
+      expect(result.current.timeout).toBe(30000);
+    });
+
+    it('setTimeoutFilter with null clears timeout param', () => {
+      const { result } = renderHook(() => useURLParams(), {
+        wrapper: createWrapper(['/?timeout=5000']),
+      });
+
+      act(() => {
+        result.current.setTimeoutFilter(null);
+      });
+
+      expect(result.current.timeout).toBeNull();
+    });
+  });
+
+  describe('timeout param parsing', () => {
+    it('reads timeout param as number', () => {
+      const { result } = renderHook(() => useURLParams(), {
+        wrapper: createWrapper(['/?timeout=5000']),
+      });
+
+      expect(result.current.timeout).toBe(5000);
+    });
+
+    it('returns null for absent timeout param', () => {
+      const { result } = renderHook(() => useURLParams(), {
+        wrapper: createWrapper(['/']),
+      });
+
+      expect(result.current.timeout).toBeNull();
+    });
+
+    it('returns null when timeout param is NaN', () => {
+      const { result } = renderHook(() => useURLParams(), {
+        wrapper: createWrapper(['/?timeout=invalid']),
+      });
+
+      expect(result.current.timeout).toBeNull();
     });
   });
 });
