@@ -95,7 +95,11 @@ describe('logGapManager', () => {
       expect(result.map((r) => r.data.index)).toEqual([3, 4, 5, 6, 7, 8]);
     });
 
-    it('reduces remaining gap based on displayed neighbors', () => {
+    it('remainingGap always mirrors gapSize (field reserved for future use)', () => {
+      // Design note: remainingGap is intentionally equal to gapSize at all times.
+      // The field is reserved for future "count visible neighbours" semantics and
+      // no code currently sets it to a value other than gapSize. Do not assert
+      // remainingGap < gapSize here: that would be a false expectation.
       const filtered = makeFilteredLines([0, 10]);
       const raw = makeRawLines(15);
       const forcedRanges: ForcedRange[] = [{ start: 1, end: 4 }];
@@ -223,6 +227,51 @@ describe('logGapManager', () => {
       );
 
       expect(result).toEqual([{ start: 12, end: 15 }]);
+    });
+
+    it('returns original ranges when totalGap is zero (adjacent displayed lines)', () => {
+      // displayedIndices [4, 5] makes adjacent lines → up gap for line 5 has totalGap = 0
+      const displayedIndices = [4, 5];
+      const forcedRanges: ForcedRange[] = [];
+
+      const result = calculateGapExpansion('up-5', 'all', displayedIndices, 10, forcedRanges);
+
+      // No room to expand, should return the original reference unchanged
+      expect(result).toBe(forcedRanges);
+    });
+
+    it('returns full gap for next-match on an up-gap (isDownGap=false branch)', () => {
+      // 'next-match' with isUpGap=true should fall into the else branch (L269)
+      const displayedIndices = [3, 10];
+      const forcedRanges: ForcedRange[] = [];
+
+      const result = calculateGapExpansion(
+        'up-10',
+        'next-match',
+        displayedIndices,
+        20,
+        forcedRanges
+      );
+
+      // When isDownGap is false, returns the full up-gap: start = prevIndex+1 = 4, end = anchorIndex = 10
+      expect(result).toEqual([{ start: 4, end: 10 }]);
+    });
+
+    it('returns full gap for prev-match on a down-gap (isUpGap=false branch)', () => {
+      // 'prev-match' with isDownGap=true should fall into the else branch (L284)
+      const displayedIndices = [3, 15];
+      const forcedRanges: ForcedRange[] = [];
+
+      const result = calculateGapExpansion(
+        'down-3',
+        'prev-match',
+        displayedIndices,
+        20,
+        forcedRanges
+      );
+
+      // When isUpGap is false, returns the full down-gap: start = anchorIndex+1 = 4, end = nextIndex = 15
+      expect(result).toEqual([{ start: 4, end: 15 }]);
     });
   });
 

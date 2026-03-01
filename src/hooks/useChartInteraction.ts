@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect, type MouseEvent } from 'react';
 import { localPoint } from '@visx/event';
 import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_MILLISECOND } from '../types/time.types';
+import { xToTime, snapToEdge } from '../utils/chartUtils';
 
 interface SelectionPoint {
   x: number;
@@ -75,9 +76,7 @@ export function useChartInteraction<TBucket>({
       if (x < 0 || x > xMax) return;
 
       // Calculate time at click position
-      const progress = x / xMax;
-      const timeRange = (maxTime ?? 0) - (minTime ?? 0);
-      const clickTime = (minTime ?? 0) + progress * timeRange;
+      const clickTime = xToTime(x, xMax, (minTime ?? 0) as TimestampMicros, (maxTime ?? 0) as TimestampMicros);
 
       // Start selection mode
       setIsSelecting(true);
@@ -105,8 +104,13 @@ export function useChartInteraction<TBucket>({
     // time span of min/maxTime (handles the case where the user drags to the
     // first/last visible bar but the computed time is slightly inside the bucket).
     const bucketTimeSpan = xMax > 0 ? (xScaleStep / xMax) * ((maxTime ?? 0) - (minTime ?? 0)) : 0;
-    const startTime = rawStart - (minTime ?? 0) < bucketTimeSpan ? (minTime as TimestampMicros) : rawStart;
-    const endTime = (maxTime ?? 0) - rawEnd < bucketTimeSpan ? (maxTime as TimestampMicros) : rawEnd;
+    const [startTime, endTime] = snapToEdge(
+      rawStart,
+      rawEnd,
+      (minTime ?? 0) as TimestampMicros,
+      (maxTime ?? 0) as TimestampMicros,
+      bucketTimeSpan
+    );
 
     // Only apply if there's a meaningful range (> 100ms = 100,000 microseconds)
     if (endTime - startTime > 100 * MICROS_PER_MILLISECOND && onTimeRangeSelected) {
@@ -161,9 +165,7 @@ export function useChartInteraction<TBucket>({
       }
 
       // Calculate actual cursor time based on position
-      const progress = x / xMax;
-      const timeRange = (maxTime ?? 0) - (minTime ?? 0);
-      const cursorTime = (minTime ?? 0) + progress * timeRange;
+      const cursorTime = xToTime(x, xMax, (minTime ?? 0) as TimestampMicros, (maxTime ?? 0) as TimestampMicros);
 
       if (isSelecting) {
         // Selection mode: update end cursor position

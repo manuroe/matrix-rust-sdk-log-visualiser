@@ -4,6 +4,15 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { BurgerMenu } from '../BurgerMenu';
 import { useLogStore } from '../../stores/logStore';
 
+// Bypass zustand persist middleware to avoid localStorage issues in tests
+vi.mock('zustand/middleware', async (importOriginal) => {
+  const original = await importOriginal<typeof import('zustand/middleware')>();
+  return {
+    ...original,
+    persist: (fn: (...args: unknown[]) => unknown) => fn,
+  };
+});
+
 // Track navigation calls
 const navigateMock = vi.fn();
 let currentSearchParams = new URLSearchParams();
@@ -140,6 +149,125 @@ describe('BurgerMenu', () => {
       fireEvent.click(screen.getByText('Summary'));
 
       // Menu should be closed (dropdown no longer visible)
+      expect(screen.queryByText('Summary')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('New Session', () => {
+    it('navigates to "/" when New Session is clicked', () => {
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      fireEvent.click(screen.getByText('New Session'));
+
+      expect(navigateMock).toHaveBeenCalledWith('/');
+    });
+
+    it('clears store data when New Session is clicked', () => {
+      useLogStore.setState({ startTime: 'last-hour', endTime: 'end' });
+
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      fireEvent.click(screen.getByText('New Session'));
+
+      // Store should be cleared
+      expect(useLogStore.getState().allRequests).toEqual([]);
+    });
+
+    it('closes menu after New Session', () => {
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      expect(screen.getByText('New Session')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('New Session'));
+      expect(screen.queryByText('New Session')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Theme Buttons', () => {
+    it('renders theme buttons when menu is open', () => {
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+
+      expect(screen.getByRole('button', { name: /system theme/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /light theme/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /dark theme/i })).toBeInTheDocument();
+    });
+
+    it('sets light theme when Light theme button is clicked', () => {
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      fireEvent.click(screen.getByRole('button', { name: /light theme/i }));
+
+      // Menu should still be open (theme change doesn't close menu)
+      expect(screen.getByRole('button', { name: /dark theme/i })).toBeInTheDocument();
+    });
+
+    it('sets dark theme when Dark theme button is clicked', () => {
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      fireEvent.click(screen.getByRole('button', { name: /dark theme/i }));
+
+      expect(screen.getByRole('button', { name: /dark theme/i })).toBeInTheDocument();
+    });
+
+    it('sets system theme when System theme button is clicked', () => {
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      fireEvent.click(screen.getByRole('button', { name: /system theme/i }));
+
+      expect(screen.getByRole('button', { name: /system theme/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Close on outside click', () => {
+    it('closes menu when clicking outside', () => {
+      render(
+        <div>
+          <MemoryRouter>
+            <BurgerMenu />
+          </MemoryRouter>
+          <div data-testid="outside">outside</div>
+        </div>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      expect(screen.getByText('Summary')).toBeInTheDocument();
+
+      fireEvent.mouseDown(screen.getByTestId('outside'));
       expect(screen.queryByText('Summary')).not.toBeInTheDocument();
     });
   });

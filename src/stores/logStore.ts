@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import type { HttpRequest, SyncRequest, ParsedLogLine } from '../types/log.types';
-import { calculateTimeRangeMicros } from '../utils/timeUtils';
 import { wrapError, type AppError } from '../utils/errorHandling';
 import { DEFAULT_MS_PER_PIXEL } from '../utils/timelineUtils';
+import { filterSyncRequests, filterHttpRequests } from '../utils/requestFilters';
 
 interface LogStore {
   // Sync-specific state
@@ -207,91 +207,25 @@ export const useLogStore = create<LogStore>((set, get) => ({
 
   filterRequests: () => {
     const { allRequests, rawLogLines, selectedConnId, showIncomplete, selectedTimeout, statusCodeFilter, startTime, endTime } = get();
-    
-    // Calculate time range if filters are set (in microseconds)
-    let timeRangeUs: { startUs: number; endUs: number } | null = null;
-    if (startTime || endTime) {
-      // Find min/max time from rawLogLines
-      const times = rawLogLines.map((l) => l.timestampUs).filter((t) => t > 0);
-      const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
-      const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
-      
-      // Calculate time range relative to the log's time boundaries
-      timeRangeUs = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
-    }
-    
-    const filtered = allRequests.filter((r) => {
-      // Connection filter
-      if (selectedConnId && r.connId !== selectedConnId) return false;
-
-      // Timeout filter
-      if (selectedTimeout !== null && r.timeout !== selectedTimeout) return false;
-      
-      // Incomplete filter
-      if (!showIncomplete && !r.status) return false;
-      
-      // Status code filter (null = all enabled)
-      if (statusCodeFilter !== null) {
-        const statusKey = r.status || 'Incomplete';
-        if (!statusCodeFilter.has(statusKey)) return false;
-      }
-      
-      // Time filter
-      if (timeRangeUs && r.responseLineNumber) {
-        const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
-        if (responseLine && responseLine.timestampUs) {
-          if (responseLine.timestampUs < timeRangeUs.startUs || responseLine.timestampUs > timeRangeUs.endUs) {
-            return false;
-          }
-        }
-      }
-      
-      return true;
+    const filtered = filterSyncRequests(allRequests, rawLogLines, {
+      selectedConnId,
+      showIncomplete,
+      selectedTimeout,
+      statusCodeFilter,
+      startTime,
+      endTime,
     });
     set({ filteredRequests: filtered });
   },
-  
+
   filterHttpRequests: () => {
     const { allHttpRequests, rawLogLines, showIncompleteHttp, statusCodeFilter, uriFilter, startTime, endTime } = get();
-    
-    // Calculate time range if filters are set (in microseconds)
-    let timeRangeUs: { startUs: number; endUs: number } | null = null;
-    if (startTime || endTime) {
-      // Find min/max time from rawLogLines
-      const times = rawLogLines.map((l) => l.timestampUs).filter((t) => t > 0);
-      const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
-      const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
-      
-      // Calculate time range relative to the log's time boundaries
-      timeRangeUs = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
-    }
-    
-    const filtered = allHttpRequests.filter((r) => {
-      // Incomplete filter
-      if (!showIncompleteHttp && !r.status) return false;
-      
-      // Status code filter (null = all enabled)
-      if (statusCodeFilter !== null) {
-        const statusKey = r.status || 'Incomplete';
-        if (!statusCodeFilter.has(statusKey)) return false;
-      }
-      
-      // URI filter (case-insensitive substring match)
-      if (uriFilter && uriFilter.length > 0) {
-        if (!r.uri.toLowerCase().includes(uriFilter.toLowerCase())) return false;
-      }
-      
-      // Time filter
-      if (timeRangeUs && r.responseLineNumber) {
-        const responseLine = rawLogLines.find(l => l.lineNumber === r.responseLineNumber);
-        if (responseLine && responseLine.timestampUs) {
-          if (responseLine.timestampUs < timeRangeUs.startUs || responseLine.timestampUs > timeRangeUs.endUs) {
-            return false;
-          }
-        }
-      }
-      
-      return true;
+    const filtered = filterHttpRequests(allHttpRequests, rawLogLines, {
+      showIncompleteHttp,
+      statusCodeFilter,
+      uriFilter,
+      startTime,
+      endTime,
     });
     set({ filteredHttpRequests: filtered });
   },

@@ -135,7 +135,7 @@ describe('App.tsx - URL Parameter Synchronization', () => {
       });
     });
 
-    it('case-insensitive filter matching via store logic', async () => {
+    it('stores the raw filter string from the URL without modification', async () => {
       const requests = createHttpRequests(5);
       const logLines = createParsedLogLines(10);
       useLogStore.getState().setHttpRequests(requests, logLines);

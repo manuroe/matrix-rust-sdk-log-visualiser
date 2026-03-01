@@ -81,33 +81,40 @@ describe('LogActivityChart', () => {
     expect(hasTimeFormat).toBe(true);
   });
 
-  it('displays tooltip with log level counts on mouse move', async () => {
+  it('displays tooltip with log level counts on mouse move', () => {
+    // createParsedLogLines cycles through ERROR/WARN/INFO/DEBUG/TRACE levels
     const logs = createParsedLogLines(100);
     const { container } = render(<LogActivityChart logLines={logs} />);
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
 
-    // Move mouse over the chart
+    // clientX=150 → adjustedX=100 (past marginLeft=50): falls on a real bucket
     fireEvent.mouseMove(overlay, { clientX: 150, clientY: 50 });
 
-    // Cursor line should be visible
-    await new Promise(resolve => setTimeout(resolve, 50));
-    const cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
-    expect(cursorLine).toBeInTheDocument();
+    // showTooltip fires in the same handleMouseMove call as setCursorX,
+    // so both state updates are synchronously applied by the time fireEvent returns.
+    // The tooltip div renders inline (not in a portal).
+    expect(screen.getByText(/^Total:/)).toBeInTheDocument();
+
+    // At least one log-level label should be present in the tooltip
+    const levelLabels = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
+    const hasLevel = levelLabels.some((l) => {
+      try { return screen.getByText(new RegExp(`^${l}:`)) !== null; } catch { return false; }
+    });
+    expect(hasLevel).toBe(true);
   });
 
-  it('shows total count in tooltip', async () => {
+  it('shows total count in tooltip (non-zero for a populated bucket)', () => {
     const logs = createParsedLogLines(50);
     const { container } = render(<LogActivityChart logLines={logs} />);
-
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
 
-    // Move mouse to trigger tooltip
     fireEvent.mouseMove(overlay, { clientX: 150, clientY: 50 });
 
-    // Verify cursor line is displayed
-    await new Promise(resolve => setTimeout(resolve, 50));
-    const cursorLine = container.querySelector('line[stroke-dasharray="4,2"]');
-    expect(cursorLine).toBeInTheDocument();
+    // Tooltip should render "Total: N" where N > 0
+    const totalEl = screen.getByText(/^Total:/);
+    expect(totalEl).toBeInTheDocument();
+    const totalNumber = parseInt(totalEl.textContent!.replace('Total:', '').trim());
+    expect(totalNumber).toBeGreaterThan(0);
   });
 
   it('renders bars for all log levels', () => {

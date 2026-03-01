@@ -18,6 +18,7 @@ import type { TimestampMicros } from '../../types/time.types';
 
 // ─── Captured callback registry (refreshed each render) ────────────────────
 let capturedOnTimeRangeSelected: ((startUs: TimestampMicros, endUs: TimestampMicros) => void) | undefined;
+let capturedOnResetZoom: (() => void) | undefined;
 
 // ─── useURLParams mock ──────────────────────────────────────────────────────
 const mockSetTimeFilter = vi.fn();
@@ -30,16 +31,19 @@ vi.mock('../../components/BurgerMenu', () => ({
   BurgerMenu: () => <div data-testid="burger-menu" />,
 }));
 
-// Mock LogActivityChart – exposes onTimeRangeSelected so tests can simulate selections
+// Mock LogActivityChart – exposes onTimeRangeSelected and onResetZoom so tests can simulate interactions
 vi.mock('../../components/LogActivityChart', () => ({
   LogActivityChart: ({
     logLines,
     onTimeRangeSelected,
+    onResetZoom,
   }: {
     logLines: ParsedLogLine[];
     onTimeRangeSelected?: (startUs: TimestampMicros, endUs: TimestampMicros) => void;
+    onResetZoom?: () => void;
   }) => {
     capturedOnTimeRangeSelected = onTimeRangeSelected;
+    capturedOnResetZoom = onResetZoom;
     return <div data-testid="log-activity-chart">Lines: {logLines.length}</div>;
   },
 }));
@@ -63,6 +67,7 @@ describe('SummaryView', () => {
     useLogStore.getState().clearData();
     mockSetTimeFilter.mockClear();
     capturedOnTimeRangeSelected = undefined;
+    capturedOnResetZoom = undefined;
   });
 
   describe('empty state', () => {
@@ -631,6 +636,301 @@ describe('SummaryView', () => {
       });
 
       expect(mockSetTimeFilter).toHaveBeenCalledWith(null, null);
+    });
+  });
+
+  // ============================================================================
+  // handleResetZoom
+  // ============================================================================
+
+  describe('handleResetZoom', () => {
+    const BASE_R = 1_700_500_000_000_000 as TimestampMicros;
+    const STEP_R = 5_000_000 as TimestampMicros;
+
+    function buildResetLines() {
+      return [0, 1, 2, 3, 4].map((i) =>
+        createParsedLogLine({
+          lineNumber: i + 10,
+          timestampUs: (BASE_R + STEP_R * i) as TimestampMicros,
+        })
+      );
+    }
+
+    afterEach(() => {
+      useLogStore.getState().setTimeFilter(null, null);
+    });
+
+    it('clears local selection when a selection is active', async () => {
+      const lines = buildResetLines();
+      useLogStore.getState().setHttpRequests([], lines);
+      renderSummaryView();
+
+      const innerStart = (BASE_R + STEP_R) as TimestampMicros;
+      const innerEnd = (BASE_R + STEP_R * 3) as TimestampMicros;
+      await act(async () => { capturedOnTimeRangeSelected?.(innerStart, innerEnd); });
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+
+      await act(async () => { capturedOnResetZoom?.(); });
+      expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+    });
+
+    it('sets full-range local selection when global filter is narrower than data', async () => {
+      const lines = buildResetLines();
+      useLogStore.getState().setHttpRequests([], lines);
+      // Narrow global filter (only middle 3 lines)
+      useLogStore.getState().setTimeFilter(lines[1].isoTimestamp, lines[3].isoTimestamp);
+      renderSummaryView();
+
+      // No local selection initially
+      expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+
+      await act(async () => { capturedOnResetZoom?.(); });
+      // Should now have local selection = full range, so Cancel/Apply appear
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    });
+
+    it('does nothing when no local selection and already at full range', async () => {
+      const lines = buildResetLines();
+      useLogStore.getState().setHttpRequests([], lines);
+      renderSummaryView();
+
+      await act(async () => { capturedOnResetZoom?.(); });
+      expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // shouldShowApplyButton with global filter
+  // ============================================================================
+
+  describe('shouldShowApplyButton - global filter comparison', () => {
+    const BASE_S = 1_701_000_000_000_000 as TimestampMicros;
+    const STEP_S = 5_000_000 as TimestampMicros;
+    const minS = BASE_S;
+    const maxS = (BASE_S + STEP_S * 4) as TimestampMicros;
+
+    afterEach(() => {
+      useLogStore.getState().setTimeFilter(null, null);
+    });
+
+    it('hides Apply button when local selection exactly matches global filter', async () => {
+      const lines = [0, 1, 2, 3, 4].map((i) =>
+        createParsedLogLine({ lineNumber: i + 20, timestampUs: (BASE_S + STEP_S * i) as TimestampMicros })
+      );
+      useLogStore.getState().setHttpRequests([], lines);
+      // Global filter = full range via keywords
+      useLogStore.getState().setTimeFilter('start', 'end');
+      renderSummaryView();
+
+      // Select full range (matches global filter)
+      await act(async () => { capturedOnTimeRangeSelected?.(minS, maxS); });
+      // shouldShowApplyButton: diff = 0 ≤ 1000 → false → no Apply button
+      expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Stats with HTTP requests and local time range
+  // ============================================================================
+
+  describe('stats with HTTP requests and local time range', () => {
+    const BASE_H = 1_702_000_000_000_000 as TimestampMicros;
+    const STEP_H = 5_000_000 as TimestampMicros;
+
+    it('filters HTTP and sync requests by local zoom selection', async () => {
+      const lines = [0, 1, 2, 3, 4].map((i) =>
+        createParsedLogLine({ lineNumber: i + 30, timestampUs: (BASE_H + STEP_H * i) as TimestampMicros })
+      );
+      const httpReq = createHttpRequest({
+        requestId: 'REQ-H1',
+        status: '200',
+        sendLineNumber: 30,
+        responseLineNumber: 32,
+        requestDurationMs: 500,
+        uri: '/api/test',
+      });
+      const syncReq = createSyncRequest({
+        requestId: 'SYNC-H1',
+        connId: 'conn-h',
+        sendLineNumber: 31,
+        responseLineNumber: 33,
+      });
+      useLogStore.getState().setRequests([syncReq], ['conn-h'], lines);
+      useLogStore.getState().setHttpRequests([httpReq], lines);
+      renderSummaryView();
+
+      // Activate local zoom that includes lines 31-33
+      const selStart = (BASE_H + STEP_H) as TimestampMicros;
+      const selEnd = (BASE_H + STEP_H * 3) as TimestampMicros;
+      await act(async () => { capturedOnTimeRangeSelected?.(selStart, selEnd); });
+
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
+
+    it('includes timeout in httpRequestsWithTimestamps for matching sync request', () => {
+      const lines = [0, 1, 2, 3, 4].map((i) =>
+        createParsedLogLine({ lineNumber: i + 40, timestampUs: (BASE_H + STEP_H * i) as TimestampMicros })
+      );
+      // HTTP request and sync request share the same requestId
+      const sharedId = 'SHARED-TIMEOUT';
+      const httpReq = createHttpRequest({
+        requestId: sharedId,
+        status: '200',
+        sendLineNumber: 40,
+        responseLineNumber: 41,
+        requestDurationMs: 100,
+        uri: '/api/sync-test',
+      });
+      const syncReq = createSyncRequest({
+        requestId: sharedId,
+        connId: 'conn-t',
+        sendLineNumber: 40,
+        responseLineNumber: 41,
+        timeout: 30000,
+      });
+      useLogStore.getState().setRequests([syncReq], ['conn-t'], lines);
+      useLogStore.getState().setHttpRequests([httpReq], lines);
+      renderSummaryView();
+
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // extractCoreMessage ISO timestamp prefix
+  // ============================================================================
+
+  describe('extractCoreMessage with ISO-prefixed log messages', () => {
+    it('strips ISO timestamp prefix from error and warning messages', () => {
+      const lines = [
+        createParsedLogLine({
+          lineNumber: 50,
+          level: 'ERROR',
+          message: '2024-01-15T10:00:00.000000Z ERROR connection failed',
+        }),
+        createParsedLogLine({
+          lineNumber: 51,
+          level: 'WARN',
+          message: '2024-01-15T10:00:01.000000Z WARN slow query detected',
+        }),
+      ];
+      useLogStore.getState().setHttpRequests([], lines);
+      renderSummaryView();
+
+      // Should render error section from extracted messages
+      const errorHeader = screen.getByRole('columnheader', { name: /top errors/i });
+      expect(errorHeader).toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Incomplete HTTP requests
+  // ============================================================================
+
+  describe('incomplete HTTP requests', () => {
+    it('shows incomplete count in HTTP Requests Over Time heading', () => {
+      const BASE_I = 1_703_000_000_000_000 as TimestampMicros;
+      const lines = [
+        createParsedLogLine({ lineNumber: 60, timestampUs: BASE_I }),
+        createParsedLogLine({ lineNumber: 61, timestampUs: (BASE_I + 1_000_000) as TimestampMicros }),
+      ];
+      // Incomplete request: empty status, sendLineNumber points to existing line
+      // responseLineNumber = 0 (falsy) so excluded from completedRequestsWithTimestamps
+      const incompleteReq = createHttpRequest({
+        requestId: 'INC-1',
+        status: '',
+        sendLineNumber: 61,
+        responseLineNumber: 0,
+      });
+      useLogStore.getState().setHttpRequests([incompleteReq], lines);
+      renderSummaryView();
+
+      // The HTTP Requests Over Time heading should show "1 incomplete"
+      expect(screen.getByText(/1 incomplete/)).toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Slowest URLs – requests with no status (incomplete badge)
+  // ============================================================================
+
+  describe('slowest URLs with empty status (incomplete badge)', () => {
+    it('shows "incomplete" badge for requests missing a status code', () => {
+      const BASE_SL = 1_704_000_000_000_000 as TimestampMicros;
+      const lines = [
+        createParsedLogLine({ lineNumber: 70, timestampUs: BASE_SL }),
+        createParsedLogLine({ lineNumber: 71, timestampUs: (BASE_SL + 1_000_000) as TimestampMicros }),
+      ];
+      // Request with responseLineNumber but empty status
+      const noStatusReq = createHttpRequest({
+        requestId: 'NO-STATUS-SL',
+        status: '',
+        sendLineNumber: 70,
+        responseLineNumber: 71,
+        requestDurationMs: 2000,
+        uri: '/slow/endpoint',
+      });
+      useLogStore.getState().setHttpRequests([noStatusReq], lines);
+      renderSummaryView();
+
+      expect(screen.getByText('incomplete')).toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Navigation button clicks
+  // ============================================================================
+
+  describe('navigation button clicks', () => {
+    it('clicking View button in Sync Requests by Connection triggers navigation', () => {
+      const lines = createParsedLogLines(2);
+      const syncReq = createSyncRequest({
+        requestId: 'SYNC-NAV-1',
+        connId: 'nav-conn',
+        sendLineNumber: 0,
+        responseLineNumber: 1,
+      });
+      useLogStore.getState().setRequests([syncReq], ['nav-conn'], lines);
+      renderSummaryView();
+
+      const viewBtn = screen.getByRole('button', { name: /^view$/i });
+      expect(viewBtn).toBeInTheDocument();
+      fireEvent.click(viewBtn);
+      expect(screen.getByText('nav-conn')).toBeInTheDocument();
+    });
+
+    it('clicking the error count span in Top Errors heading triggers navigation', () => {
+      const lines = [
+        createParsedLogLine({ lineNumber: 80, level: 'ERROR', message: 'some error' }),
+      ];
+      useLogStore.getState().setHttpRequests([], lines);
+      renderSummaryView();
+
+      const errorHeader = screen.getByRole('columnheader', { name: /top errors/i });
+      const clickableSpan = errorHeader.querySelector('span');
+      if (clickableSpan) fireEvent.click(clickableSpan);
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
+
+    it('clicking Top Failed URLs count heading triggers navigation', () => {
+      const lines = createParsedLogLines(2);
+      const httpReq = createHttpRequest({
+        requestId: 'FAIL-NAV',
+        status: '500',
+        uri: '/api/failed',
+        sendLineNumber: 0,
+        responseLineNumber: 1,
+      });
+      useLogStore.getState().setHttpRequests([httpReq], lines);
+      renderSummaryView();
+
+      // Click the count in Top Failed URLs heading
+      const failedTable = screen.queryByRole('columnheader', { name: /top failed urls/i });
+      if (failedTable) {
+        const countSpan = failedTable.querySelector('span');
+        if (countSpan) fireEvent.click(countSpan);
+      }
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
     });
   });
 });

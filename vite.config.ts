@@ -34,7 +34,21 @@ export default mergeConfig(
           'scripts/**',
           'vite.config.ts',
           'eslint.config.js',
+          'src/main.tsx', // bootstrap entry point — no testable logic
         ],
+        thresholds: {
+          // Per-folder floors based on current coverage — do not regress below these.
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          'src/utils/**': { statements: 92, branches: 87, functions: 94, lines: 93 },
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          'src/stores/**': { statements: 90, branches: 69, functions: 100, lines: 92 },
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          'src/hooks/**': { statements: 98, branches: 95, functions: 100, lines: 98 },
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          'src/components/**': { statements: 95, branches: 89, functions: 92, lines: 97 },
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          'src/views/**': { statements: 93, branches: 83, functions: 94, lines: 95 },
+        },
       },
     },
   })

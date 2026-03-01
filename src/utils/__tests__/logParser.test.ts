@@ -185,18 +185,78 @@ describe('logParser', () => {
         expect(result.httpRequests.map(r => r.requestId).sort()).toEqual(['REQ-1', 'REQ-2']);
       });
 
-      it('sorts requests by sendLineNumber', () => {
+      it('sorts requests by sendLineNumber, not by Map insertion order', () => {
+        // REQ-B response appears first (line 1) → inserted into Map first.
+        // REQ-A and REQ-C sends follow (lines 2-3).
+        // REQ-B send appears last (line 4), so its sendLineNumber is the highest.
+        //
+        // Map insertion order:         B, A, C
+        // Expected after sort by sendLineNumber: A(2), C(3), B(4)
+        //
+        // If the sort were absent the result would be [B, A, C], not [A, C, B].
         const content = [
-          SEND_LINE.replace('REQ-62', 'REQ-B'),
-          SEND_LINE.replace('REQ-62', 'REQ-A'),
-          SEND_LINE.replace('REQ-62', 'REQ-C'),
+          RESPONSE_LINE.replace('REQ-63', 'REQ-B'),  // line 1 — response only for B
+          SEND_LINE.replace('REQ-62', 'REQ-A'),      // line 2 — send for A
+          SEND_LINE.replace('REQ-62', 'REQ-C'),      // line 3 — send for C
+          SEND_LINE.replace('REQ-62', 'REQ-B'),      // line 4 — send for B (late)
         ].join('\n');
 
         const result = parseAllHttpRequests(content);
 
-        expect(result.httpRequests[0].requestId).toBe('REQ-B');
-        expect(result.httpRequests[1].requestId).toBe('REQ-A');
-        expect(result.httpRequests[2].requestId).toBe('REQ-C');
+        expect(result.httpRequests).toHaveLength(3);
+        expect(result.httpRequests[0].requestId).toBe('REQ-A'); // sendLineNumber=2
+        expect(result.httpRequests[1].requestId).toBe('REQ-C'); // sendLineNumber=3
+        expect(result.httpRequests[2].requestId).toBe('REQ-B'); // sendLineNumber=4
+      });
+    });
+
+    describe('regression: response before send (late-arriving send)', () => {
+      it('correctly pairs response-first with its subsequent send line', () => {
+        // In real logs the response occasionally appears before the send
+        // (e.g. when log buffering flushes out of order). The parser must
+        // handle this: the request should have both sendLineNumber and responseLineNumber.
+        const responseFirst = RESPONSE_LINE.replace('REQ-63', 'REQ-X');
+        const sendLater = SEND_LINE.replace('REQ-62', 'REQ-X');
+        const content = [responseFirst, sendLater].join('\n');
+
+        const result = parseAllHttpRequests(content);
+
+        expect(result.httpRequests).toHaveLength(1);
+        expect(result.httpRequests[0].requestId).toBe('REQ-X');
+        // Response at line 1, send at line 2
+        expect(result.httpRequests[0].responseLineNumber).toBe(1);
+        expect(result.httpRequests[0].sendLineNumber).toBe(2);
+        // Status and method are populated from the first seen line (response)
+        expect(result.httpRequests[0].status).toBe('200');
+        expect(result.httpRequests[0].method).toBe('POST');
+      });
+
+      it('does not duplicate the request when paired in reverse order', () => {
+        const responseFirst = RESPONSE_LINE.replace('REQ-63', 'REQ-Y');
+        const sendLater = SEND_LINE.replace('REQ-62', 'REQ-Y');
+        const content = [responseFirst, sendLater].join('\n');
+
+        const result = parseAllHttpRequests(content);
+
+        expect(result.httpRequests).toHaveLength(1);
+      });
+    });
+
+    describe('regression: duplicate request_id', () => {
+      it('uses the last send line number when the same request_id is sent twice', () => {
+        // If the client retransmits with the same ID, only the last send's line
+        // number is recorded (the Map is keyed by request_id and sendLineNumber
+        // is always overwritten). All other stable fields retain their first value.
+        const send1 = SEND_LINE.replace('REQ-62', 'DUPE');
+        const send2 = SEND_LINE.replace('REQ-62', 'DUPE');
+        const content = [send1, send2].join('\n');
+
+        const result = parseAllHttpRequests(content);
+
+        // Only one record in the result even though the same ID appeared twice
+        expect(result.httpRequests).toHaveLength(1);
+        // sendLineNumber should be from the second send (line 2)
+        expect(result.httpRequests[0].sendLineNumber).toBe(2);
       });
     });
 

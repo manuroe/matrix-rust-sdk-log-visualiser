@@ -14,6 +14,16 @@ import {
   filterValueToURL,
   urlToFilterValue,
   countRequestsForTimeRange,
+  formatTimestamp,
+  microsToMs,
+  msToMicros,
+  extractTimeFromISO,
+  escapeHtml,
+  isFullISODatetime,
+  msToISO,
+  isoToTime,
+  applyTimeRangeFilterMicros,
+  formatDuration,
 } from '../timeUtils';
 
 describe('Time Filter Utilities', () => {
@@ -276,6 +286,77 @@ describe('Time Filter Utilities', () => {
       expect(parseTimeInput('last-min')).toBe('last-min');
     });
   });
+
+  describe('formatTimestamp', () => {
+    const sampleMicros = isoToMicros('2024-06-15T12:34:56.123456Z');
+
+    it('returns empty string for zero micros', () => {
+      expect(formatTimestamp(0)).toBe('');
+    });
+
+    it('returns empty string for negative micros', () => {
+      // @ts-expect-error testing negative value path
+      expect(formatTimestamp(-1000)).toBe('');
+    });
+
+    it('formats HH:MM format', () => {
+      const result = formatTimestamp(sampleMicros, 'HH:MM');
+      expect(result).toBe('12:34');
+    });
+
+    it('formats HH:MM:SS format (default)', () => {
+      const result = formatTimestamp(sampleMicros, 'HH:MM:SS');
+      expect(result).toBe('12:34:56');
+    });
+
+    it('formats HH:MM:SS.us format', () => {
+      const result = formatTimestamp(sampleMicros, 'HH:MM:SS.us');
+      expect(result).toBe('12:34:56.123456');
+    });
+
+    it('formats ISO format', () => {
+      const result = formatTimestamp(sampleMicros, 'ISO');
+      expect(result).toBe('2024-06-15T12:34:56.123456Z');
+    });
+
+    it('uses HH:MM:SS as default format', () => {
+      expect(formatTimestamp(sampleMicros)).toBe('12:34:56');
+    });
+  });
+
+  describe('calculateTimeRangeMicros - keyword branches', () => {
+    const minUs = isoToMicros('2024-01-01T10:00:00.000000Z');
+    const maxUs = isoToMicros('2024-01-01T12:00:00.000000Z');
+
+    it('handles start keyword as start filter', () => {
+      const result = calculateTimeRangeMicros('start', null, minUs, maxUs);
+      expect(result.startUs).toBe(minUs);
+      expect(result.endUs).toBe(maxUs);
+    });
+
+    it('handles end keyword as end filter', () => {
+      const result = calculateTimeRangeMicros(null, 'end', minUs, maxUs);
+      expect(result.startUs).toBe(minUs);
+      expect(result.endUs).toBe(maxUs);
+    });
+
+    it('handles both start and end keywords', () => {
+      const result = calculateTimeRangeMicros('start', 'end', minUs, maxUs);
+      expect(result.startUs).toBe(minUs);
+      expect(result.endUs).toBe(maxUs);
+    });
+  });
+
+  describe('microsToISO edge cases', () => {
+    it('returns empty string for zero micros', () => {
+      expect(microsToISO(0)).toBe('');
+    });
+
+    it('returns empty string for null-ish input', () => {
+      // @ts-expect-error testing edge case
+      expect(microsToISO(null)).toBe('');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -306,6 +387,10 @@ describe('countRequestsForTimeRange', () => {
   });
 
   it('counts only completed requests in range + all incomplete when a filter is set', () => {
+    // Design intent: incomplete requests (responseLineNumber=0) are ALWAYS included regardless
+    // of the time window. They serve as the canonical denominator in stats display
+    // (e.g. “2 completed within window / 4 total including in-flight”), so the caller never
+    // under-counts the work that was in progress at the time of the snapshot.
     const rawLogLines = makeLines(10);
     // 2 completed inside window (lines 1, 3), 1 outside (line 7), 2 incomplete
     const requests = [makeReq(1), makeReq(3), makeReq(7), makeReq(0), makeReq(0)];
@@ -333,5 +418,225 @@ describe('countRequestsForTimeRange', () => {
     const rawLogLines = makeLines(5);
     const requests = [makeReq(0), makeReq(0), makeReq(0)];
     expect(countRequestsForTimeRange(requests, rawLogLines, null, null)).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// microsToMs / msToMicros
+// ---------------------------------------------------------------------------
+describe('microsToMs', () => {
+  it('converts microseconds to milliseconds (floor)', () => {
+    expect(microsToMs(1000)).toBe(1);
+    expect(microsToMs(1500)).toBe(1);
+    expect(microsToMs(2000000)).toBe(2000);
+  });
+
+  it('returns 0 for 0', () => {
+    expect(microsToMs(0)).toBe(0);
+  });
+});
+
+describe('msToMicros', () => {
+  it('converts milliseconds to microseconds', () => {
+    expect(msToMicros(1)).toBe(1000);
+    expect(msToMicros(2000)).toBe(2000000);
+  });
+
+  it('returns 0 for 0', () => {
+    expect(msToMicros(0)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractTimeFromISO / isoToTime
+// ---------------------------------------------------------------------------
+describe('extractTimeFromISO', () => {
+  it('extracts time portion from ISO string', () => {
+    expect(extractTimeFromISO('2026-01-26T16:01:13.382222Z')).toBe('16:01:13.382222');
+  });
+
+  it('extracts time without fractional seconds', () => {
+    expect(extractTimeFromISO('2026-01-26T09:30:00Z')).toBe('09:30:00');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(extractTimeFromISO('')).toBe('');
+  });
+
+  it('returns input as-is when no T delimiter', () => {
+    expect(extractTimeFromISO('not-an-iso-string')).toBe('not-an-iso-string');
+  });
+});
+
+describe('isoToTime (legacy wrapper)', () => {
+  it('delegates to extractTimeFromISO', () => {
+    expect(isoToTime('2026-01-26T16:01:13.382222Z')).toBe('16:01:13.382222');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(isoToTime('')).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isFullISODatetime
+// ---------------------------------------------------------------------------
+describe('isFullISODatetime', () => {
+  it('returns true for full ISO datetime strings', () => {
+    expect(isFullISODatetime('2026-01-26T16:01:13Z')).toBe(true);
+    expect(isFullISODatetime('2026-01-26T16:01:13.382222Z')).toBe(true);
+  });
+
+  it('returns false for time-only and shortcut strings', () => {
+    expect(isFullISODatetime('16:01:13')).toBe(false);
+    expect(isFullISODatetime('last-5-min')).toBe(false);
+    expect(isFullISODatetime('start')).toBe(false);
+    expect(isFullISODatetime('')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// msToISO (legacy wrapper)
+// ---------------------------------------------------------------------------
+describe('msToISO', () => {
+  it('converts milliseconds timestamp to ISO string', () => {
+    const ms = new Date('2026-01-26T16:01:13.000Z').getTime();
+    const result = msToISO(ms);
+    expect(result).toMatch(/^2026-01-26T16:01:13\./);
+  });
+
+  it('returns empty string for 0', () => {
+    expect(msToISO(0)).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// escapeHtml
+// ---------------------------------------------------------------------------
+describe('escapeHtml', () => {
+  it('escapes < and > characters', () => {
+    const result = escapeHtml('<script>alert("xss")</script>');
+    expect(result).toContain('&lt;');
+    expect(result).toContain('&gt;');
+    expect(result).not.toContain('<script>');
+  });
+
+  it('returns plain text unchanged', () => {
+    expect(escapeHtml('hello world')).toBe('hello world');
+  });
+
+  it('escapes ampersands', () => {
+    const result = escapeHtml('a & b');
+    expect(result).toContain('&amp;');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatDuration
+// ---------------------------------------------------------------------------
+describe('formatDuration', () => {
+  it('formats sub-second durations as integer ms', () => {
+    expect(formatDuration(500)).toBe('500ms');
+    expect(formatDuration(0)).toBe('0ms');
+    expect(formatDuration(999)).toBe('999ms');
+  });
+
+  it('formats durations >= 1000ms as seconds with 2 decimal places', () => {
+    expect(formatDuration(1000)).toBe('1.00s');
+    expect(formatDuration(1500)).toBe('1.50s');
+    expect(formatDuration(2750)).toBe('2.75s');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyTimeRangeFilterMicros
+// ---------------------------------------------------------------------------
+describe('applyTimeRangeFilterMicros', () => {
+  const BASE_US = new Date('2024-01-15T10:00:00Z').getTime() * 1000;
+  const SEC_US = 1_000_000;
+
+  const makeLines = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      lineNumber: i + 1,
+      timestampUs: BASE_US + i * SEC_US,
+    }));
+
+  const isoAt = (i: number) =>
+    new Date((BASE_US + i * SEC_US) / 1000).toISOString();
+
+  it('returns all requests when no filter set', () => {
+    const requests = [{ responseLineNumber: 1 }, { responseLineNumber: 2 }];
+    const result = applyTimeRangeFilterMicros(requests, makeLines(5), null, null);
+    expect(result).toHaveLength(2);
+  });
+
+  it('returns all requests when rawLogLines has no valid timestamps (defensive fallback)', () => {
+    // When there are no log lines to derive min/max times from,
+    // the function cannot filter by time and returns the input unchanged.
+    const emptyLines: Array<{ lineNumber: number; timestampUs: number }> = [];
+    const requests = [{ responseLineNumber: 1 }];
+    const result = applyTimeRangeFilterMicros(requests, emptyLines, isoAt(0), isoAt(4));
+    expect(result).toEqual(requests);
+  });
+
+  it('filters out requests whose response timestamp is outside the range', () => {
+    const rawLogLines = makeLines(10);
+    const requests = [
+      { responseLineNumber: 2 },  // line 2 → inside window [line1, line4]
+      { responseLineNumber: 4 },  // line 4 → inside
+      { responseLineNumber: 8 },  // line 8 → outside
+    ];
+    const result = applyTimeRangeFilterMicros(
+      requests,
+      rawLogLines,
+      isoAt(0),
+      isoAt(3)
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it('excludes incomplete requests (responseLineNumber === 0)', () => {
+    const rawLogLines = makeLines(5);
+    const requests = [{ responseLineNumber: 0 }, { responseLineNumber: 2 }];
+    const result = applyTimeRangeFilterMicros(requests, rawLogLines, isoAt(0), isoAt(4));
+    expect(result).toHaveLength(1);
+    expect(result[0].responseLineNumber).toBe(2);
+  });
+
+  it('handles end keyword as end filter', () => {
+    const rawLogLines = makeLines(5);
+    const requests = [{ responseLineNumber: 2 }, { responseLineNumber: 4 }];
+    const result = applyTimeRangeFilterMicros(requests, rawLogLines, isoAt(0), 'end');
+    expect(result).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseTimeInput — invalid ISO time-component branches
+// ---------------------------------------------------------------------------
+describe('parseTimeInput - invalid time component branches', () => {
+  it('rejects ISO with hour out of range (> 23)', () => {
+    expect(parseTimeInput('2026-01-26T25:00:00Z')).toBeNull();
+  });
+
+  it('rejects ISO with minute out of range (> 59)', () => {
+    expect(parseTimeInput('2026-01-26T10:61:00Z')).toBeNull();
+  });
+
+  it('rejects ISO with second out of range (> 59)', () => {
+    expect(parseTimeInput('2026-01-26T10:00:61Z')).toBeNull();
+  });
+
+  it('rejects time-only with hour out of range', () => {
+    expect(parseTimeInput('25:00:00')).toBeNull();
+  });
+
+  it('rejects time-only with minute out of range', () => {
+    expect(parseTimeInput('10:61:00')).toBeNull();
+  });
+
+  it('accepts valid ISO without trailing Z and appends Z', () => {
+    const result = parseTimeInput('2026-01-26T10:00:00');
+    expect(result).toBe('2026-01-26T10:00:00Z');
   });
 });
