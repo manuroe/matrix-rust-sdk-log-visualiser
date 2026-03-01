@@ -63,16 +63,18 @@ function createHttpRequest(
   const method = METHODS[lineNumber % METHODS.length];
   const uri = URIS[lineNumber % URIS.length];
   const status = Math.random() > 0.1 ? '200' : (Math.random() > 0.5 ? '400' : '500');
+  const reqSizeBytes = Math.floor(Math.random() * 2000) + 100;
+  const respSizeBytes = Math.floor(Math.random() * 5000) + 500;
 
   return {
     requestId,
     method,
     uri,
     status,
-    requestSizeString: `${Math.floor(Math.random() * 2000) + 100}B`,
-    responseSizeString: `${Math.floor(Math.random() * 5000) + 500}B`,
-    requestSize: Math.floor(Math.random() * 2000) + 100,
-    responseSize: Math.floor(Math.random() * 5000) + 500,
+    requestSizeString: `${reqSizeBytes}B`,
+    responseSizeString: `${respSizeBytes}B`,
+    requestSize: reqSizeBytes,
+    responseSize: respSizeBytes,
     requestDurationMs: durationMs,
     sendLineNumber: lineNumber,
     responseLineNumber: lineNumber + 1,

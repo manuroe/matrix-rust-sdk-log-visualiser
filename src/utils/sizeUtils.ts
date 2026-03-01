@@ -4,9 +4,10 @@
  */
 export function parseSizeString(sizeStr: string): number {
   if (!sizeStr) return 0;
-  const match = sizeStr.match(/^([0-9.]+)\s*([BbkKmMgG]?)$/);
+  const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([BbkKmMgG]?)$/);
   if (!match) return 0;
   const value = parseFloat(match[1]);
+  if (Number.isNaN(value)) return 0;
   const unit = match[2].toLowerCase();
   switch (unit) {
     case 'k': return Math.round(value * 1_024);

@@ -378,12 +378,17 @@ export function SummaryView() {
       .filter((item) => item.count > 0)
       .sort((a, b) => b.count - a.count);
 
-    // Sum uploaded and downloaded bytes from filtered HTTP requests
+    // Sum uploaded and downloaded bytes over all charted requests (completed + incomplete in range)
+    // to match the set represented by the chart and the request count headline.
+    const httpRequestById = new Map(allHttpRequests.map(r => [r.requestId, r]));
     let totalUploadBytes = 0;
     let totalDownloadBytes = 0;
-    filteredHttpRequests.forEach((req) => {
-      totalUploadBytes += req.requestSize;
-      totalDownloadBytes += req.responseSize;
+    httpRequestsWithTimestamps.forEach(({ requestId }) => {
+      const req = httpRequestById.get(requestId);
+      if (req) {
+        totalUploadBytes += req.requestSize;
+        totalDownloadBytes += req.responseSize;
+      }
     });
 
     return {
