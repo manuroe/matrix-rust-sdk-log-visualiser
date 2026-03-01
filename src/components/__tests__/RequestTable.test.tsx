@@ -34,7 +34,7 @@ vi.mock('../../hooks/useURLParams', () => ({
     setUriFilter: (filter: string | null) => {
       useLogStore.getState().setUriFilter(filter);
     },
-    setStatusFilter: (codes: string[]) => {
+    setStatusFilter: (codes: Set<string> | null) => {
       useLogStore.getState().setStatusFilter(codes);
     },
     setTimeFilter: () => {},

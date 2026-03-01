@@ -119,21 +119,8 @@ describe('useURLParams', () => {
 
   describe('writing params', () => {
     it('setTimeFilter updates start and end', () => {
-      // Use a component that exposes searchParams for verification
-      let currentParams: URLSearchParams | null = null;
-      
-      function TestComponent() {
-        const [params] = useSearchParams();
-        currentParams = params;
-        return null;
-      }
-
       const { result } = renderHook(
-        () => {
-          const urlParams = useURLParams();
-          // Also render our spy component
-          return urlParams;
-        },
+        () => useURLParams(),
         { wrapper: createWrapper(['/']) }
       );
 

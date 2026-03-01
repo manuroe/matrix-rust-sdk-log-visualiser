@@ -88,8 +88,8 @@ describe('LogsView', () => {
     ) as HTMLElement;
     
     const shownCount = parseInt(shownCountEl.textContent || '0');
-    expect(shownCount).toBeLessThan(100);
-    expect(shownCount).toBeGreaterThan(0);
+    // 100 logs at 1s intervals (0s–99s); filter 25s–75s inclusive → logs 25..75 = 51 logs
+    expect(shownCount).toBe(51);
   });
 
   it('shows total count as all raw logs regardless of filter', () => {
@@ -127,22 +127,6 @@ describe('LogsView', () => {
     expect(logsContainer).toBeInTheDocument();
 
     // The LogDisplayView should be present (contains log lines)
-    const logLines = container.querySelectorAll(`.${logDisplayStyles.logLine}`);
-    expect(logLines.length).toBeGreaterThan(0);
-  });
-
-  it('provides prevRequestLineRange and nextRequestLineRange props to LogDisplayView', () => {
-    const logs = createParsedLogLines(10);
-    useLogStore.setState({ rawLogLines: logs });
-
-    // Since LogDisplayView doesn't expose these props in the DOM, we verify indirectly
-    // by ensuring LogDisplayView renders without errors and can access them
-    const { container } = render(<LogsView />);
-    
-    const logsContainer = container.querySelector('.logs-view-container');
-    expect(logsContainer).toBeInTheDocument();
-    
-    // Verify LogDisplayView rendered (has at least one log line)
     const logLines = container.querySelectorAll(`.${logDisplayStyles.logLine}`);
     expect(logLines.length).toBeGreaterThan(0);
   });

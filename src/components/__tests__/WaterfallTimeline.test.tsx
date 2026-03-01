@@ -152,12 +152,11 @@ describe('WaterfallTimeline', () => {
       expect(width1171ms).toBeCloseTo(117.1, 1);
     });
 
-    it('getWaterfallBarWidth uses calculated width when larger than dynamic minimum', () => {
-      // 1000ms with good ratio should use calculated width, not minimum
+    it('getWaterfallBarWidth uses dynamic minimum when calculated width is smaller', () => {
+      // 1000ms with this ratio: calculated = (1000/10000)*800 = 80px
+      // Dynamic min = max(1, 1000/10) = 100px
+      // Calculated (80px) < dynamic min (100px) → dynamic min wins.
       const width = getWaterfallBarWidth(1000, 10000, 800);
-      // (1000 / 10000) * 800 = 80px (much larger than min of 100px would be)
-      // Dynamic min would be max(1, 1000/10) = 100px
-      // Calculated is 80px, so use dynamic min of 100px
       expect(width).toBe(100);
     });
 

@@ -378,6 +378,10 @@ describe('countRequestsForTimeRange', () => {
   });
 
   it('counts only completed requests in range + all incomplete when a filter is set', () => {
+    // Design intent: incomplete requests (responseLineNumber=0) are ALWAYS included regardless
+    // of the time window. They serve as the canonical denominator in stats display
+    // (e.g. “2 completed within window / 4 total including in-flight”), so the caller never
+    // under-counts the work that was in progress at the time of the snapshot.
     const rawLogLines = makeLines(10);
     // 2 completed inside window (lines 1, 3), 1 outside (line 7), 2 incomplete
     const requests = [makeReq(1), makeReq(3), makeReq(7), makeReq(0), makeReq(0)];

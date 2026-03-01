@@ -84,17 +84,30 @@ describe('ErrorBoundary', () => {
       expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
     });
 
-    it('Try Again button is present and clickable', () => {
+    it('Try Again button resets error state and re-renders children', () => {
+      // Use a mutable flag so we can stop throwing before the boundary re-renders
+      let shouldThrow = true;
+      function RecoverableChild() {
+        if (shouldThrow) throw new Error('Test error');
+        return <div>Recovered content</div>;
+      }
+
       render(
         <ErrorBoundary>
-          <ThrowingComponent shouldThrow />
+          <RecoverableChild />
         </ErrorBoundary>
       );
 
-      const button = screen.getByRole('button', { name: /try again/i });
-      expect(button).toBeInTheDocument();
-      // Clicking should not throw
-      expect(() => fireEvent.click(button)).not.toThrow();
+      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+      expect(screen.queryByText('Recovered content')).not.toBeInTheDocument();
+
+      // Allow recovery before clicking Try Again
+      shouldThrow = false;
+      fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+
+      // Fallback should be gone and children should be visible again
+      expect(screen.getByText('Recovered content')).toBeInTheDocument();
+      expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
     });
   });
 
@@ -113,22 +126,34 @@ describe('ErrorBoundary', () => {
       expect(screen.getByText('Custom fallback: custom error')).toBeInTheDocument();
     });
 
-    it('passes resetError to custom fallback', () => {
-      const resetMock = vi.fn();
+    it('passes resetError to custom fallback and clicking it re-renders children', () => {
+      let shouldThrow = true;
+      function RecoverableChild() {
+        if (shouldThrow) throw new Error('Test error');
+        return <div>Custom recovered</div>;
+      }
+
       const customFallback = (_error: Error, reset: () => void) => (
         <button onClick={reset}>Reset</button>
       );
 
       render(
         <ErrorBoundary fallback={customFallback}>
-          <ThrowingComponent shouldThrow />
+          <RecoverableChild />
         </ErrorBoundary>
       );
 
-      const resetButton = screen.getByRole('button', { name: /reset/i });
-      expect(resetButton).toBeInTheDocument();
-      // Clicking should not throw
-      expect(() => fireEvent.click(resetButton)).not.toThrow();
+      // Custom fallback is shown, children are not
+      expect(screen.getByRole('button', { name: /reset/i })).toBeInTheDocument();
+      expect(screen.queryByText('Custom recovered')).not.toBeInTheDocument();
+
+      // Allow recovery then click the reset button provided by resetError
+      shouldThrow = false;
+      fireEvent.click(screen.getByRole('button', { name: /reset/i }));
+
+      // Children should now render; custom fallback should be gone
+      expect(screen.getByText('Custom recovered')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /reset/i })).not.toBeInTheDocument();
     });
   });
 });

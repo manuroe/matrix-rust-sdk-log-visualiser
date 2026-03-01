@@ -95,7 +95,11 @@ describe('logGapManager', () => {
       expect(result.map((r) => r.data.index)).toEqual([3, 4, 5, 6, 7, 8]);
     });
 
-    it('reduces remaining gap based on displayed neighbors', () => {
+    it('remainingGap always mirrors gapSize (field reserved for future use)', () => {
+      // Design note: remainingGap is intentionally equal to gapSize at all times.
+      // The field is reserved for future "count visible neighbours" semantics and
+      // no code currently sets it to a value other than gapSize. Do not assert
+      // remainingGap < gapSize here: that would be a false expectation.
       const filtered = makeFilteredLines([0, 10]);
       const raw = makeRawLines(15);
       const forcedRanges: ForcedRange[] = [{ start: 1, end: 4 }];

@@ -165,7 +165,7 @@ describe('App routing fallback', () => {
       });
     });
 
-    it('ignores request_id parameter when clearing filters on navigation', async () => {
+    it('clears uriFilter and openLogViewerIds when navigating away to a different route', async () => {
       const requests = createHttpRequests(10);
       const logLines = createParsedLogLines(15);
       useLogStore.getState().setHttpRequests(requests, logLines);

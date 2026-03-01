@@ -12,7 +12,8 @@ import {
   createParsedLogLine,
   createParsedLogLines,
 } from '../../test/fixtures';
-import type { AppError } from '../../utils/errorHandling';
+import { AppError } from '../../utils/errorHandling';
+import { microsToISO } from '../../utils/timeUtils';
 
 describe('logStore', () => {
   beforeEach(() => {
@@ -224,13 +225,13 @@ describe('logStore', () => {
   });
 
   describe('time filtering', () => {
-    it('filters requests within time range', () => {
-      // Create rawLogLines with specific timestamps
-      const baseTime = 1700000000000000; // microseconds
+    it('filters requests within time range using real ISO datetime filters', () => {
+      // Fixed reference point so the test is deterministic regardless of wall-clock time.
+      const baseUs = 1700000000000000; // 2023-11-14T22:13:20.000000Z
       const rawLines = [
-        createParsedLogLine({ lineNumber: 1, timestampUs: baseTime }),
-        createParsedLogLine({ lineNumber: 2, timestampUs: baseTime + 1000000 }), // +1 second
-        createParsedLogLine({ lineNumber: 3, timestampUs: baseTime + 2000000 }), // +2 seconds
+        createParsedLogLine({ lineNumber: 1, timestampUs: baseUs }),
+        createParsedLogLine({ lineNumber: 2, timestampUs: baseUs + 1_000_000 }), // +1 s
+        createParsedLogLine({ lineNumber: 3, timestampUs: baseUs + 2_000_000 }), // +2 s
       ];
 
       const requests = [
@@ -240,12 +241,16 @@ describe('logStore', () => {
       ];
 
       useLogStore.getState().setHttpRequests(requests, rawLines);
-      // Filter to ~50% of time range (should roughly filter some requests)
-      useLogStore.getState().setTimeFilter('00:00:00.000000', '00:00:01.000000');
+
+      // Filter window covers only the first second (baseUs to baseUs+0.5s).
+      // Only REQ-1 (response at baseUs) should survive.
+      const startISO = microsToISO(baseUs);
+      const endISO = microsToISO(baseUs + 500_000);
+      useLogStore.getState().setTimeFilter(startISO, endISO);
 
       const state = useLogStore.getState();
-      // Depending on calculation, some requests should be filtered out
-      expect(state.filteredHttpRequests.length).toBeLessThanOrEqual(3);
+      expect(state.filteredHttpRequests).toHaveLength(1);
+      expect(state.filteredHttpRequests[0].requestId).toBe('REQ-1');
     });
 
     it('includes all requests when no time filter is set', () => {
@@ -380,24 +385,24 @@ describe('logStore', () => {
 
   describe('error handling', () => {
     it('setError stores error', () => {
-      const error: AppError = {
-        message: 'Test error',
-        code: 'TEST_ERROR',
-        timestamp: Date.now(),
-      };
+      const error = new AppError('Test error', 'error');
       useLogStore.getState().setError(error);
       expect(useLogStore.getState().error).toEqual(error);
     });
 
     it('clearError resets error to null', () => {
-      const error: AppError = {
-        message: 'Test error',
-        code: 'TEST_ERROR',
-        timestamp: Date.now(),
-      };
+      const error = new AppError('Test error', 'error');
       useLogStore.getState().setError(error);
       useLogStore.getState().clearError();
       expect(useLogStore.getState().error).toBeNull();
+    });
+
+    it('stored error has the expected userMessage and severity', () => {
+      const error = new AppError('File too large', 'warning');
+      useLogStore.getState().setError(error);
+      const stored = useLogStore.getState().error!;
+      expect(stored.userMessage).toBe('File too large');
+      expect(stored.severity).toBe('warning');
     });
   });
 

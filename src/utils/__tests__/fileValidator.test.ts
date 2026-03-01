@@ -52,13 +52,22 @@ describe('fileValidator', () => {
       const invalidUtf8 = new Uint8Array([0x74, 0x65, 0x73, 0x74, 0x80, 0x81]); // "test" + invalid bytes
       const result = isValidTextContent(invalidUtf8);
       expect(result.isValid).toBe(true);
+      // Must emit a warning about encoding issues — not silently swallow the problem
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => /encoding issues/i.test(w.userMessage))).toBe(true);
     });
 
-    it('falls back to ISO-8859-1 with warning', () => {
-      // Use bytes that are invalid UTF-8 but not BOM markers
+    it('falls back to lenient UTF-8 (not ISO-8859-1) for bytes invalid in strict mode', () => {
+      // Bytes 0x80-0x83 are continuation bytes with no lead byte: invalid strict UTF-8,
+      // but TextDecoder('utf-8', { fatal: false }) replaces them with U+FFFD, so the
+      // lenient UTF-8 path succeeds. The ISO-8859-1 fallback is therefore unreachable
+      // for this input — which is correct: the file is still valid, just with repair.
       const iso88591Only = new Uint8Array([0x80, 0x81, 0x82, 0x83]); // Control chars that are invalid UTF-8
       const result = isValidTextContent(iso88591Only);
       expect(result.isValid).toBe(true);
+      // Must warn the caller that encoding issues were detected and characters were replaced
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => /encoding issues/i.test(w.userMessage))).toBe(true);
     });
   });
 
