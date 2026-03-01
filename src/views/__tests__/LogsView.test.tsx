@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, fireEvent, act } from '@testing-library/react';
 import { screen, within, waitFor } from '@testing-library/dom';
 import { useLogStore } from '../../stores/logStore';
 import { LogsView } from '../LogsView';
-import { createParsedLogLines } from '../../test/fixtures';
+import { createParsedLogLines, createParsedLogLine } from '../../test/fixtures';
 import * as TimeUtils from '../../utils/timeUtils';
 import logDisplayStyles from '../LogDisplayView.module.css';
 
@@ -231,5 +231,88 @@ describe('LogsView', () => {
       );
       expect(callsWithEmptyFilter.length).toBe(0);
     });
+  });
+
+  it('uses uriFilter from store as filterPrefill (non-null uriFilter path)', () => {
+    // This exercises the `uriFilter ?? ''` left branch (idx=0) on L18
+    const logs = createParsedLogLines(5);
+    useLogStore.setState({ rawLogLines: logs, uriFilter: 'my-uri-filter' });
+
+    const { container } = render(<LogsView />);
+
+    // Component renders successfully with the non-null uriFilter
+    expect(container.querySelector('.logs-view-container')).toBeInTheDocument();
+  });
+
+  it('handles log lines with zero timestamps (minLogTimeUs === Infinity path)', () => {
+    // All lines have timestampUs = 0, so minLogTimeUs stays Infinity → reset to 0
+    const lines = [0, 1, 2, 3, 4].map((i) =>
+      createParsedLogLine({ lineNumber: i, timestampUs: 0 as any })
+    );
+    useLogStore.setState({ rawLogLines: lines });
+
+    const { container } = render(<LogsView />);
+
+    expect(screen.getByText('5', { selector: '#shown-count' })).toBeInTheDocument();
+    expect(container.querySelector('.logs-view-container')).toBeInTheDocument();
+  });
+
+  it('calls setUriFilter via handleFilterChange when filter input is changed', () => {
+    // Use fake timers to control debounce
+    vi.useFakeTimers();
+
+    const logs = createParsedLogLines(3);
+    useLogStore.setState({ rawLogLines: logs });
+
+    const { unmount } = render(<LogsView />);
+
+    // Find the filter input (rendered by LogDisplayView → SearchInput)
+    const filterInput = screen.getByPlaceholderText('Filter logs...');
+
+    // Type a non-empty filter value → fires handleFilterChange('my-filter') (truthy branch)
+    act(() => {
+      fireEvent.change(filterInput, { target: { value: 'my-filter' } });
+    });
+
+    // Advance past the 300ms debounce delay
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    // mockSetSearchParams should have been called since setUriFilter was invoked
+    expect(mockSetSearchParams).toHaveBeenCalled();
+
+    unmount();
+    vi.useRealTimers();
+  });
+
+  it('calls setUriFilter(null) when filter is cleared (falsy branch of filter || null)', () => {
+    vi.useFakeTimers();
+
+    const logs = createParsedLogLines(3);
+    // Set uriFilter so requestFilter starts as non-empty
+    useLogStore.setState({ rawLogLines: logs, uriFilter: 'initial-filter' });
+
+    const { unmount } = render(<LogsView />);
+
+    // Find the filter input (initialized to 'initial-filter' prop)
+    const filterInput = screen.getByPlaceholderText('Filter logs...');
+
+    // Let the initial debounce settle
+    act(() => { vi.advanceTimersByTime(400); });
+    mockSetSearchParams.mockClear();
+
+    // Clear the filter (empty string → '' || null → null) 
+    act(() => {
+      fireEvent.change(filterInput, { target: { value: '' } });
+    });
+
+    act(() => { vi.advanceTimersByTime(400); });
+
+    // When filterQuery='' !== requestFilter='initial-filter' → onFilterChange('') → setUriFilter(null)
+    expect(mockSetSearchParams).toHaveBeenCalled();
+
+    unmount();
+    vi.useRealTimers();
   });
 });

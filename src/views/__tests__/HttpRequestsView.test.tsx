@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, waitFor, screen } from '@testing-library/react';
 import { HttpRequestsView } from '../HttpRequestsView';
 import { useLogStore } from '../../stores/logStore';
-import { createHttpRequests, createHttpRequest, createParsedLogLines } from '../../test/fixtures';
+import { createHttpRequests, createHttpRequest, createParsedLogLines, createSyncRequest } from '../../test/fixtures';
 import type { HttpRequest } from '../../types/log.types';
 import { act } from '@testing-library/react';
 
@@ -425,5 +425,51 @@ describe('HttpRequestsView - stats-compact with active time window', () => {
     // Incomplete is off: shown = 2 completed in window; total = 2 completed + 1 incomplete
     expect(shown).toBe(2);
     expect(total).toBe(3);
+  });
+});
+
+describe('HttpRequestsView - getBarColor with sync timeout', () => {
+  beforeEach(() => {
+    useLogStore.getState().clearData();
+    HTMLElement.prototype.scrollTo = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('enriches bar color with timeout when allRequests has matching sync request', () => {
+    const sharedRequestId = 'SYNC-HTTP-TEST';
+
+    // HTTP request and matching sync request with the same requestId and timeout
+    const httpReq = createHttpRequest({
+      requestId: sharedRequestId,
+      uri: '/_matrix/client/v3/sync?timeout=30000',
+      sendLineNumber: 0,
+      responseLineNumber: 1,
+      status: '200',
+    });
+
+    const syncReq = createSyncRequest({
+      requestId: sharedRequestId,
+      timeout: 30000,
+      sendLineNumber: 0,
+      responseLineNumber: 1,
+    });
+
+    const rawLogLines = createParsedLogLines(5);
+
+    useLogStore.setState({
+      allHttpRequests: [httpReq],
+      filteredHttpRequests: [httpReq],
+      allRequests: [syncReq],
+      rawLogLines,
+    });
+
+    // getBarColor is called internally during render via RequestTable → WaterfallTimeline
+    // This exercises the `? { ...req, timeout }` branch in getBarColor
+    expect(() => {
+      act(() => { render(<HttpRequestsView />); });
+    }).not.toThrow();
   });
 });

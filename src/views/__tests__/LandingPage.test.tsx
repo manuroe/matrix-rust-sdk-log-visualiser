@@ -95,4 +95,37 @@ describe('LandingPage', () => {
       expect(screen.getByText(/failed to load demo/i)).toBeInTheDocument();
     });
   });
+
+  it('dismisses the demo error when onDismiss is called', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
+
+    renderLandingPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
+
+    // Wait for error to appear
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load demo/i)).toBeInTheDocument();
+    });
+
+    // Click dismiss button (×) — this invokes the onDismiss handler
+    const dismissButton = screen.getByRole('button', { name: /dismiss/i });
+    fireEvent.click(dismissButton);
+
+    // Error should be cleared
+    await waitFor(() => {
+      expect(screen.queryByText(/failed to load demo/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('uses PR-specific GitHub URL when VITE_PR_NUMBER is set', () => {
+    vi.stubEnv('VITE_PR_NUMBER', '42');
+
+    renderLandingPage();
+
+    const githubLink = screen.getByRole('link', { name: /view on github/i });
+    expect(githubLink.getAttribute('href')).toContain('/pull/42');
+
+    vi.unstubAllEnvs();
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, waitFor, screen } from '@testing-library/react';
+import { render, waitFor, screen, fireEvent } from '@testing-library/react';
 import { SyncView } from '../SyncView';
 import { useLogStore } from '../../stores/logStore';
 import { createSyncRequests, createSyncRequest, createParsedLogLines } from '../../test/fixtures';
@@ -467,5 +467,94 @@ describe('SyncView - stats-compact with active time window', () => {
     // Incomplete is off: shown = 2 completed in window; total = 2 completed + 1 incomplete
     expect(shown).toBe(2);
     expect(total).toBe(3);
+  });
+});
+
+describe('SyncView - formatTimeout edge cases and onChange handlers', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollTo = vi.fn();
+  });
+
+  it('formats a non-standard timeout >= 1000ms as Xs', () => {
+    // timeout = 5000ms → formatTimeout should return '5s' (covers L123 ms >= 1000 branch)
+    const requests = [
+      createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, timeout: 5000 }),
+    ];
+    useLogStore.setState({ allRequests: requests, filteredRequests: requests });
+
+    act(() => { render(<SyncView />); });
+
+    const select = document.getElementById('timeout-filter') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    // '5s' label should appear as option text
+    const options = Array.from(select.options).map(o => o.text);
+    expect(options).toContain('5s');
+  });
+
+  it('formats a non-standard timeout < 1000ms as Xms', () => {
+    // timeout = 500ms → formatTimeout should return '500ms' (covers L123 ms < 1000 branch)
+    const requests = [
+      createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, timeout: 500 }),
+    ];
+    useLogStore.setState({ allRequests: requests, filteredRequests: requests });
+
+    act(() => { render(<SyncView />); });
+
+    const select = document.getElementById('timeout-filter') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    const options = Array.from(select.options).map(o => o.text);
+    expect(options).toContain('500ms');
+  });
+
+  it('fires onChange on conn-filter and updates selectedConnId', () => {
+    const requests = [
+      createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, connId: 'room-list' }),
+    ];
+    useLogStore.setState({
+      allRequests: requests,
+      filteredRequests: requests,
+      connectionIds: ['room-list'],
+      selectedConnId: '',
+    });
+
+    act(() => { render(<SyncView />); });
+
+    const connSelect = document.getElementById('conn-filter') as HTMLSelectElement;
+    expect(connSelect).not.toBeNull();
+
+    // Fire change to select 'room-list' — covers line 132 setSelectedConnId(e.target.value)
+    act(() => { fireEvent.change(connSelect, { target: { value: 'room-list' } }); });
+    expect(useLogStore.getState().selectedConnId).toBe('room-list');
+  });
+
+  it('fires onChange on timeout-filter and updates selectedTimeout (covers L147-149)', () => {
+    const mockSetTimeoutFilter = vi.fn();
+    vi.doMock('../../hooks/useURLParams', () => ({
+      useURLParams: () => ({ setTimeoutFilter: mockSetTimeoutFilter }),
+    }));
+
+    const requests = [
+      createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, timeout: 0 }),
+      createSyncRequest({ requestId: 'S-2', sendLineNumber: 2, timeout: 30000 }),
+    ];
+    useLogStore.setState({
+      allRequests: requests,
+      filteredRequests: requests,
+      selectedTimeout: null,
+    });
+
+    act(() => { render(<SyncView />); });
+
+    const timeoutSelect = document.getElementById('timeout-filter') as HTMLSelectElement;
+    expect(timeoutSelect).not.toBeNull();
+
+    // Select timeout '0' — parseInt('0', 10) = 0
+    act(() => { fireEvent.change(timeoutSelect, { target: { value: '0' } }); });
+    // selectedTimeout should now be 0
+    expect(useLogStore.getState().selectedTimeout).toBe(0);
+
+    // Select empty (reset) — val becomes null
+    act(() => { fireEvent.change(timeoutSelect, { target: { value: '' } }); });
+    expect(useLogStore.getState().selectedTimeout).toBeNull();
   });
 });

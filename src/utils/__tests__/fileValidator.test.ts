@@ -104,17 +104,21 @@ describe('fileValidator', () => {
     });
 
     it('rejects file larger than 500MB', async () => {
-      const content = 'x';
+      const content = 'content';
       const file = new File([content], 'test.log', { type: 'text/plain' });
+      Object.defineProperty(file, 'size', { value: 501 * 1024 * 1024, configurable: true });
       const result = await validateTextFile(file);
-      expect(result.isValid).toBe(true); // Small file should pass
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => /too large/i.test(e.userMessage))).toBe(true);
     });
 
-    it('warns for file larger than 100MB', async () => {
-      const content = 'x';
+    it('warns for file larger than 100MB but below 500MB', async () => {
+      const content = 'valid log content\nline 2';
       const file = new File([content], 'test.log', { type: 'text/plain' });
+      Object.defineProperty(file, 'size', { value: 110 * 1024 * 1024, configurable: true });
       const result = await validateTextFile(file);
       expect(result.isValid).toBe(true);
+      expect(result.warnings.some(w => /large file/i.test(w.userMessage))).toBe(true);
     });
 
     it('rejects file with null bytes', async () => {
@@ -149,6 +153,28 @@ describe('fileValidator', () => {
       const result = await validateGzipFile(file, decompressSync);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects gzip file larger than 500MB', async () => {
+      const content = 'valid';
+      const encoded = new TextEncoder().encode(content);
+      const compressed = compressSync(encoded);
+      const file = new File([compressed as BlobPart], 'big.log.gz', { type: 'application/gzip' });
+      Object.defineProperty(file, 'size', { value: 501 * 1024 * 1024, configurable: true });
+      const result = await validateGzipFile(file, decompressSync);
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => /too large/i.test(e.userMessage))).toBe(true);
+    });
+
+    it('warns for gzip file larger than 100MB but below 500MB', async () => {
+      const content = 'valid log content\nline 2';
+      const encoded = new TextEncoder().encode(content);
+      const compressed = compressSync(encoded);
+      const file = new File([compressed as BlobPart], 'big.log.gz', { type: 'application/gzip' });
+      Object.defineProperty(file, 'size', { value: 110 * 1024 * 1024, configurable: true });
+      const result = await validateGzipFile(file, decompressSync);
+      expect(result.isValid).toBe(true);
+      expect(result.warnings.some(w => /large file/i.test(w.userMessage))).toBe(true);
     });
 
     it('rejects gzip with binary content (null bytes)', async () => {

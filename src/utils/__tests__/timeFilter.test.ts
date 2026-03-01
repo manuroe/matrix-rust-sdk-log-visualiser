@@ -14,6 +14,7 @@ import {
   filterValueToURL,
   urlToFilterValue,
   countRequestsForTimeRange,
+  formatTimestamp,
 } from '../timeUtils';
 
 describe('Time Filter Utilities', () => {
@@ -274,6 +275,77 @@ describe('Time Filter Utilities', () => {
       expect(shortcutToMs('last-min')).toBe(60 * 1000);
       expect(getTimeDisplayName('last-min')).toBe('Last min');
       expect(parseTimeInput('last-min')).toBe('last-min');
+    });
+  });
+
+  describe('formatTimestamp', () => {
+    const sampleMicros = isoToMicros('2024-06-15T12:34:56.123456Z');
+
+    it('returns empty string for zero micros', () => {
+      expect(formatTimestamp(0)).toBe('');
+    });
+
+    it('returns empty string for negative micros', () => {
+      // @ts-expect-error testing negative value path
+      expect(formatTimestamp(-1000)).toBe('');
+    });
+
+    it('formats HH:MM format', () => {
+      const result = formatTimestamp(sampleMicros, 'HH:MM');
+      expect(result).toBe('12:34');
+    });
+
+    it('formats HH:MM:SS format (default)', () => {
+      const result = formatTimestamp(sampleMicros, 'HH:MM:SS');
+      expect(result).toBe('12:34:56');
+    });
+
+    it('formats HH:MM:SS.us format', () => {
+      const result = formatTimestamp(sampleMicros, 'HH:MM:SS.us');
+      expect(result).toBe('12:34:56.123456');
+    });
+
+    it('formats ISO format', () => {
+      const result = formatTimestamp(sampleMicros, 'ISO');
+      expect(result).toBe('2024-06-15T12:34:56.123456Z');
+    });
+
+    it('uses HH:MM:SS as default format', () => {
+      expect(formatTimestamp(sampleMicros)).toBe('12:34:56');
+    });
+  });
+
+  describe('calculateTimeRangeMicros - keyword branches', () => {
+    const minUs = isoToMicros('2024-01-01T10:00:00.000000Z');
+    const maxUs = isoToMicros('2024-01-01T12:00:00.000000Z');
+
+    it('handles start keyword as start filter', () => {
+      const result = calculateTimeRangeMicros('start', null, minUs, maxUs);
+      expect(result.startUs).toBe(minUs);
+      expect(result.endUs).toBe(maxUs);
+    });
+
+    it('handles end keyword as end filter', () => {
+      const result = calculateTimeRangeMicros(null, 'end', minUs, maxUs);
+      expect(result.startUs).toBe(minUs);
+      expect(result.endUs).toBe(maxUs);
+    });
+
+    it('handles both start and end keywords', () => {
+      const result = calculateTimeRangeMicros('start', 'end', minUs, maxUs);
+      expect(result.startUs).toBe(minUs);
+      expect(result.endUs).toBe(maxUs);
+    });
+  });
+
+  describe('microsToISO edge cases', () => {
+    it('returns empty string for zero micros', () => {
+      expect(microsToISO(0)).toBe('');
+    });
+
+    it('returns empty string for null-ish input', () => {
+      // @ts-expect-error testing edge case
+      expect(microsToISO(null)).toBe('');
     });
   });
 });

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, act } from '@testing-library/react';
 import { WaterfallTimeline } from '../WaterfallTimeline';
 import { getWaterfallPosition, getWaterfallBarWidth } from '../../utils/timelineUtils';
 import { createRef } from 'react';
@@ -171,6 +171,170 @@ describe('WaterfallTimeline', () => {
       // Dynamic min: max(1, 10/10) = 1px
       const width10ms = getWaterfallBarWidth(10, 1000000, 10000);
       expect(width10ms).toBe(1);
+    });
+  });
+
+  describe('Mouse Events', () => {
+    let rafCallback: FrameRequestCallback | null = null;
+
+    beforeEach(() => {
+      rafCallback = null;
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        rafCallback = cb;
+        return 1;
+      });
+      vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('shows cursor at correct position on mousemove in bounds', () => {
+      const containerRef = createRef<HTMLDivElement>();
+      const { container } = render(
+        <div>
+          <div ref={containerRef} style={{ width: 800, height: 600 }}>
+            Container
+          </div>
+          <WaterfallTimeline cursorContainerRef={containerRef} cursorOffsetLeft={0} />
+        </div>
+      );
+
+      const containerEl = containerRef.current!;
+      vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, right: 800, bottom: 600,
+        width: 800, height: 600, x: 0, y: 0, toJSON: () => {},
+      });
+
+      act(() => {
+        const event = new MouseEvent('mousemove', { clientX: 300, clientY: 100, bubbles: true });
+        containerEl.dispatchEvent(event);
+        // Execute RAF callback
+        if (rafCallback) rafCallback(0);
+      });
+
+      const cursor = document.querySelector('.waterfall-cursor-line') as HTMLElement;
+      expect(cursor).toBeInTheDocument();
+      expect(cursor.style.display).toBe('block');
+      expect(cursor.style.left).toBe('300px');
+    });
+
+    it('hides cursor when mousemove is out of bounds', () => {
+      const containerRef = createRef<HTMLDivElement>();
+      render(
+        <div>
+          <div ref={containerRef} style={{ width: 800, height: 600 }}>
+            Container
+          </div>
+          <WaterfallTimeline cursorContainerRef={containerRef} cursorOffsetLeft={0} />
+        </div>
+      );
+
+      const containerEl = containerRef.current!;
+      vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+        left: 100, top: 0, right: 900, bottom: 600,
+        width: 800, height: 600, x: 100, y: 0, toJSON: () => {},
+      });
+
+      act(() => {
+        // clientX: 50 → relativeX = 50 - 100 = -50, out of bounds
+        const event = new MouseEvent('mousemove', { clientX: 50, clientY: 100, bubbles: true });
+        containerEl.dispatchEvent(event);
+        if (rafCallback) rafCallback(0);
+      });
+
+      const cursor = document.querySelector('.waterfall-cursor-line') as HTMLElement;
+      expect(cursor).not.toBeNull();
+      expect(cursor.style.display).toBe('none');
+    });
+
+    it('hides cursor on mouseleave', () => {
+      const containerRef = createRef<HTMLDivElement>();
+      render(
+        <div>
+          <div ref={containerRef} style={{ width: 800, height: 600 }}>
+            Container
+          </div>
+          <WaterfallTimeline cursorContainerRef={containerRef} />
+        </div>
+      );
+
+      const containerEl = containerRef.current!;
+
+      act(() => {
+        const event = new MouseEvent('mouseleave', { bubbles: true });
+        containerEl.dispatchEvent(event);
+      });
+
+      const cursor = document.querySelector('.waterfall-cursor-line') as HTMLElement;
+      expect(cursor).not.toBeNull();
+      expect(cursor.style.display).toBe('none');
+    });
+
+    it('cancels pending RAF on rapid mousemove', () => {
+      const cancelRAF = vi.fn();
+      vi.stubGlobal('cancelAnimationFrame', cancelRAF);
+
+      // First RAF returns id=1, second returns id=2
+      let rafId = 0;
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        rafCallback = cb;
+        return ++rafId;
+      });
+
+      const containerRef = createRef<HTMLDivElement>();
+      render(
+        <div>
+          <div ref={containerRef} style={{ width: 800, height: 600 }}>
+            Container
+          </div>
+          <WaterfallTimeline cursorContainerRef={containerRef} />
+        </div>
+      );
+
+      const containerEl = containerRef.current!;
+      vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, right: 800, bottom: 600,
+        width: 800, height: 600, x: 0, y: 0, toJSON: () => {},
+      });
+
+      act(() => {
+        // First mousemove queues RAF (id=1), don't execute it
+        containerEl.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 100, bubbles: true }));
+        // Second mousemove should cancel RAF id=1 and queue a new one
+        containerEl.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 100, bubbles: true }));
+      });
+
+      expect(cancelRAF).toHaveBeenCalledWith(1);
+    });
+
+    it('accounts for cursorOffsetLeft in cursor positioning', () => {
+      const containerRef = createRef<HTMLDivElement>();
+      render(
+        <div>
+          <div ref={containerRef} style={{ width: 800, height: 600 }}>
+            Container
+          </div>
+          <WaterfallTimeline cursorContainerRef={containerRef} cursorOffsetLeft={50} />
+        </div>
+      );
+
+      const containerEl = containerRef.current!;
+      vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, right: 800, bottom: 600,
+        width: 800, height: 600, x: 0, y: 0, toJSON: () => {},
+      });
+
+      act(() => {
+        // clientX: 300, relativeX = 300 - 50 = 250 (in bounds), timelineX = 250 + scroll(0) = 250
+        containerEl.dispatchEvent(new MouseEvent('mousemove', { clientX: 300, clientY: 100, bubbles: true }));
+        if (rafCallback) rafCallback(0);
+      });
+
+      const cursor = document.querySelector('.waterfall-cursor-line') as HTMLElement;
+      expect(cursor).not.toBeNull();
+      expect(cursor.style.left).toBe('250px');
     });
   });
 });
