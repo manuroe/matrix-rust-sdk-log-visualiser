@@ -6,7 +6,8 @@ import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
 import { HttpActivityChart, type HttpRequestWithTimestamp } from '../components/HttpActivityChart';
-import { calculateTimeRangeMicros, formatTimestamp } from '../utils/timeUtils';
+import { calculateTimeRangeMicros, formatTimestamp, formatDuration } from '../utils/timeUtils';
+import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
 import type { LogLevel, ParsedLogLine } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
@@ -155,6 +156,8 @@ export function SummaryView() {
         syncRequestsByConnection: [] as Array<{ connId: string; count: number }>,
         httpRequestsWithTimestamps: [] as HttpRequestWithTimestamp[],
         incompleteRequestCount: 0,
+        totalUploadBytes: 0,
+        totalDownloadBytes: 0,
         chartTimeRange: { minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros },
       };
     }
@@ -375,6 +378,19 @@ export function SummaryView() {
       .filter((item) => item.count > 0)
       .sort((a, b) => b.count - a.count);
 
+    // Sum uploaded and downloaded bytes over all charted requests (completed + incomplete in range)
+    // to match the set represented by the chart and the request count headline.
+    const httpRequestById = new Map(allHttpRequests.map(r => [r.requestId, r]));
+    let totalUploadBytes = 0;
+    let totalDownloadBytes = 0;
+    httpRequestsWithTimestamps.forEach(({ requestId }) => {
+      const req = httpRequestById.get(requestId);
+      if (req) {
+        totalUploadBytes += req.requestSize;
+        totalDownloadBytes += req.responseSize;
+      }
+    });
+
     return {
       totalLogLines: filteredLogLines.length,
       filteredLogLines, // Include for chart
@@ -389,6 +405,8 @@ export function SummaryView() {
       syncRequestsByConnection,
       httpRequestsWithTimestamps,
       incompleteRequestCount: incompleteRequestsWithTimestamps.length,
+      totalUploadBytes,
+      totalDownloadBytes,
       chartTimeRange: { minTime: chartMinTime, maxTime: chartMaxTime },
     };
   }, [rawLogLines, allHttpRequests, allRequests, connectionIds, startTime, endTime, localStartTime, localEndTime]);
@@ -406,13 +424,6 @@ export function SummaryView() {
       </div>
     );
   }
-
-  const formatDuration = (ms: number): string => {
-    if (ms >= 1000) {
-      return `${(ms / 1000).toFixed(2)}s`;
-    }
-    return `${ms.toFixed(0)}ms`;
-  };
 
   return (
     <div className="app">
@@ -569,7 +580,7 @@ export function SummaryView() {
         {/* HTTP Requests Activity Chart */}
         {stats.httpRequestsWithTimestamps.length > 0 && (
           <section className={styles.summarySection}>
-            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests{stats.incompleteRequestCount > 0 ? ` (${stats.incompleteRequestCount} incomplete)` : ''}</h2>
+            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests{stats.incompleteRequestCount > 0 ? ` (${stats.incompleteRequestCount} incomplete)` : ''}{(stats.totalUploadBytes > 0 || stats.totalDownloadBytes > 0) ? ` — ↑ ${formatBytes(stats.totalUploadBytes)} / ↓ ${formatBytes(stats.totalDownloadBytes)}` : ''}</h2>
             <div className={styles.activityChartContainer}>
               <HttpActivityChart
                 httpRequests={stats.httpRequestsWithTimestamps}

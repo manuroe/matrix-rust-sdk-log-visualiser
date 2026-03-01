@@ -63,13 +63,13 @@ export function SyncView() {
       id: 'requestSize',
       label: '↑ Size',
       className: 'size',
-      getValue: (req) => req.requestSize || '-',
+      getValue: (req) => req.requestSizeString || '-',
     },
     {
       id: 'responseSize',
       label: '↓ Size',
       className: 'size',
-      getValue: (req) => req.responseSize || '-',
+      getValue: (req) => req.responseSizeString || '-',
     },
   ], [getDisplayTime]);
 

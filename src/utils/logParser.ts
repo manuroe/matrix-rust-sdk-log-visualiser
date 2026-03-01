@@ -1,6 +1,7 @@
 import type { HttpRequest, SyncRequest, LogParserResult, ParsedLogLine, LogLevel } from '../types/log.types';
 import type { ISODateTimeString, TimestampMicros } from '../types/time.types';
 import { isoToMicros, extractTimeFromISO } from './timeUtils';
+import { parseSizeString } from './sizeUtils';
 import { ParsingError } from './errorHandling';
 
 // Regex patterns for parsing HTTP requests - generic (all URIs)
@@ -119,8 +120,8 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       rec.method = rec.method || respMatch.groups.method;
       rec.uri = rec.uri || respMatch.groups.uri;
       rec.status = rec.status || respMatch.groups.status;
-      rec.responseSize = rec.responseSize || respMatch.groups.resp_size;
-      rec.requestSize = rec.requestSize || respMatch.groups.req_size;
+      rec.responseSizeString = rec.responseSizeString || respMatch.groups.resp_size;
+      rec.requestSizeString = rec.requestSizeString || respMatch.groups.req_size;
       rec.requestDurationMs = rec.requestDurationMs || durationMs;
       rec.responseLineNumber = i + 1;
       continue;
@@ -139,7 +140,7 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       rec.requestId = requestId;
       rec.method = rec.method || sendMatch.groups.method;
       rec.uri = rec.uri || sendMatch.groups.uri;
-      rec.requestSize = rec.requestSize || sendMatch.groups.req_size;
+      rec.requestSizeString = rec.requestSizeString || sendMatch.groups.req_size;
       rec.sendLineNumber = i + 1;
     }
   }
@@ -164,8 +165,10 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     rec.method = rec.method || '';
     rec.uri = rec.uri || '';
     rec.status = rec.status || '';
-    rec.requestSize = rec.requestSize || '';
-    rec.responseSize = rec.responseSize || '';
+    rec.requestSizeString = rec.requestSizeString || '';
+    rec.responseSizeString = rec.responseSizeString || '';
+    rec.requestSize = parseSizeString(rec.requestSizeString);
+    rec.responseSize = parseSizeString(rec.responseSizeString);
     rec.requestDurationMs = rec.requestDurationMs || 0;
     rec.sendLineNumber = rec.sendLineNumber || 0;
     rec.responseLineNumber = rec.responseLineNumber || 0;
