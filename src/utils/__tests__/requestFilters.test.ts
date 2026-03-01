@@ -329,6 +329,36 @@ describe('filterHttpRequests', () => {
     expect(result.map((r) => r.requestId).sort()).toEqual(['A', 'B']);
   });
 
+  it('includes incomplete HTTP requests matching "Incomplete" statusCodeFilter key', () => {
+    // Exercises the `r.status || 'Incomplete'` branch in filterHttpRequests
+    // when statusCodeFilter is set and the request has no status.
+    const requests = [
+      createHttpRequest({ requestId: 'A', status: '200' }),
+      createHttpRequest({ requestId: 'B', status: '' }),  // incomplete
+    ];
+    const result = filterHttpRequests(
+      requests,
+      [],
+      makeFilters({ showIncompleteHttp: true, statusCodeFilter: new Set(['Incomplete']) })
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].requestId).toBe('B');
+  });
+
+  it('excludes incomplete HTTP requests when statusCodeFilter does not include "Incomplete"', () => {
+    const requests = [
+      createHttpRequest({ requestId: 'A', status: '200' }),
+      createHttpRequest({ requestId: 'B', status: '' }),  // incomplete
+    ];
+    const result = filterHttpRequests(
+      requests,
+      [],
+      makeFilters({ showIncompleteHttp: true, statusCodeFilter: new Set(['200']) })
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].requestId).toBe('A');
+  });
+
   it('performs case-insensitive URI filter', () => {
     const requests = [
       createHttpRequest({ requestId: 'A', uri: 'https://example.com/SYNC?timeout=30000' }),

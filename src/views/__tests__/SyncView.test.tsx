@@ -5,6 +5,7 @@ import { useLogStore } from '../../stores/logStore';
 import { createSyncRequests, createSyncRequest, createParsedLogLines } from '../../test/fixtures';
 import type { SyncRequest } from '../../types/log.types';
 import { act } from '@testing-library/react';
+import * as URLParamsModule from '../../hooks/useURLParams';
 
 // Mock dependencies
 vi.mock('react-router-dom', () => ({
@@ -527,11 +528,17 @@ describe('SyncView - formatTimeout edge cases and onChange handlers', () => {
     expect(useLogStore.getState().selectedConnId).toBe('room-list');
   });
 
-  it('fires onChange on timeout-filter and updates selectedTimeout (covers L147-149)', () => {
+  it('fires onChange on timeout-filter: updates selectedTimeout store and calls setTimeoutFilter (covers L147-149)', () => {
+    // Spy on useURLParams so we can capture and assert on setTimeoutFilter.
+    // vi.doMock cannot replace an already-imported module; vi.spyOn works correctly here.
     const mockSetTimeoutFilter = vi.fn();
-    vi.doMock('../../hooks/useURLParams', () => ({
-      useURLParams: () => ({ setTimeoutFilter: mockSetTimeoutFilter }),
-    }));
+    const spy = vi.spyOn(URLParamsModule, 'useURLParams').mockReturnValue({
+      start: null, end: null, scale: 'hour', status: null,
+      filter: null, requestId: null, timeout: null,
+      setTimeFilter: vi.fn(), setScale: vi.fn(), setStatusFilter: vi.fn(),
+      setUriFilter: vi.fn(), setRequestId: vi.fn(),
+      setTimeoutFilter: mockSetTimeoutFilter,
+    });
 
     const requests = [
       createSyncRequest({ requestId: 'S-1', sendLineNumber: 0, timeout: 0 }),
@@ -550,11 +557,16 @@ describe('SyncView - formatTimeout edge cases and onChange handlers', () => {
 
     // Select timeout '0' — parseInt('0', 10) = 0
     act(() => { fireEvent.change(timeoutSelect, { target: { value: '0' } }); });
-    // selectedTimeout should now be 0
+    // Store state updated
     expect(useLogStore.getState().selectedTimeout).toBe(0);
+    // URL param setter also called
+    expect(mockSetTimeoutFilter).toHaveBeenCalledWith(0);
 
     // Select empty (reset) — val becomes null
     act(() => { fireEvent.change(timeoutSelect, { target: { value: '' } }); });
     expect(useLogStore.getState().selectedTimeout).toBeNull();
+    expect(mockSetTimeoutFilter).toHaveBeenCalledWith(null);
+
+    spy.mockRestore();
   });
 });
