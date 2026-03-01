@@ -231,6 +231,7 @@
 .size {
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
+    font-weight: normal;
     text-align: left;
     color: var(--text-tertiary);
 }

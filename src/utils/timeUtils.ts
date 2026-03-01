@@ -504,3 +504,13 @@ export function applyTimeRangeFilterMicros<T extends { responseLineNumber: numbe
   });
 }
 
+/**
+ * Format a duration in milliseconds as a human-readable string.
+ * Returns seconds with 2 decimal places for >= 1000ms, otherwise milliseconds.
+ */
+export function formatDuration(ms: number): string {
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(2)}s`;
+  }
+  return `${ms.toFixed(0)}ms`;
+}

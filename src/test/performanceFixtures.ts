@@ -69,8 +69,10 @@ function createHttpRequest(
     method,
     uri,
     status,
-    requestSize: String(Math.floor(Math.random() * 2000) + 100),
-    responseSize: String(Math.floor(Math.random() * 5000) + 500),
+    requestSizeString: `${Math.floor(Math.random() * 2000) + 100}B`,
+    responseSizeString: `${Math.floor(Math.random() * 5000) + 500}B`,
+    requestSize: Math.floor(Math.random() * 2000) + 100,
+    responseSize: Math.floor(Math.random() * 5000) + 500,
     requestDurationMs: durationMs,
     sendLineNumber: lineNumber,
     responseLineNumber: lineNumber + 1,
@@ -195,9 +197,9 @@ export function generateLogContent(
       const responseDate = new Date(responseTimeMs);
       
       // Add send line
-      lines.push(`${requestDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}"}`);
+      lines.push(`${requestDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSizeString}"}`);
       // Add response line
-      lines.push(`${responseDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}" status=${req.status} response_size="${req.responseSize}" request_duration=${(req.requestDurationMs / 1000).toFixed(2)}s}`);
+      lines.push(`${responseDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSizeString}" status=${req.status} response_size="${req.responseSizeString}" request_duration=${(req.requestDurationMs / 1000).toFixed(2)}s}`);
     }
 
     if (logIdx < logLines.length) {
@@ -213,8 +215,8 @@ export function generateLogContent(
     const requestDate = new Date(requestTimeMs);
     const responseDate = new Date(responseTimeMs);
     
-    lines.push(`${requestDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}"}`);
-    lines.push(`${responseDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSize}" status=${req.status} response_size="${req.responseSize}" request_duration=${(req.requestDurationMs / 1000).toFixed(2)}s}`);
+    lines.push(`${requestDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSizeString}"}`);
+    lines.push(`${responseDate.toISOString()} INFO send{request_id="${req.requestId}" method=${req.method} uri="${req.uri}" request_size="${req.requestSizeString}" status=${req.status} response_size="${req.responseSizeString}" request_duration=${(req.requestDurationMs / 1000).toFixed(2)}s}`);
   }
 
   return lines.join('\n');

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
@@ -15,6 +15,7 @@ import { LogDisplayView } from '../views/LogDisplayView';
 import { useScrollSync } from '../hooks/useScrollSync';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
+import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
 import type { HttpRequest } from '../types/log.types';
 import styles from './RequestTable.module.css';
@@ -293,6 +294,17 @@ export function RequestTable({
     container.scrollLeft = Math.max(0, targetScroll);
   }, [rawLogLines, minTime, totalDuration, timelineWidth, msPerPixel]);
 
+  // Sum upload/download bytes for displayed requests
+  const { totalUploadBytes, totalDownloadBytes } = useMemo(() => {
+    let up = 0;
+    let down = 0;
+    for (const req of displayedRequests) {
+      up += req.requestSize;
+      down += req.responseSize;
+    }
+    return { totalUploadBytes: up, totalDownloadBytes: down };
+  }, [displayedRequests]);
+
   // Use shared URL auto-scroll hook (placed after handleWaterfallRowClick is defined)
   useUrlRequestAutoScroll(displayedRequests, leftPanelRef, handleWaterfallRowClick);
 
@@ -397,6 +409,11 @@ export function RequestTable({
 
           <div className="stats-compact">
             <span id="shown-count">{displayedRequests.length}</span> / <span id="total-count">{totalCount}</span>
+            {(totalUploadBytes > 0 || totalDownloadBytes > 0) && (
+              <span style={{ marginLeft: '8px', opacity: 0.8 }}>
+                &mdash; ↑ {formatBytes(totalUploadBytes)} / ↓ {formatBytes(totalDownloadBytes)}
+              </span>
+            )}
           </div>
         </div>
 

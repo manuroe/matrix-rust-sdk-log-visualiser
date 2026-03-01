@@ -5,8 +5,10 @@ export interface HttpRequest {
   method: string;
   uri: string;
   status: string;
-  requestSize: string;
-  responseSize: string;
+  requestSizeString: string;
+  responseSizeString: string;
+  requestSize: number;
+  responseSize: number;
   requestDurationMs: number;
   sendLineNumber: number;
   responseLineNumber: number;

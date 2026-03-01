@@ -31,8 +31,10 @@ describe('logParser', () => {
           method: 'POST',
           uri: expect.stringContaining('/sync'),
           status: '200',
-          requestSize: '5.9k',
-          responseSize: '7.4k',
+          requestSizeString: '5.9k',
+          responseSizeString: '7.4k',
+          requestSize: Math.round(5.9 * 1024),  // 6042
+          responseSize: Math.round(7.4 * 1024), // 7578
           sendLineNumber: 1,
           responseLineNumber: 2,
         });
