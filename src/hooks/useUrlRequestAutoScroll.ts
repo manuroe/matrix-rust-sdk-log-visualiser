@@ -35,13 +35,13 @@ export function useUrlRequestAutoScroll(
         return;
       }
       
-      const requestExists = filteredRequests.some(r => r.requestId === reqId);
+      const requestIndex = filteredRequests.findIndex(r => r.requestId === reqId);
 
-      if (requestExists) {
+      if (requestIndex !== -1) {
         scrolledIdRef.current = reqId;
-        
-        const matchedReq = filteredRequests.find(r => r.requestId === reqId);
-        const rowKey = (matchedReq?.sendLineNumber || matchedReq?.responseLineNumber) as number;
+
+        const matchedReq = filteredRequests[requestIndex];
+        const rowKey = (matchedReq.sendLineNumber || matchedReq.responseLineNumber) as number;
 
         if (!openLogViewerIds.has(rowKey)) {
           openLogViewer(rowKey);
@@ -49,8 +49,6 @@ export function useUrlRequestAutoScroll(
         if (!expandedRows.has(rowKey)) {
           toggleRowExpansion(rowKey);
         }
-
-        const requestIndex = filteredRequests.findIndex(r => r.requestId === reqId);
 
         const checkAndScroll = () => {
           const leftPanel = leftPanelRef.current;

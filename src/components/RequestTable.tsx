@@ -357,7 +357,7 @@ export function RequestTable({
       <div className={styles.expandedLogViewer}>
         <LogDisplayView
           key={expandedRowKey}
-          requestFilter={`"${req.requestId}"`}
+          lineRange={{ start: req.sendLineNumber!, end: req.responseLineNumber ?? req.sendLineNumber! }}
           defaultShowOnlyMatching
           defaultLineWrap
           logLines={rawLogLines.map(line => ({
@@ -368,7 +368,8 @@ export function RequestTable({
           nextRequestLineRange={nextRequestLineRange}
           onExpand={() => {
             const params = new URLSearchParams();
-            params.set('filter', `"${req.requestId}"`);
+            params.set('start_line', String(req.sendLineNumber!));
+            params.set('end_line', String(req.responseLineNumber ?? req.sendLineNumber!));
             const { startTime: storeStart, endTime: storeEnd } = useLogStore.getState();
             if (storeStart) params.set('start', storeStart);
             if (storeEnd) params.set('end', storeEnd);
