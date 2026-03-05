@@ -70,7 +70,8 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
   // Map from requestId to all in-progress records for that ID.
   // Multiple requests can share the same requestId; each gets its own record.
   const recordsByRequestId = new Map<string, Partial<HttpRequest>[]>();
-  // Flat list preserving insertion order for final output.
+  // Flat list of all request records in discovery (insertion) order;
+  // final output may be reordered later.
   const allRecordsList: Partial<HttpRequest>[] = [];
   const rawLogLines: ParsedLogLine[] = [];
   let linesWithTimestamps = 0;
@@ -174,20 +175,28 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       }
       const bucket = recordsByRequestId.get(requestId)!;
 
-      // Find the last record for this requestId that has NO sendLineNumber.
-      // This handles out-of-order logs where a response line appears before
-      // its matching send: in that case the response already created a record,
-      // and we pair the send into it instead of creating a duplicate.
-      // If all existing records already have a send, this is a new independent
-      // request sharing the same requestId, so we create a fresh record.
-      // Walk backwards to avoid array allocation.
+      // Pair this send with the best compatible response-only record by scanning
+      // backwards (most-recent first) in a single pass.
+      // Priority:
+      //   1. Last response-only record with matching method+uri.
+      //   2. Last response-only record with no method/uri yet.
+      //   3. Otherwise create a new record.
+      const sendMethod = sendMatch.groups.method;
+      const sendUri = sendMatch.groups.uri;
       let rec: Partial<HttpRequest> | null = null;
+      let fallbackEmpty: Partial<HttpRequest> | null = null;
       for (let j = bucket.length - 1; j >= 0; j--) {
-        if (!bucket[j].sendLineNumber) {
-          rec = bucket[j];
+        const candidate = bucket[j];
+        if (candidate.sendLineNumber) continue;
+        if (candidate.method === sendMethod && candidate.uri === sendUri) {
+          rec = candidate;
           break;
         }
+        if (!fallbackEmpty && !candidate.method && !candidate.uri) {
+          fallbackEmpty = candidate;
+        }
       }
+      if (!rec) rec = fallbackEmpty;
       if (!rec) {
         rec = {};
         bucket.push(rec);

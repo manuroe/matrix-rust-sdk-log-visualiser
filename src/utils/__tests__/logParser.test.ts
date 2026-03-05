@@ -308,6 +308,32 @@ describe('logParser', () => {
         expect(result.httpRequests[1].sendLineNumber).toBe(2);
         expect(result.httpRequests[1].responseLineNumber).toBe(3);
       });
+
+      it('does not attach a send to an incompatible response-only record', () => {
+        const responseA = RESPONSE_LINE
+          .replace('REQ-63', 'DUPE-SEND-PAIR')
+          .replace('method=POST', 'method=GET')
+          .replace('/sync"', '/a"');
+        const responseB = RESPONSE_LINE
+          .replace('REQ-63', 'DUPE-SEND-PAIR')
+          .replace('/sync"', '/b"');
+        const sendC = SEND_LINE
+          .replace('REQ-62', 'DUPE-SEND-PAIR')
+          .replace('/sync"', '/c"');
+
+        const result = parseAllHttpRequests([responseA, responseB, sendC].join('\n'));
+
+        // Keep both response-only records intact; create a new send-only record for /c.
+        expect(result.httpRequests).toHaveLength(3);
+
+        const byUri = new Map(result.httpRequests.map(req => [req.uri, req]));
+        expect(byUri.get('https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/a')?.responseLineNumber).toBe(1);
+        expect(byUri.get('https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/a')?.sendLineNumber).toBe(0);
+        expect(byUri.get('https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/b')?.responseLineNumber).toBe(2);
+        expect(byUri.get('https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/b')?.sendLineNumber).toBe(0);
+        expect(byUri.get('https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/c')?.sendLineNumber).toBe(3);
+        expect(byUri.get('https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/c')?.responseLineNumber).toBe(0);
+      });
     });
 
     describe('error handling', () => {
