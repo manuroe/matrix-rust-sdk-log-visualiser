@@ -493,7 +493,8 @@ export function SummaryView() {
           {/* Activity Chart */}
           <div className={styles.activityChartContainer}>
             <LogActivityChart 
-              logLines={stats.filteredLogLines} 
+              logLines={stats.filteredLogLines}
+              sentryEvents={stats.sentryEvents}
               onTimeRangeSelected={handleTimeRangeSelected}
               onResetZoom={handleResetZoom}
             />
