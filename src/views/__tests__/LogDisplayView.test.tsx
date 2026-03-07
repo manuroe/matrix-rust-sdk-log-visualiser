@@ -450,9 +450,9 @@ describe('LogDisplayView filter & search behaviors', () => {
 
     await new Promise(resolve => setTimeout(resolve, 400));
 
-    // Matches are highlighted and both lines remain visible
+    // Matches are highlighted in both lines (case-insensitive search) and both lines remain visible
     const marks = screen.queryAllByRole('mark');
-    expect(marks.length).toBeGreaterThanOrEqual(1);
+    expect(marks.length).toBe(2);
     expect(screen.getByText('0')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
   });

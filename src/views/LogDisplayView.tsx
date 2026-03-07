@@ -157,10 +157,10 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     if (!searchQuery.trim()) return new Set<number>();
     // Build a set of original indices that match the search within filtered lines
     const matchingOriginalIndices = new Set<number>();
+    const normalizedQuery = searchQuery.toLowerCase();
     filteredLines.forEach(({ line, index }) => {
       const text = line.rawText.toLowerCase();
-      const query = searchQuery.toLowerCase();
-      if (text.includes(query)) {
+      if (text.includes(normalizedQuery)) {
         matchingOriginalIndices.add(index);
       }
     });
