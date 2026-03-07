@@ -12,7 +12,7 @@ vi.mock('@tanstack/react-virtual', () => {
   return {
     useVirtualizer: (opts: any) => ({
       getTotalSize: () => opts.count * 24,
-      getVirtualItems: () => Array.from({ length: opts.count + 1 }, (_, i) => ({ index: i, key: i, start: i * 24 })),
+      getVirtualItems: () => Array.from({ length: opts.count }, (_, i) => ({ index: i, key: i, start: i * 24 })),
       measureElement: () => {},
       measure: () => {},
       measurementsCache: [],
