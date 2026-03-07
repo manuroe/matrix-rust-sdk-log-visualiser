@@ -59,7 +59,7 @@ Before committing **any** code change (new feature, bug fix, PR comment fix, ref
 ```sh
 npm run build   # must produce no errors
 npm run lint    # must produce no warnings or errors
-npm test -- --run  # all tests must pass
+npm test -- --run --coverage  # coverage thresholds must pass
 ```
 
 Do not commit if any of these steps fail. Fix the issue first, then re-run the full checklist before committing.
@@ -107,7 +107,7 @@ A hand-crafted demo log lives at [`public/demo/demo.log`](public/demo/demo.log).
 - Prefer additive changes over refactors unless necessary.
 - Keep documentation high-level; link to code for implementation specifics.
 - Every new feature must be represented in [`public/demo/demo.log`](public/demo/demo.log).
-- Always pass the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) (`npm run build`, `npm run lint`, `npm test -- --run`) before committing.
+- Always pass the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) (`npm run build`, `npm run lint`, `npm test -- --run --coverage`) before committing.
 
 ## Reference Files (Entry Points)
 - Routing: [docs/APP_ROUTING.md](docs/APP_ROUTING.md)
