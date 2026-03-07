@@ -94,7 +94,6 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
 
   const [contextLines, setContextLines] = useState(0);
   const [lineWrap, setLineWrap] = useState(defaultLineWrap);
-  const [caseSensitive, setCaseSensitive] = useState(false);
   const [stripPrefix, setStripPrefix] = useState(true);
   const [forcedRanges, setForcedRanges] = useState<ForcedRange[]>([]);
 
@@ -125,8 +124,8 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
 
   // Filter determines which lines to show/hide (like old showOnlyMatching behavior)
   const filterMatchingLineIndices = useMemo(() => {
-    return findMatchingIndices(displayLogLines, filterQuery, caseSensitive, (line) => line.rawText);
-  }, [displayLogLines, filterQuery, caseSensitive]);
+    return findMatchingIndices(displayLogLines, filterQuery, false, (line) => line.rawText);
+  }, [displayLogLines, filterQuery]);
 
   // Build the filtered lines based on filter query and context
   const filteredLines = useMemo(() => {
@@ -158,15 +157,15 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     if (!searchQuery.trim()) return new Set<number>();
     // Build a set of original indices that match the search within filtered lines
     const matchingOriginalIndices = new Set<number>();
+    const normalizedQuery = searchQuery.toLowerCase();
     filteredLines.forEach(({ line, index }) => {
-      const text = caseSensitive ? line.rawText : line.rawText.toLowerCase();
-      const query = caseSensitive ? searchQuery : searchQuery.toLowerCase();
-      if (text.includes(query)) {
+      const text = line.rawText.toLowerCase();
+      if (text.includes(normalizedQuery)) {
         matchingOriginalIndices.add(index);
       }
     });
     return matchingOriginalIndices;
-  }, [filteredLines, searchQuery, caseSensitive]);
+  }, [filteredLines, searchQuery]);
 
   // Convert search matches to sorted array for navigation
   const searchMatchesArray = useMemo(() => {
@@ -233,7 +232,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
 
     const parts = highlightTextUtil(displayText, {
       query: searchQuery,
-      caseSensitive,
+      caseSensitive: false,
       keyPrefix: `line-${originalIndex}`,
       highlightClassName: styles.searchHighlight,
     });
@@ -332,14 +331,6 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
               }
             }}
           />
-          <label className={styles.logToolbarOption}>
-            <input
-              type="checkbox"
-              checked={caseSensitive}
-              onChange={(e) => setCaseSensitive(e.target.checked)}
-            />
-            Case sensitive
-          </label>
           {searchMatchesArray.length > 0 && (
             <>
               <div className={styles.searchNavigation}>
