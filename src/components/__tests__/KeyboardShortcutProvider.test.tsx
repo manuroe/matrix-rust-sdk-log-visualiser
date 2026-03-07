@@ -249,6 +249,15 @@ describe('KeyboardShortcutProvider', () => {
     expect(screen.getByTestId('pending-chord').textContent).toBe('none');
   });
 
+  it('unrecognized second chord key clears pendingChord without navigating', () => {
+    renderProvider();
+    act(() => { fireKey('g'); });
+    expect(screen.getByTestId('pending-chord').textContent).toBe('g');
+    act(() => { fireKey('z'); }); // 'z' is not a known second key
+    expect(screen.getByTestId('pending-chord').textContent).toBe('none');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('g chord does nothing when an input is focused', () => {
     renderProvider();
     const input = document.createElement('input');

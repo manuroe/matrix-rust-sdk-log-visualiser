@@ -115,6 +115,41 @@ describe('ShortcutHelpOverlay', () => {
     expect(screen.getByText(/cycle theme/i)).toBeInTheDocument();
     expect(screen.getByText(/new session/i)).toBeInTheDocument();
   });
+
+  // ---------------------------------------------------------------------------
+  // Focus trap
+  // ---------------------------------------------------------------------------
+
+  it('Tab on the last focusable element wraps focus to first', () => {
+    renderWithCtx(makeCtx({ showHelp: true }), <ShortcutHelpOverlay />);
+    const panel = screen.getByRole('dialog');
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    // Close button is both first and last focusable element; move focus to it
+    closeBtn.focus();
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    panel.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(closeBtn);
+  });
+
+  it('Shift+Tab on the first focusable element wraps focus to last', () => {
+    renderWithCtx(makeCtx({ showHelp: true }), <ShortcutHelpOverlay />);
+    const panel = screen.getByRole('dialog');
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    closeBtn.focus();
+    const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    panel.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(closeBtn);
+  });
+
+  it('non-Tab key inside the panel is not intercepted', () => {
+    renderWithCtx(makeCtx({ showHelp: true }), <ShortcutHelpOverlay />);
+    const panel = screen.getByRole('dialog');
+    const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+    panel.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
 });
 
 describe('ChordToast', () => {
