@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateGitHubSourceUrl, resolveSwiftFilenameToBlobUrl, resetSwiftPathCacheForTests } from '../githubLinkGenerator';
+import { generateGitHubSourceUrl, resolveSwiftFilenameToBlobUrl, resetSwiftPathCacheForTests, SWIFT_PATH_SESSION_STORAGE_KEY } from '../githubLinkGenerator';
 
 describe('githubLinkGenerator', () => {
   afterEach(() => {
@@ -45,20 +45,32 @@ describe('githubLinkGenerator', () => {
     const url = await resolveSwiftFilenameToBlobUrl('ClientProxy.swift', 1092);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.github.com/repos/element-hq/element-x-ios/git/trees/main?recursive=1'
+      'https://api.github.com/repos/element-hq/element-x-ios/git/trees/main?recursive=1',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expect(url).toBe('https://github.com/element-hq/element-x-ios/blob/main/ElementX/Sources/Services/Client/ClientProxy.swift#L1092');
   });
 
-  it('returns undefined when the tree fetch fails', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+  it('returns undefined when the tree fetch fails and allows a retry', async () => {
+    // First call fails.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
       json: async () => ({}),
     } as Response);
 
-    const url = await resolveSwiftFilenameToBlobUrl('Unknown.swift', 99);
+    const first = await resolveSwiftFilenameToBlobUrl('Unknown.swift', 99);
+    expect(first).toBeUndefined();
 
-    expect(url).toBeUndefined();
+    // After failure treeFetchPromise is reset; second call retries and succeeds.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        tree: [{ path: 'ElementX/Sources/Unknown.swift', type: 'blob' }],
+      }),
+    } as Response);
+
+    const second = await resolveSwiftFilenameToBlobUrl('Unknown.swift', 99);
+    expect(second).toBe('https://github.com/element-hq/element-x-ios/blob/main/ElementX/Sources/Unknown.swift#L99');
   });
 
   it('returns undefined when file is not found in the tree', async () => {
@@ -92,4 +104,20 @@ describe('githubLinkGenerator', () => {
     expect(second).toBe('https://github.com/element-hq/element-x-ios/blob/main/ElementX/Sources/Services/Client/ClientProxy.swift#L101');
     expect(third).toBe('https://github.com/element-hq/element-x-ios/blob/main/ElementX/Sources/Other/OtherFile.swift#L5');
   });
+
+  it('hydrates path cache from sessionStorage on the second resolve call', async () => {
+    // Seed sessionStorage directly (as if a previous page load had populated it).
+    sessionStorage.setItem(
+      SWIFT_PATH_SESSION_STORAGE_KEY,
+      JSON.stringify({ 'ClientProxy.swift': 'ElementX/Sources/Services/Client/ClientProxy.swift' })
+    );
+
+    // resolveSwiftFilenameToBlobUrl should hydrate from sessionStorage without fetching.
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const url = await resolveSwiftFilenameToBlobUrl('ClientProxy.swift', 1092);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(url).toBe('https://github.com/element-hq/element-x-ios/blob/main/ElementX/Sources/Services/Client/ClientProxy.swift#L1092');
+  });
 });
+

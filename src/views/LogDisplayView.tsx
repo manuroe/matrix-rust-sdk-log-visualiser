@@ -237,9 +237,19 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
         if (sourceRefIndex >= 0) {
           const before = displayText.slice(0, sourceRefIndex);
           const after = displayText.slice(sourceRefIndex + sourceRef.length);
+          // Preserve search highlights in the segments surrounding the link.
+          const highlightOpts = searchQuery && isMatch
+            ? { query: searchQuery, caseSensitive: false, highlightClassName: styles.searchHighlight }
+            : null;
+          const renderedBefore = highlightOpts
+            ? highlightTextUtil(before, { ...highlightOpts, keyPrefix: `line-${originalIndex}-b` })
+            : before;
+          const renderedAfter = highlightOpts
+            ? highlightTextUtil(after, { ...highlightOpts, keyPrefix: `line-${originalIndex}-a` })
+            : after;
           return (
             <>
-              {before}
+              {renderedBefore}
               <a
                 href={githubUrl}
                 target="_blank"
@@ -250,7 +260,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
               >
                 {sourceRef}
               </a>
-              {after}
+              {renderedAfter}
             </>
           );
         }
@@ -301,11 +311,12 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
 
     e.preventDefault();
 
-    // Open without 'noopener' so we retain the window reference needed to
-    // navigate it after the async resolution.  The destination is always
-    // github.com so there is no cross-origin trust concern here.
+    // Open without 'noopener' in the features string so the browser returns a
+    // usable window reference; then immediately nullify opener to block
+    // reverse-tabnabbing (the opened page cannot access window.opener).
     const pendingWindow = window.open('', '_blank');
     if (!pendingWindow) return;
+    pendingWindow.opener = null;
 
     const resolvedUrl = await resolveSwiftFilenameToBlobUrl(filePath, sourceLineNumber);
     const fallbackUrl = generateGitHubSourceUrl(filePath, sourceLineNumber);
@@ -526,6 +537,9 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 className={`${styles.logLine} ${getLogLevelClass(line.level)} ${isMatch ? styles.matchLine : ''} ${isCurrentSearchMatch ? styles.currentMatch : ''} ${lineWrap ? styles.wrap : styles.nowrap}`}
                 onMouseEnter={() => setHoveredLineIndex(index)}
                 onMouseLeave={() => setHoveredLineIndex(null)}
+                onFocus={() => setHoveredLineIndex(index)}
+                onBlur={() => setHoveredLineIndex(null)}
+                tabIndex={0}
                 style={{
                   position: 'absolute',
                   top: 0,

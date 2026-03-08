@@ -1,11 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, waitFor, act } from '@testing-library/react';
 import { screen, fireEvent, createEvent } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { useLogStore } from '../../stores/logStore';
 import { LogDisplayView } from '../LogDisplayView';
 import { createLogsWithMatches, createParsedLogLine } from '../../test/fixtures';
 import { parseAllHttpRequests } from '../../utils/logParser';
+import { resetSwiftPathCacheForTests } from '../../utils/githubLinkGenerator';
 import styles from '../LogDisplayView.module.css';
 import {
   KeyboardShortcutContext,
@@ -255,24 +256,103 @@ describe('LogDisplayView gap arrows & expansion', () => {
     expect(line2Container.classList.contains(styles.nowrap)).toBe(false);
   });
 
-  it('shows a GitHub source link on hover for source-tagged lines', async () => {
-    const user = userEvent.setup();
-    const rustLine = '2026-02-04T13:01:45.365379Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=1 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root';
-    const swiftLine = '2026-02-04T13:10:37.511766Z  INFO elementx: Received room list update: running | ClientProxy.swift:1092 | spans: root';
-    const parsed = parseAllHttpRequests(`${rustLine}\n${swiftLine}`);
-    useLogStore.setState({ rawLogLines: parsed.rawLogLines });
+  describe('GitHub source links', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      resetSwiftPathCacheForTests();
+    });
 
-    render(<LogDisplayView />);
+    const RUST_LINE = '2026-02-04T13:01:45.365379Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=1 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root';
+    const SWIFT_LINE = '2026-02-04T13:10:37.511766Z  INFO elementx: Received room list update: running | ClientProxy.swift:1092 | spans: root';
 
-    const rustLineContainer = getLineContainer(1);
-    await user.hover(rustLineContainer);
-    const rustLink = await screen.findByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
-    expect(rustLink).toHaveAttribute('href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk/src/http_client/native.rs#L78');
+    it('shows a GitHub source link on hover for source-tagged lines', async () => {
+      const user = userEvent.setup();
+      const parsed = parseAllHttpRequests(`${RUST_LINE}\n${SWIFT_LINE}`);
+      useLogStore.setState({ rawLogLines: parsed.rawLogLines });
 
-    const swiftLineContainer = getLineContainer(2);
-    await user.hover(swiftLineContainer);
-    const swiftLink = await screen.findByRole('link', { name: 'ClientProxy.swift:1092' });
-    expect(swiftLink).toHaveAttribute('href', 'https://github.com/element-hq/element-x-ios/search?q=ClientProxy.swift%20repo%3Aelement-hq%2Felement-x-ios&type=code');
+      render(<LogDisplayView />);
+
+      const rustLineContainer = getLineContainer(1);
+      await user.hover(rustLineContainer);
+      const rustLink = await screen.findByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
+      expect(rustLink).toHaveAttribute('href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk/src/http_client/native.rs#L78');
+
+      const swiftLineContainer = getLineContainer(2);
+      await user.hover(swiftLineContainer);
+      const swiftLink = await screen.findByRole('link', { name: 'ClientProxy.swift:1092' });
+      expect(swiftLink).toHaveAttribute('href', 'https://github.com/element-hq/element-x-ios/search?q=ClientProxy.swift%20repo%3Aelement-hq%2Felement-x-ios&type=code');
+    });
+
+    it('shows a GitHub source link on keyboard focus', async () => {
+      const parsed = parseAllHttpRequests(RUST_LINE);
+      useLogStore.setState({ rawLogLines: parsed.rawLogLines });
+
+      render(<LogDisplayView />);
+
+      const container = getLineContainer(1);
+      act(() => { container.focus(); });
+
+      const link = await screen.findByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
+      expect(link).toHaveAttribute('href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk/src/http_client/native.rs#L78');
+
+      act(() => { container.blur(); });
+      expect(screen.queryByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' })).not.toBeInTheDocument();
+    });
+
+    it('clicking a Swift source link navigates to the resolved file URL in a new tab', async () => {
+      const user = userEvent.setup();
+      const parsed = parseAllHttpRequests(SWIFT_LINE);
+      useLogStore.setState({ rawLogLines: parsed.rawLogLines });
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          tree: [{ path: 'ElementX/Sources/Services/Client/ClientProxy.swift', type: 'blob' }],
+        }),
+      } as Response);
+
+      const mockTab = { opener: null as unknown, location: { href: '' }, close: vi.fn() };
+      vi.spyOn(window, 'open').mockReturnValue(mockTab as Window);
+
+      render(<LogDisplayView />);
+      await user.hover(getLineContainer(1));
+      const link = await screen.findByRole('link', { name: 'ClientProxy.swift:1092' });
+      // Use fireEvent.click so the synthetic onClick fires without userEvent's
+      // anchor-navigation side-effects in jsdom.
+      fireEvent.click(link);
+
+      expect(window.open).toHaveBeenCalledWith('', '_blank');
+      expect(mockTab.opener).toBeNull();
+      await waitFor(() => {
+        expect(mockTab.location.href).toBe(
+          'https://github.com/element-hq/element-x-ios/blob/main/ElementX/Sources/Services/Client/ClientProxy.swift#L1092'
+        );
+      });
+    });
+
+    it('preserves search highlights in the text surrounding the source link when hovering a matched line', async () => {
+      const user = userEvent.setup();
+      const parsed = parseAllHttpRequests(RUST_LINE);
+      useLogStore.setState({ rawLogLines: parsed.rawLogLines });
+
+      render(<LogDisplayView />);
+
+      const searchInput = screen.getByPlaceholderText(/search/i);
+      await user.type(searchInput, 'Sending');
+      // Wait for the debounced searchQuery to update and the line to be classed as a match.
+      await waitFor(() => expect(getLineContainer(1).className).toMatch(/matchLine/));
+
+      const container = getLineContainer(1);
+      await user.hover(container);
+
+      const link = await screen.findByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
+      expect(link).toBeInTheDocument();
+
+      // The matched word should still appear highlighted inside a <mark>
+      const marks = container.querySelectorAll('mark');
+      expect(marks.length).toBeGreaterThan(0);
+      expect(marks[0].textContent).toBe('Sending');
+    });
   });
 
   it('contextLines shows surrounding lines when enabled', async () => {

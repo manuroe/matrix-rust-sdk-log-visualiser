@@ -50,8 +50,16 @@ export function generateGitHubSourceUrl(
 //   This returns every file path in the repo in a single JSON response and
 //   works without any credentials.  We walk the tree, index every .swift
 //   blob by its bare filename, and store the result in `swiftPathCache`.
-//   Subsequent lookups are instant O(1) map reads.  The fetch is guarded by
-//   `treeFetchPromise` so it fires at most once even under concurrent calls.
+//   Subsequent lookups are instant O(1) map reads.
+//
+// Performance / resilience:
+//   • sessionStorage: on a successful fetch the full filename→path map is
+//     written to sessionStorage so subsequent page loads in the same tab
+//     session skip the network request entirely.
+//   • AbortController timeout (3 s): if the GitHub API is slow the fetch is
+//     aborted so the caller falls back to the search URL promptly.
+//   • Retry: `treeFetchPromise` is reset to null after each failed attempt,
+//     so the next user click will try again instead of silently giving up.
 // ---------------------------------------------------------------------------
 
 interface GitHubTreeItem {
@@ -64,37 +72,100 @@ interface GitHubTreeResponse {
   truncated?: boolean;
 }
 
+export const SWIFT_PATH_SESSION_STORAGE_KEY = 'element-x-ios-swift-path-cache-v1';
+const TREE_FETCH_TIMEOUT_MS = 3000;
+
 // Maps bare filename (e.g. "ClientProxy.swift") -> full repo path
 const swiftPathCache = new Map<string, string>();
-// Promise guarding a single in-flight tree fetch
+// Promise guarding a single in-flight tree fetch; reset to null on failure so
+// the next call can retry.
 let treeFetchPromise: Promise<void> | null = null;
+// Guards against re-reading sessionStorage more than once per page load.
+let swiftCacheInitializedFromSession = false;
+
+function loadSwiftPathCacheFromSessionStorage(): void {
+  if (swiftCacheInitializedFromSession) return;
+  swiftCacheInitializedFromSession = true;
+  try {
+    const raw = typeof sessionStorage !== 'undefined'
+      ? sessionStorage.getItem(SWIFT_PATH_SESSION_STORAGE_KEY)
+      : null;
+    if (!raw) return;
+    const data = JSON.parse(raw) as Record<string, string>;
+    for (const [name, path] of Object.entries(data)) {
+      if (name && path && !swiftPathCache.has(name)) {
+        swiftPathCache.set(name, path);
+      }
+    }
+  } catch {
+    // Ignore storage/JSON errors and fall back to empty cache.
+  }
+}
+
+function saveSwiftPathCacheToSessionStorage(): void {
+  try {
+    if (typeof sessionStorage === 'undefined' || swiftPathCache.size === 0) return;
+    const data: Record<string, string> = {};
+    for (const [name, path] of swiftPathCache.entries()) {
+      data[name] = path;
+    }
+    sessionStorage.setItem(SWIFT_PATH_SESSION_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage/serialization errors; cache will remain in-memory only.
+  }
+}
 
 export function resetSwiftPathCacheForTests(): void {
   swiftPathCache.clear();
   treeFetchPromise = null;
+  swiftCacheInitializedFromSession = false;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(SWIFT_PATH_SESSION_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage errors in test helper.
+  }
 }
 
 async function ensureSwiftTreeLoaded(): Promise<void> {
+  // Hydrate from sessionStorage first — avoids the network on repeat visits.
+  loadSwiftPathCacheFromSessionStorage();
   if (swiftPathCache.size > 0) return;
+
   if (!treeFetchPromise) {
     treeFetchPromise = (async () => {
       try {
-        const response = await fetch(
-          'https://api.github.com/repos/element-hq/element-x-ios/git/trees/main?recursive=1'
-        );
-        if (!response.ok) return;
-        const payload = (await response.json()) as GitHubTreeResponse;
-        for (const item of payload.tree ?? []) {
-          if (item.type === 'blob' && item.path?.endsWith('.swift')) {
-            const name = item.path.split('/').pop();
-            // Keep the first occurrence when multiple files share a name.
-            if (name && !swiftPathCache.has(name)) {
-              swiftPathCache.set(name, item.path);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TREE_FETCH_TIMEOUT_MS);
+        try {
+          const response = await fetch(
+            'https://api.github.com/repos/element-hq/element-x-ios/git/trees/main?recursive=1',
+            { signal: controller.signal }
+          );
+          if (!response.ok) return;
+          const payload = (await response.json()) as GitHubTreeResponse;
+          for (const item of payload.tree ?? []) {
+            if (item.type === 'blob' && item.path?.endsWith('.swift')) {
+              const name = item.path.split('/').pop();
+              // Keep the first occurrence when multiple files share a name.
+              if (name && !swiftPathCache.has(name)) {
+                swiftPathCache.set(name, item.path);
+              }
             }
           }
+          // Persist the populated map for the rest of this browser session.
+          saveSwiftPathCacheToSessionStorage();
+        } finally {
+          clearTimeout(timeoutId);
         }
       } catch {
         // Leave cache empty; caller will fall back to the search URL.
+      } finally {
+        // Allow a future retry if the cache is still empty (fetch failed/timed out).
+        if (swiftPathCache.size === 0) {
+          treeFetchPromise = null;
+        }
       }
     })();
   }
