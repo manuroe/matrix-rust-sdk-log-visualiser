@@ -39,8 +39,14 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Install pngquant
+        run: sudo apt-get install -y pngquant
+
       - name: Capture screenshots
         run: npm run screenshots
+
+      - name: Compress screenshots
+        run: pngquant --force --ext .png --quality 65-85 public/demo/screenshot-*.png
 
       - name: Commit screenshots
         run: |

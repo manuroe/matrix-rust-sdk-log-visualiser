@@ -101,6 +101,12 @@ A hand-crafted demo log lives at [`public/demo/demo.log`](public/demo/demo.log).
 
 **When adding a new feature**, extend `public/demo/demo.log` so the feature is visible and exercisable in the demo. The log must remain a valid, parseable Matrix Rust SDK log that exercises all existing app capabilities as well as the new one.
 
+## Demo Screenshots
+
+Screenshots in [`public/demo/screenshot-*.png`](public/demo/) are **generated and committed automatically by CI** ([.github/workflows/screenshots.yml](.github/workflows/screenshots.yml)) using a headless Chromium on Ubuntu, then compressed with pngquant for a consistent, OS-independent result.
+
+**Do not regenerate screenshots locally.** Push your changes and let CI update them. If you need to verify what the screenshots will look like, run the dev server and inspect the UI manually.
+
 ## Contribution Guidelines
 - Use camelCase for identifiers (lint enforced).
 - Avoid embedding parsing logic directly in components.
