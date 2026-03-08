@@ -418,6 +418,24 @@ function formatForAgent(prData: PRData, comments: FormattedComment[]): string {
   return output;
 }
 
+function createDetailedReplySkeleton(comment: FormattedComment): string {
+  const location = comment.file && comment.line
+    ? `${comment.file}:${comment.line}`
+    : 'general PR discussion';
+  const sourceLabel = comment.sourceType === 'reviewInline'
+    ? 'inline review comment'
+    : comment.sourceType === 'reviewBody'
+      ? 'review summary comment'
+      : 'PR issue comment';
+
+  return [
+    `Implemented the requested changes for ${sourceLabel} #${comment.id}.`,
+    `Where: ${location}.`,
+    'Validation: npm run build, npm run lint, npm test -- --run --coverage.',
+    'Commit: <paste commit SHA or link>.',
+  ].join('\n');
+}
+
 /**
  * Main execution
  */
@@ -444,6 +462,10 @@ function main() {
     owner: prData.owner,
     repo: prData.repo,
     generatedAt: new Date().toISOString(),
+    replyGuidance: {
+      format: ['Implemented', 'Where', 'Validation', 'Commit'],
+      note: 'Replace placeholders and keep replies concise and specific to the addressed comment.',
+    },
     replies: unresolvedComments.map(comment => ({
       commentId: comment.id,
       sourceType: comment.sourceType,
@@ -452,7 +474,7 @@ function main() {
       file: comment.file,
       line: comment.line,
       commentUrl: comment.commentUrl,
-      message: '',
+      message: createDetailedReplySkeleton(comment),
       skip: false,
     })),
   };
