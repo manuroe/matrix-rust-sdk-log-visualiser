@@ -70,7 +70,7 @@ Do not commit if any of these steps fail. Fix the issue first, then re-run the f
 When prompted **"Review PR comments"**:
 1. Run `npm run pr:comments`.
 2. Read `pr-comments-for-agent.md` for unresolved actionable comments (contains comment IDs and reply endpoint type).
-3. Create a todo list and fix each comment systematically.
+3. Create a todo list and address each comment systematically (fix or reject).
 4. Run the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) before each commit.
 5. Fill `pr-replies-template.json` with one detailed reply per addressed comment.
 6. Send replies in one batch with `npm run pr:reply:batch` (or `npm run pr:reply -- --batch-file <path>`).
