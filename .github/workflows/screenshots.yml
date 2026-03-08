@@ -39,8 +39,23 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Install pngquant
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pngquant
+
       - name: Capture screenshots
         run: npm run screenshots
+
+      - name: Compress screenshots
+        run: |
+          set +e
+          pngquant --force --skip-if-larger --ext .png --quality 65-85 public/demo/screenshot-*.png
+          status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 99 ]; then
+            echo "pngquant failed with unexpected exit code $status"
+            exit "$status"
+          fi
 
       - name: Commit screenshots
         run: |
