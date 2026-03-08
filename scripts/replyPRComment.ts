@@ -74,6 +74,11 @@ function parseArgs(): SingleArgs | BatchArgs {
   const failOnAnyError = args.includes('--fail-on-any-error');
   const resultsFileIdx = args.indexOf('--results-file');
 
+  if (batchFileIdx !== -1 && !args[batchFileIdx + 1]) {
+    console.error('❌ Missing --batch-file <path>');
+    process.exit(1);
+  }
+
   if (batchFileIdx !== -1 && args[batchFileIdx + 1]) {
     const maxRetriesRaw = maxRetriesIdx !== -1 ? Number(args[maxRetriesIdx + 1]) : 1;
     if (Number.isNaN(maxRetriesRaw) || maxRetriesRaw < 1) {
