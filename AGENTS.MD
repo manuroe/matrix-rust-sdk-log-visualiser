@@ -49,8 +49,9 @@ This document is a lightweight guide for contributors and automated agents. It f
 - Unit tests: `npm test -- --run` (exits after completion; omit `-- --run` for watch mode)
 - Performance benchmarks: `npm run bench`
   - Runs `.perf.test.ts` suites in Node runtime and reports results through CodSpeed in CI
-- Fetch PR review comments (unresolved only): `npm run pr:comments` (auto-detects current branch) or `npm run pr:comments -- --pr <number>`
-- Reply to a PR review comment: `npm run pr:reply -- --comment-id <id> --message "<text>"`
+- Fetch PR review comments (unresolved actionable list): `npm run pr:comments` (auto-detects current branch) or `npm run pr:comments -- --pr <number>`
+- Batch-reply to PR comments from template file: `npm run pr:reply:batch` (reads `pr-replies-template.json`)
+- Reply to a single PR review comment: `npm run pr:reply -- --comment-id <id> --message "<text>"`
 
 ## Pre-Commit Checklist (for Agents)
 
@@ -66,7 +67,17 @@ Do not commit if any of these steps fail. Fix the issue first, then re-run the f
 
 ## PR Review Workflow (for Agents)
 
-When prompted **"Review PR comments"**: run `npm run pr:comments`, read `pr-comments-for-agent.md` (only unresolved comments are shown), create todo list, fix each systematically, run the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) before each commit, then reply to every addressed comment: `npm run pr:reply -- --comment-id <id> --message "Fixed in $(git rev-parse --short HEAD)"`.
+When prompted **"Review PR comments"**:
+1. Run `npm run pr:comments`.
+2. Read `pr-comments-for-agent.md` for unresolved actionable comments (contains comment IDs and reply endpoint type).
+3. Create a todo list and fix each comment systematically.
+4. Run the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) before each commit.
+5. Fill `pr-replies-template.json` with one detailed reply per addressed comment.
+6. Send replies in one batch with `npm run pr:reply:batch` (or `npm run pr:reply -- --batch-file <path>`).
+
+Reply quality guideline:
+- Do not send only `Fixed in <sha>`.
+- Prefer a concise detailed format: what changed, where it changed, how it was validated, and the commit reference/link.
 
 ## Architecture (Conceptual)
 1. Parse log text into structured records once.
