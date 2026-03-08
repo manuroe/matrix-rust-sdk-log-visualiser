@@ -265,38 +265,48 @@ describe('LogDisplayView gap arrows & expansion', () => {
     const RUST_LINE = '2026-02-04T13:01:45.365379Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=1 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root';
     const SWIFT_LINE = '2026-02-04T13:10:37.511766Z  INFO elementx: Received room list update: running | ClientProxy.swift:1092 | spans: root';
 
-    it('shows a GitHub source link on hover for source-tagged lines', async () => {
+    it('shows source links with hover styling for source-tagged lines', async () => {
       const user = userEvent.setup();
       const parsed = parseAllHttpRequests(`${RUST_LINE}\n${SWIFT_LINE}`);
       useLogStore.setState({ rawLogLines: parsed.rawLogLines });
 
       render(<LogDisplayView />);
 
-      const rustLineContainer = getLineContainer(1);
-      await user.hover(rustLineContainer);
-      const rustLink = await screen.findByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
+      // Links are always in the DOM; before hover they carry the inactive class.
+      const rustLink = screen.getByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
       expect(rustLink).toHaveAttribute('href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk/src/http_client/native.rs#L78');
+      expect(rustLink.className).toMatch(/sourceLinkInactive/);
 
-      const swiftLineContainer = getLineContainer(2);
-      await user.hover(swiftLineContainer);
-      const swiftLink = await screen.findByRole('link', { name: 'ClientProxy.swift:1092' });
+      // Hovering the row switches the link to active (visible) styling.
+      await user.hover(getLineContainer(1));
+      await waitFor(() => expect(rustLink.className).toMatch(/sourceLink(?!Inactive)/));
+
+      const swiftLink = screen.getByRole('link', { name: 'ClientProxy.swift:1092' });
       expect(swiftLink).toHaveAttribute('href', 'https://github.com/element-hq/element-x-ios/search?q=ClientProxy.swift%20repo%3Aelement-hq%2Felement-x-ios&type=code');
+      expect(swiftLink.className).toMatch(/sourceLinkInactive/);
+      await user.hover(getLineContainer(2));
+      await waitFor(() => expect(swiftLink.className).toMatch(/sourceLink(?!Inactive)/));
     });
 
-    it('shows a GitHub source link on keyboard focus', async () => {
+    it('shows active link styling on keyboard focus and restores inactive on blur', async () => {
       const parsed = parseAllHttpRequests(RUST_LINE);
       useLogStore.setState({ rawLogLines: parsed.rawLogLines });
 
       render(<LogDisplayView />);
 
+      // Link is always in the DOM; starts with inactive (plain-text) styling.
+      const link = screen.getByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
+      expect(link).toHaveAttribute('href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk/src/http_client/native.rs#L78');
+      expect(link.className).toMatch(/sourceLinkInactive/);
+
+      // Focus the row → link becomes visually active.
       const container = getLineContainer(1);
       act(() => { container.focus(); });
+      await waitFor(() => expect(link.className).toMatch(/sourceLink(?!Inactive)/));
 
-      const link = await screen.findByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
-      expect(link).toHaveAttribute('href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk/src/http_client/native.rs#L78');
-
+      // Blur the row entirely → link reverts to inactive styling (still in DOM).
       act(() => { container.blur(); });
-      expect(screen.queryByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' })).not.toBeInTheDocument();
+      await waitFor(() => expect(link.className).toMatch(/sourceLinkInactive/));
     });
 
     it('clicking a Swift source link navigates to the resolved file URL in a new tab', async () => {
@@ -352,6 +362,49 @@ describe('LogDisplayView gap arrows & expansion', () => {
       const marks = container.querySelectorAll('mark');
       expect(marks.length).toBeGreaterThan(0);
       expect(marks[0].textContent).toBe('Sending');
+    });
+
+    it('highlights search matches inside the source link text when the line matches the search', async () => {
+      const user = userEvent.setup();
+      const parsed = parseAllHttpRequests(RUST_LINE);
+      useLogStore.setState({ rawLogLines: parsed.rawLogLines });
+
+      render(<LogDisplayView />);
+
+      // Search for a term that appears inside the sourceRef itself.
+      const searchInput = screen.getByPlaceholderText(/search/i);
+      await user.type(searchInput, 'native.rs');
+      await waitFor(() => expect(getLineContainer(1).className).toMatch(/matchLine/));
+
+      // The link is always in the DOM; its highlighted text can be found by accessible name.
+      const link = await screen.findByRole('link', { name: /native\.rs/ });
+      const markInLink = link.querySelector('mark');
+      expect(markInLink).not.toBeNull();
+      expect(markInLink?.textContent).toBe('native.rs');
+    });
+
+    it('keeps active link styling when focus moves from the row to the link inside it', async () => {
+      const parsed = parseAllHttpRequests(RUST_LINE);
+      useLogStore.setState({ rawLogLines: parsed.rawLogLines });
+
+      render(<LogDisplayView />);
+
+      // Link is always in the DOM; starts inactive.
+      const link = screen.getByRole('link', { name: 'crates/matrix-sdk/src/http_client/native.rs:78' });
+      expect(link.className).toMatch(/sourceLinkInactive/);
+
+      const container = getLineContainer(1);
+      act(() => { container.focus(); });
+      await waitFor(() => expect(link.className).toMatch(/sourceLink(?!Inactive)/));
+
+      // Blur the row with relatedTarget = the link (focus staying inside the row).
+      // The active styling should be preserved.
+      act(() => { fireEvent.blur(container, { relatedTarget: link }); });
+      expect(link.className).toMatch(/sourceLink(?!Inactive)/);
+
+      // Blur to outside: inactive styling restored.
+      act(() => { container.blur(); });
+      await waitFor(() => expect(link.className).toMatch(/sourceLinkInactive/));
     });
   });
 

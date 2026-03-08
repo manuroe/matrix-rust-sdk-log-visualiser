@@ -229,7 +229,10 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     const displayText = getDisplayText(line);
     const isHovered = hoveredLineIndex === originalIndex;
 
-    if (isHovered && line.filePath && line.sourceLineNumber) {
+    // Always render the anchor so the first click lands on the element.
+    // The link only receives visible link styling when the row is hovered/focused;
+    // otherwise it inherits the surrounding text appearance (sourceLinkInactive).
+    if (line.filePath && line.sourceLineNumber) {
       const githubUrl = generateGitHubSourceUrl(line.filePath, line.sourceLineNumber);
       if (githubUrl) {
         const sourceRef = `${line.filePath}:${line.sourceLineNumber}`;
@@ -244,6 +247,9 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
           const renderedBefore = highlightOpts
             ? highlightTextUtil(before, { ...highlightOpts, keyPrefix: `line-${originalIndex}-b` })
             : before;
+          const renderedSourceRef = highlightOpts
+            ? highlightTextUtil(sourceRef, { ...highlightOpts, keyPrefix: `line-${originalIndex}-r` })
+            : sourceRef;
           const renderedAfter = highlightOpts
             ? highlightTextUtil(after, { ...highlightOpts, keyPrefix: `line-${originalIndex}-a` })
             : after;
@@ -254,11 +260,11 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 href={githubUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={styles.sourceLink}
-                title="View on GitHub"
+                className={isHovered ? styles.sourceLink : styles.sourceLinkInactive}
+                title={isHovered ? 'View on GitHub' : undefined}
                 onClick={(e) => handleSourceLinkClick(e, line.filePath, line.sourceLineNumber)}
               >
-                {sourceRef}
+                {renderedSourceRef}
               </a>
               {renderedAfter}
             </>
@@ -538,8 +544,12 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 onMouseEnter={() => setHoveredLineIndex(index)}
                 onMouseLeave={() => setHoveredLineIndex(null)}
                 onFocus={() => setHoveredLineIndex(index)}
-                onBlur={() => setHoveredLineIndex(null)}
-                tabIndex={0}
+                onBlur={(e: React.FocusEvent<HTMLDivElement>) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    setHoveredLineIndex(null);
+                  }
+                }}
+                tabIndex={-1}
                 style={{
                   position: 'absolute',
                   top: 0,
