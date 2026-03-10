@@ -558,6 +558,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             const gapAbove = item.gapAbove;
             const gapBelow = item.gapBelow;
             const collapseInfo = gapBelow ? collapseGroupsMap.get(gapBelow.gapId) : undefined;
+            const collapsedCount = collapseInfo && gapBelow ? Math.min(collapseInfo.count, gapBelow.remainingGap) : 0;
 
             return (
               <div
@@ -630,9 +631,9 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                       {collapseInfo.type === 'exact' ? '=' : '≈'}
                     </span>
                     <span className={styles.collapseSummaryText}>
-                      {gapBelow.remainingGap.toLocaleString()} {collapseInfo.type === 'exact' ? 'identical' : 'similar'} {gapBelow.remainingGap === 1 ? 'line' : 'lines'} collapsed
+                      {collapsedCount.toLocaleString()} {collapseInfo.type === 'exact' ? 'identical' : 'similar'} {collapsedCount === 1 ? 'line' : 'lines'} collapsed
                       <span className={styles.collapseSummaryActions}>
-                        {gapBelow.remainingGap > 10 && (
+                        {collapsedCount > 10 && (
                           <>
                             {' - '}
                             <button
@@ -648,7 +649,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                         <button
                           className={styles.collapseSummaryBtn}
                           onClick={() => expandGap(gapBelow.gapId, 'all')}
-                          aria-label={`Expand all ${gapBelow.remainingGap} collapsed lines`}
+                          aria-label={`Expand all ${collapsedCount} collapsed lines`}
                         >
                           show all
                         </button>

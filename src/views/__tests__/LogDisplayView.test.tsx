@@ -1169,7 +1169,7 @@ describe('LogDisplayView collapse duplicates', () => {
   });
 
   it('shows +10 button only when collapsed count exceeds 10', () => {
-    // With only 2 collapsed lines, +10 button should NOT appear
+    // With only 3 collapsed lines, +10 button should NOT appear
     useLogStore.setState({ rawLogLines: createDuplicateLogLines() });
     render(<LogDisplayView />);
 

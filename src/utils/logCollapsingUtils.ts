@@ -48,7 +48,10 @@ function getLineRelation(a: ParsedLogLine, b: ParsedLogLine): CollapseType | nul
     return 'exact';
   }
   if (
-    a.filePath && a.sourceLineNumber &&
+    a.filePath !== null && a.filePath !== undefined &&
+    b.filePath !== null && b.filePath !== undefined &&
+    a.sourceLineNumber !== null && a.sourceLineNumber !== undefined &&
+    b.sourceLineNumber !== null && b.sourceLineNumber !== undefined &&
     a.filePath === b.filePath &&
     a.sourceLineNumber === b.sourceLineNumber
   ) {
@@ -69,8 +72,8 @@ function isIgnoredSource(line: ParsedLogLine): boolean {
  * collapse groups.
  *
  * Only lines that are adjacent in the raw log array (consecutive indices) are
- * grouped. Groups of 2+ lines keep only the first (representative) visible;
- * the rest are returned in `collapsedIndices`.
+ * grouped. Groups whose total size is at least `MIN_COLLAPSE_COUNT` keep only
+ * the first (representative) visible; the rest are returned in `collapsedIndices`.
  *
  * Each group is classified as:
  * - 'exact': all members are identical to the representative after removing the ISO timestamp
