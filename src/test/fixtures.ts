@@ -36,6 +36,8 @@ export function createParsedLogLine(
     level,
     message,
     strippedMessage,
+    filePath: overrides.filePath,
+    sourceLineNumber: overrides.sourceLineNumber,
   };
 }
 

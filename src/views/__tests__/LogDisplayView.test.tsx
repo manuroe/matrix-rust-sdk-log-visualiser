@@ -1042,3 +1042,253 @@ describe('LogDisplayView shortcut registration', () => {
     expect(checkbox.checked).toBe(!initial);
   });
 });
+
+describe('LogDisplayView collapse duplicates', () => {
+  function createDuplicateLogLines() {
+    // Lines 0-3: four exact duplicates (same text, different timestamps) → collapsed
+    // Lines 4-7: four similar lines (same source file:line, different content) → collapsed
+    // Line 8: unique line
+    const lines = [
+      createParsedLogLine({
+        lineNumber: 0,
+        rawText: '2024-01-15T10:00:00.000000Z ERROR Duplicate error message',
+        level: 'ERROR',
+      }),
+      createParsedLogLine({
+        lineNumber: 1,
+        rawText: '2024-01-15T10:00:01.000000Z ERROR Duplicate error message',
+        level: 'ERROR',
+      }),
+      createParsedLogLine({
+        lineNumber: 2,
+        rawText: '2024-01-15T10:00:02.000000Z ERROR Duplicate error message',
+        level: 'ERROR',
+      }),
+      createParsedLogLine({
+        lineNumber: 3,
+        rawText: '2024-01-15T10:00:03.000000Z ERROR Duplicate error message',
+        level: 'ERROR',
+      }),
+      createParsedLogLine({
+        lineNumber: 4,
+        rawText: '2024-01-15T10:00:04.000000Z INFO Room unknown room=!abc | crates/room.rs:42 | spans: root',
+        level: 'INFO',
+        filePath: 'crates/room.rs',
+        sourceLineNumber: 42,
+      }),
+      createParsedLogLine({
+        lineNumber: 5,
+        rawText: '2024-01-15T10:00:05.000000Z INFO Room unknown room=!def | crates/room.rs:42 | spans: root',
+        level: 'INFO',
+        filePath: 'crates/room.rs',
+        sourceLineNumber: 42,
+      }),
+      createParsedLogLine({
+        lineNumber: 6,
+        rawText: '2024-01-15T10:00:06.000000Z INFO Room unknown room=!ghi | crates/room.rs:42 | spans: root',
+        level: 'INFO',
+        filePath: 'crates/room.rs',
+        sourceLineNumber: 42,
+      }),
+      createParsedLogLine({
+        lineNumber: 7,
+        rawText: '2024-01-15T10:00:07.000000Z INFO Room unknown room=!jkl | crates/room.rs:42 | spans: root',
+        level: 'INFO',
+        filePath: 'crates/room.rs',
+        sourceLineNumber: 42,
+      }),
+      createParsedLogLine({
+        lineNumber: 8,
+        rawText: '2024-01-15T10:00:08.000000Z DEBUG Unique line',
+        level: 'DEBUG',
+      }),
+    ];
+    return lines;
+  }
+
+  it('collapses exact duplicates and shows summary bar with = and identical', () => {
+    useLogStore.setState({ rawLogLines: createDuplicateLogLines() });
+    render(<LogDisplayView />);
+
+    // Line 0 should be visible (representative)
+    const line0 = getLineContainer(0);
+    expect(line0).toBeInTheDocument();
+
+    // Lines 1, 2, 3 should be collapsed (not visible)
+    expect(screen.queryByText('1', { selector: `.${styles.logLineNumber}` })).toBeNull();
+    expect(screen.queryByText('2', { selector: `.${styles.logLineNumber}` })).toBeNull();
+    expect(screen.queryByText('3', { selector: `.${styles.logLineNumber}` })).toBeNull();
+
+    // Should show a collapse summary bar with = sign and "identical" text
+    const collapseBar = line0.querySelector('[data-testid="collapse-bar"]');
+    expect(collapseBar).toBeTruthy();
+    expect(collapseBar?.textContent).toContain('=');
+    expect(collapseBar?.textContent).toContain('3 identical lines collapsed');
+    expect(collapseBar?.textContent).toContain('show all');
+  });
+
+  it('collapses similar lines and shows summary bar with ≈ and source location', () => {
+    useLogStore.setState({ rawLogLines: createDuplicateLogLines() });
+    render(<LogDisplayView />);
+
+    // Line 4 should be visible (representative)
+    const line4 = getLineContainer(4);
+    expect(line4).toBeInTheDocument();
+
+    // Lines 5, 6, 7 should be collapsed
+    expect(screen.queryByText('5', { selector: `.${styles.logLineNumber}` })).toBeNull();
+    expect(screen.queryByText('6', { selector: `.${styles.logLineNumber}` })).toBeNull();
+    expect(screen.queryByText('7', { selector: `.${styles.logLineNumber}` })).toBeNull();
+
+    // Should show a collapse summary bar with ≈ sign and source info
+    const collapseBar = line4.querySelector('[data-testid="collapse-bar"]');
+    expect(collapseBar).toBeTruthy();
+    expect(collapseBar?.textContent).toContain('≈');
+    expect(collapseBar?.textContent).toContain('3 similar lines collapsed');
+    expect(collapseBar?.textContent).toContain('show all');
+  });
+
+  it('expands all collapsed lines when All button is clicked', async () => {
+    const user = userEvent.setup();
+    useLogStore.setState({ rawLogLines: createDuplicateLogLines() });
+    render(<LogDisplayView />);
+
+    // Line 1 should be collapsed
+    expect(screen.queryByText('1', { selector: `.${styles.logLineNumber}` })).toBeNull();
+
+    // Click the "All" button in the collapse summary bar
+    const line0 = getLineContainer(0);
+    const allBtn = line0.querySelector('button[aria-label*="Expand all"]') as HTMLButtonElement;
+    expect(allBtn).toBeTruthy();
+    await user.click(allBtn);
+
+    // Lines 1, 2, 3 should now be visible
+    expect(screen.getByText('1', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('2', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('3', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+  });
+
+  it('shows +10 button only when collapsed count exceeds 10', () => {
+    // With only 3 collapsed lines, +10 button should NOT appear
+    useLogStore.setState({ rawLogLines: createDuplicateLogLines() });
+    render(<LogDisplayView />);
+
+    const line0 = getLineContainer(0);
+    const plus10Btn = line0.querySelector('button[aria-label="Load 10 collapsed lines"]');
+    expect(plus10Btn).toBeNull();
+  });
+
+  it('shows all lines when collapse is disabled via checkbox', async () => {
+    const user = userEvent.setup();
+    useLogStore.setState({ rawLogLines: createDuplicateLogLines() });
+    render(<LogDisplayView />);
+
+    // Lines 1, 2, 3 should be collapsed initially
+    expect(screen.queryByText('1', { selector: `.${styles.logLineNumber}` })).toBeNull();
+
+    // Uncheck the collapse checkbox
+    const checkbox = screen.getByLabelText(/Collapse duplicates/i) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    await user.click(checkbox);
+
+    // Now all lines should be visible
+    expect(screen.getByText('1', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('2', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('3', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('5', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('6', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('7', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+  });
+
+  it('unique lines remain visible with collapsing enabled', () => {
+    useLogStore.setState({ rawLogLines: createDuplicateLogLines() });
+    render(<LogDisplayView />);
+
+    // Line 8 is unique and should always be visible
+    const line8 = getLineContainer(8);
+    expect(line8).toBeInTheDocument();
+  });
+
+  it('summary bar count updates when expanding from the bottom via gap-above arrow', async () => {
+    // 25 exact duplicates: line 0 = representative, lines 1-24 = collapsed
+    // Line 25 is a unique line after the group (has gapAbove)
+    const user = userEvent.setup();
+    const lines = [
+      ...Array.from({ length: 25 }, (_, i) =>
+        createParsedLogLine({
+          lineNumber: i,
+          rawText: `2024-01-15T10:00:${String(i).padStart(2, '0')}.000000Z ERROR Repeated error`,
+          level: 'ERROR',
+        })
+      ),
+      createParsedLogLine({
+        lineNumber: 25,
+        rawText: '2024-01-15T10:00:25.000000Z INFO Unique after group',
+        level: 'INFO',
+      }),
+    ];
+    useLogStore.setState({ rawLogLines: lines });
+    render(<LogDisplayView />);
+
+    // Line 0 visible; lines 1-24 collapsed (count=24); line 25 visible after gap
+    const line0 = getLineContainer(0);
+    const initialBar = line0.querySelector('[data-testid="collapse-bar"]');
+    expect(initialBar?.textContent).toContain('24 identical lines collapsed');
+
+    // Line 25 has a gapAbove arrow — click it to load 10 from the bottom of the gap
+    const line25 = getLineContainer(25);
+    const upArrow = line25.querySelector('button[aria-label="Load hidden lines above"]') as HTMLButtonElement;
+    expect(upArrow).toBeTruthy();
+    await user.click(upArrow);
+
+    // Lines 15-24 should now be visible
+    expect(screen.getByText('15', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('24', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+
+    // Lines 1-14 still collapsed — summary bar on line 0 must show remaining count
+    const updatedBar = line0.querySelector('[data-testid="collapse-bar"]');
+    expect(updatedBar).toBeTruthy();
+    expect(updatedBar?.textContent).toContain('14 identical lines collapsed');
+  });
+
+  it('summary bar persists and shows updated count after +10 partial expansion', async () => {
+    // 13 exact duplicates: line 0 = representative, lines 1-12 = collapsed (count=12)
+    const user = userEvent.setup();
+    const lines = Array.from({ length: 13 }, (_, i) =>
+      createParsedLogLine({
+        lineNumber: i,
+        rawText: `2024-01-15T10:00:${String(i).padStart(2, '0')}.000000Z ERROR Repeated error`,
+        level: 'ERROR',
+      })
+    );
+    useLogStore.setState({ rawLogLines: lines });
+    render(<LogDisplayView />);
+
+    // Initially: line 0 visible, lines 1-12 collapsed, summary bar shows 12 collapsed
+    const line0 = getLineContainer(0);
+    const initialBar = line0.querySelector('[data-testid="collapse-bar"]');
+    expect(initialBar).toBeTruthy();
+    expect(initialBar?.textContent).toContain('12 identical lines collapsed');
+
+    // Click +10
+    const plus10Btn = line0.querySelector('button[aria-label="Load 10 collapsed lines"]') as HTMLButtonElement;
+    expect(plus10Btn).toBeTruthy();
+    await user.click(plus10Btn);
+
+    // Lines 1-10 should now be visible
+    expect(screen.getByText('1', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+    expect(screen.getByText('10', { selector: `.${styles.logLineNumber}` })).toBeInTheDocument();
+
+    // Line 11 and 12 should still be collapsed
+    expect(screen.queryByText('11', { selector: `.${styles.logLineNumber}` })).toBeNull();
+    expect(screen.queryByText('12', { selector: `.${styles.logLineNumber}` })).toBeNull();
+
+    // Summary bar should still be visible on line 10 showing remaining 2 collapsed
+    const line10 = getLineContainer(10);
+    const updatedBar = line10.querySelector('[data-testid="collapse-bar"]');
+    expect(updatedBar).toBeTruthy();
+    expect(updatedBar?.textContent).toContain('2 identical lines collapsed');
+    // +10 should no longer appear (only 2 lines remain)
+    expect(updatedBar?.querySelector('button[aria-label="Load 10 collapsed lines"]')).toBeNull();
+  });
+});
