@@ -12,6 +12,7 @@ import type { SearchInputHandle } from '../components/SearchInput';
 import { useKeyboardShortcutContextOptional } from '../components/KeyboardShortcutContext';
 import { optionKey } from '../utils/shortcuts';
 import { generateGitHubSourceUrl, resolveSwiftFilenameToBlobUrl } from '../utils/githubLinkGenerator';
+import { detectCollapseGroups, type CollapseGroupInfo } from '../utils/logCollapsingUtils';
 import styles from './LogDisplayView.module.css';
 
 interface LogDisplayViewProps {
@@ -98,6 +99,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
   const [stripPrefix, setStripPrefix] = useState(true);
   const [forcedRanges, setForcedRanges] = useState<ForcedRange[]>([]);
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
+  const [collapseEnabled, setCollapseEnabled] = useState(true);
 
   // Option+w → toggle line wrap; Option+p → toggle strip prefix
   useEffect(() => {
@@ -153,21 +155,36 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     return allLines.filter(({ index }) => linesToShow.has(index));
   }, [displayLogLines, lineRange, filterQuery, contextLines, filterMatchingLineIndices]);
 
+  // Collapse consecutive duplicate/similar lines
+  const { visibleLines, collapseGroupsMap } = useMemo(() => {
+    if (!collapseEnabled) {
+      return { visibleLines: filteredLines, collapseGroupsMap: new Map<string, CollapseGroupInfo>() };
+    }
+    const { collapsedIndices, collapseGroups } = detectCollapseGroups(filteredLines);
+    if (collapsedIndices.size === 0) {
+      return { visibleLines: filteredLines, collapseGroupsMap: collapseGroups };
+    }
+    return {
+      visibleLines: filteredLines.filter(({ index }) => !collapsedIndices.has(index)),
+      collapseGroupsMap: collapseGroups,
+    };
+  }, [filteredLines, collapseEnabled]);
+
   // Search determines highlighting within visible lines
   // Returns a Set of original line indices (not filtered indices) that match the search
   const searchMatchingLineIndices = useMemo(() => {
     if (!searchQuery.trim()) return new Set<number>();
-    // Build a set of original indices that match the search within filtered lines
+    // Build a set of original indices that match the search within visible lines
     const matchingOriginalIndices = new Set<number>();
     const normalizedQuery = searchQuery.toLowerCase();
-    filteredLines.forEach(({ line, index }) => {
+    visibleLines.forEach(({ line, index }) => {
       const text = line.rawText.toLowerCase();
       if (text.includes(normalizedQuery)) {
         matchingOriginalIndices.add(index);
       }
     });
     return matchingOriginalIndices;
-  }, [filteredLines, searchQuery]);
+  }, [visibleLines, searchQuery]);
 
   // Convert search matches to sorted array for navigation
   const searchMatchesArray = useMemo(() => {
@@ -183,8 +200,8 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
 
   // Build display items with gap indicators
   const displayItems = useMemo(() => {
-    return buildDisplayItems(filteredLines, displayLogLines, forcedRanges);
-  }, [filteredLines, displayLogLines, forcedRanges]);
+    return buildDisplayItems(visibleLines, displayLogLines, forcedRanges);
+  }, [visibleLines, displayLogLines, forcedRanges]);
 
   const displayIndices = useMemo(() => {
     return displayItems.map((item) => item.data.index);
@@ -450,6 +467,14 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             />
             Strip prefix
           </label>
+          <label className={styles.logToolbarOption} title="Collapse consecutive duplicate/similar log lines">
+            <input
+              type="checkbox"
+              checked={collapseEnabled}
+              onChange={(e) => setCollapseEnabled(e.target.checked)}
+            />
+            Collapse duplicates
+          </label>
           <SearchInput
             ref={filterInputRef}
             value={filterQueryInput}
@@ -532,6 +557,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             const isCurrentSearchMatch = searchMatchesArray.length > 0 && index === searchMatchesArray[currentSearchMatchIndex];
             const gapAbove = item.gapAbove;
             const gapBelow = item.gapBelow;
+            const collapseInfo = gapBelow ? collapseGroupsMap.get(gapBelow.gapId) : undefined;
 
             return (
               <div
@@ -559,7 +585,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                {(gapAbove || gapBelow) && (
+                {(gapAbove || (gapBelow && !collapseInfo)) && (
                   <div className={styles.logGapControls}>
                     {gapAbove && (
                       <button
@@ -574,7 +600,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                         </svg>
                       </button>
                     )}
-                    {gapBelow && (
+                    {gapBelow && !collapseInfo && (
                       <button
                         className={styles.logGapArrow}
                         onClick={() => handleGapClick(gapBelow.gapId)}
@@ -589,20 +615,54 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                     )}
                   </div>
                 )}
-                {gapBelow && !gapBelow.isLast && <div className={`${styles.logGapDivider} ${styles.logGapDividerBelow}`} />}
+                {gapBelow && !gapBelow.isLast && !collapseInfo && <div className={`${styles.logGapDivider} ${styles.logGapDividerBelow}`} />}
                 <span className={styles.logLineNumber}>{line.lineNumber}</span>
                 <span className={styles.logLineTimestamp}>{line.displayTime}</span>
                 <span className={styles.logLineLevel}>{line.level}</span>
                 <span className={styles.logLineText}>
                   {highlightText(line, index)}
                 </span>
+                {collapseInfo && gapBelow && (
+                  <div className={styles.collapseSummaryBar} data-testid="collapse-bar">
+                    <span className={styles.logLineNumber} aria-hidden="true" />
+                    <span className={styles.logLineTimestamp} aria-hidden="true" />
+                    <span className={`${styles.logLineLevel} ${collapseInfo.type === 'exact' ? styles.collapseExact : styles.collapseSimilar}`}>
+                      {collapseInfo.type === 'exact' ? '=' : '≈'}
+                    </span>
+                    <span className={styles.collapseSummaryText}>
+                      {gapBelow.remainingGap.toLocaleString()} {collapseInfo.type === 'exact' ? 'identical' : 'similar'} {gapBelow.remainingGap === 1 ? 'line' : 'lines'} collapsed
+                      <span className={styles.collapseSummaryActions}>
+                        {gapBelow.remainingGap > 10 && (
+                          <>
+                            {' - '}
+                            <button
+                              className={styles.collapseSummaryBtn}
+                              onClick={() => expandGap(gapBelow.gapId, 10)}
+                              aria-label="Load 10 collapsed lines"
+                            >
+                              +10
+                            </button>
+                          </>
+                        )}
+                        {' - '}
+                        <button
+                          className={styles.collapseSummaryBtn}
+                          onClick={() => expandGap(gapBelow.gapId, 'all')}
+                          aria-label={`Expand all ${gapBelow.remainingGap} collapsed lines`}
+                        >
+                          show all
+                        </button>
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      {displayItems.length === 0 && filteredLines.length > 0 && (
+      {displayItems.length === 0 && visibleLines.length > 0 && (
         <div className={styles.logEmptyState}>
           No matching lines found for "{searchQuery}"
         </div>

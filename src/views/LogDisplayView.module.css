@@ -164,6 +164,7 @@
 
 .logLine {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     padding: 2px 8px;
     color: var(--log-text);
@@ -434,4 +435,52 @@
 
 .contextMenuItem:active {
     background: var(--bg-selected);
+}
+
+/* Collapse Summary Bar — rendered as a pseudo log row sharing the same column classes */
+.collapseSummaryBar {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    padding: 2px 8px;
+}
+
+/* =  exact-duplicate indicator in the level column */
+.collapseExact {
+    color: #4caf50;
+}
+
+/* ≈  similar-source indicator in the level column */
+.collapseSimilar {
+    color: #64b5f6;
+}
+
+.collapseSummaryText {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collapseSummaryActions {
+    display: inline;
+}
+
+.collapseSummaryBtn {
+    padding: 0;
+    margin-left: 8px;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.collapseSummaryBtn:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }

@@ -184,5 +184,15 @@
 2026-01-15T10:01:51.020000Z DEBUG [matrix-rust-sdk] Persisting sync token to storage
 2026-01-15T10:01:51.050000Z TRACE [matrix-rust-sdk] Cleanup cycle complete
 2026-01-15T10:01:51.100000Z  INFO [matrix-rust-sdk] Request ID counter reset after reconnect; IDs may be reused from this point
+2026-01-15T10:01:51.200000Z ERROR matrix_sdk::latest_events::room_latest_events: Room is unknown room=WeakRoom { client: WeakClient { client: (Weak) }, room_id: "!FuhjsyGEouqNmdbmQB:matrix.example.org" } | crates/matrix-sdk/src/latest_events/room_latest_events.rs:158 | spans: root
+2026-01-15T10:01:51.201000Z ERROR matrix_sdk::latest_events::room_latest_events: Room is unknown room=WeakRoom { client: WeakClient { client: (Weak) }, room_id: "!JCNVtixmXVOFBxpjxB:matrix.example.org" } | crates/matrix-sdk/src/latest_events/room_latest_events.rs:158 | spans: root
+2026-01-15T10:01:51.202000Z ERROR matrix_sdk::latest_events::room_latest_events: Room is unknown room=WeakRoom { client: WeakClient { client: (Weak) }, room_id: "!AbcDefGhiJkLmNoPqR:matrix.example.org" } | crates/matrix-sdk/src/latest_events/room_latest_events.rs:158 | spans: root
+2026-01-15T10:01:51.203000Z ERROR matrix_sdk::latest_events::room_latest_events: Room is unknown room=WeakRoom { client: WeakClient { client: (Weak) }, room_id: "!XyZaBcDeFgHiJkLmNo:matrix.example.org" } | crates/matrix-sdk/src/latest_events/room_latest_events.rs:158 | spans: root
+2026-01-15T10:01:51.210000Z DEBUG [matrix-rust-sdk] Persisting sync token to storage
+2026-01-15T10:01:51.211000Z DEBUG [matrix-rust-sdk] Persisting sync token to storage
+2026-01-15T10:01:51.212000Z DEBUG [matrix-rust-sdk] Persisting sync token to storage
+2026-01-15T10:01:51.250000Z  INFO [matrix-rust-sdk] send{request_id="req-067" method=GET uri="https://matrix.example.org/_matrix/client/v3/profile/@alice:example.org" request_size="0"} | crates/matrix-sdk/src/http_client/native.rs:89 | spans: root
+2026-01-15T10:01:51.260000Z  INFO [matrix-rust-sdk] send{request_id="req-068" method=GET uri="https://matrix.example.org/_matrix/client/v3/profile/@alice:example.org" request_size="0"} | crates/matrix-sdk/src/http_client/native.rs:89 | spans: root
+2026-01-15T10:01:51.270000Z  INFO [matrix-rust-sdk] send{request_id="req-069" method=GET uri="https://matrix.example.org/_matrix/client/v3/profile/@alice:example.org" request_size="0"} | crates/matrix-sdk/src/http_client/native.rs:89 | spans: root
 2026-01-15T10:01:51.360000Z DEBUG [matrix-rust-sdk] send{request_id="req-066" method=POST uri="https://matrix.example.org/_matrix/client/v3/keys/query" request_size="256"}
 2026-01-15T10:01:51.600000Z DEBUG [matrix-rust-sdk] send{request_id="req-066" method=POST uri="https://matrix.example.org/_matrix/client/v3/keys/query" request_size="256" status=200 response_size="2048" request_duration=240ms}
