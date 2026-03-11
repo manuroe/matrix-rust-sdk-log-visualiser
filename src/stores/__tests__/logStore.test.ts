@@ -612,7 +612,7 @@ describe('logStore', () => {
       const rawLines = createParsedLogLines(3);
       const syncReqs = createSyncRequests(2);
       const httpReqs = createHttpRequests(3);
-      const sentryEvents = [{ lineNumber: 1, message: 'Sentry error', level: 'ERROR' as const, rawText: '', isoTimestamp: '' }];
+      const sentryEvents = [{ lineNumber: 1, message: 'Sentry error', platform: 'ios' as const }];
 
       useLogStore.getState().loadLogParserResult({
         requests: syncReqs,
