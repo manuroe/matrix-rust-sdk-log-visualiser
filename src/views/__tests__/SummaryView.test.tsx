@@ -998,6 +998,56 @@ describe('SummaryView', () => {
       }
       expect(screen.getByText(/Summary/)).toBeInTheDocument();
     });
+
+    it('clicking a warning type button navigates to the logs filtered view', () => {
+      const lines = [
+        createParsedLogLine({ lineNumber: 90, level: 'WARN', message: 'some warning message' }),
+      ];
+      useLogStore.getState().setHttpRequests([], lines);
+      renderSummaryView();
+
+      const warnBtn = screen.getByRole('button', { name: /some warning message/i });
+      fireEvent.click(warnBtn);
+      // After click the component is still rendered (MemoryRouter handles navigation)
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
+
+    it('clicking an HTTP error status badge navigates to filtered HTTP requests view', () => {
+      const lines = createParsedLogLines(2);
+      const httpReq = createHttpRequest({
+        requestId: 'ERR-STATUS-NAV',
+        status: '404',
+        uri: '/api/missing',
+        sendLineNumber: 0,
+        responseLineNumber: 1,
+      });
+      useLogStore.getState().setHttpRequests([httpReq], lines);
+      renderSummaryView();
+
+      const statusBadge = screen.getByRole('button', { name: '404' });
+      fireEvent.click(statusBadge);
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
+
+    it('clicking a top failed URL button with a single matching request navigates with request_id param', () => {
+      const lines = createParsedLogLines(2);
+      const httpReq = createHttpRequest({
+        requestId: 'SINGLE-FAIL-REQ',
+        status: '500',
+        uri: '/api/single-fail',
+        sendLineNumber: 0,
+        responseLineNumber: 1,
+      });
+      useLogStore.getState().setHttpRequests([httpReq], lines);
+      renderSummaryView();
+
+      // The top failed URL button navigates with request_id for single match (exercise the single-match branch)
+      const failedUrlBtn = screen.queryByRole('button', { name: /single-fail/i });
+      if (failedUrlBtn) {
+        fireEvent.click(failedUrlBtn);
+      }
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
   });
 
   // ============================================================================

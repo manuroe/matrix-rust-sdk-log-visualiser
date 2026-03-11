@@ -5,13 +5,12 @@ import { useURLParams } from '../hooks/useURLParams';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
-import { HttpActivityChart, type HttpRequestWithTimestamp } from '../components/HttpActivityChart';
-import { calculateTimeRangeMicros, formatTimestamp, formatDuration, getMinMaxTimestamps } from '../utils/timeUtils';
-import { getTimeRangeUs } from '../utils/requestFilters';
+import { HttpActivityChart } from '../components/HttpActivityChart';
+import { calculateTimeRangeMicros, formatTimestamp, formatDuration, getMinMaxTimestamps, snapSelectionToLogLine, SNAP_TOLERANCE_US } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
 import { stripMatrixClientPath } from '../utils/uriUtils';
-import type { LogLevel, ParsedLogLine, SentryEvent } from '../types/log.types';
+import { computeSummaryStats } from '../utils/summaryStats';
 import type { TimestampMicros } from '../types/time.types';
 import styles from './SummaryView.module.css';
 import tableStyles from '../components/Table.module.css';
@@ -51,8 +50,8 @@ export function SummaryView() {
    */
   const formatSelectionBoundary = useCallback(
     (us: TimestampMicros): string => {
-      if (Math.abs(us - fullDataRange.minTime) <= 1000) return 'start';
-      if (Math.abs(us - fullDataRange.maxTime) <= 1000) return 'end';
+      if (Math.abs(us - fullDataRange.minTime) <= SNAP_TOLERANCE_US) return 'start';
+      if (Math.abs(us - fullDataRange.maxTime) <= SNAP_TOLERANCE_US) return 'end';
       return formatTimestamp(us, 'HH:MM:SS');
     },
     [fullDataRange]
@@ -78,8 +77,8 @@ export function SummaryView() {
       // No local selection - check if we can zoom out to full range
       const { startUs: currentStartUs, endUs: currentEndUs } = calculateTimeRangeMicros(startTime, endTime, fullDataRange.minTime, fullDataRange.maxTime);
       
-      // Only zoom out if current range is narrower than full range (with 1000us = 1ms tolerance)
-      if (currentStartUs > fullDataRange.minTime + 1000 || currentEndUs < fullDataRange.maxTime - 1000) {
+      // Only zoom out if current range is narrower than full range (with 1ms tolerance)
+      if (currentStartUs > fullDataRange.minTime + SNAP_TOLERANCE_US || currentEndUs < fullDataRange.maxTime - SNAP_TOLERANCE_US) {
         // Set as local selection so Apply button appears
         setLocalStartTime(fullDataRange.minTime as TimestampMicros);
         setLocalEndTime(fullDataRange.maxTime as TimestampMicros);
@@ -89,35 +88,17 @@ export function SummaryView() {
 
   const handleApplyGlobally = useCallback(() => {
     if (localStartTime !== null && localEndTime !== null && rawLogLines.length > 0) {
-      const startMatchesFull = Math.abs(localStartTime - fullDataRange.minTime) <= 1000;
-      const endMatchesFull = Math.abs(localEndTime - fullDataRange.maxTime) <= 1000;
+      const startMatchesFull = Math.abs(localStartTime - fullDataRange.minTime) <= SNAP_TOLERANCE_US;
+      const endMatchesFull = Math.abs(localEndTime - fullDataRange.maxTime) <= SNAP_TOLERANCE_US;
 
       // If selection matches full range (within 1ms tolerance), clear the filter instead
       if (startMatchesFull && endMatchesFull) {
         setTimeFilter(null, null);
       } else {
         // Use keywords when the selection boundary aligns with the data edge,
-        // otherwise find the closest log line and use its original timestamp string.
-        let startParam: string;
-        if (startMatchesFull) {
-          startParam = 'start';
-        } else {
-          const startLine = rawLogLines.reduce((closest, line) =>
-            Math.abs(line.timestampUs - localStartTime) < Math.abs(closest.timestampUs - localStartTime) ? line : closest
-          );
-          startParam = startLine.isoTimestamp;
-        }
-
-        let endParam: string;
-        if (endMatchesFull) {
-          endParam = 'end';
-        } else {
-          const endLine = rawLogLines.reduce((closest, line) =>
-            Math.abs(line.timestampUs - localEndTime) < Math.abs(closest.timestampUs - localEndTime) ? line : closest
-          );
-          endParam = endLine.isoTimestamp;
-        }
-
+        // otherwise snap to the nearest log line and use its ISO timestamp string.
+        const startParam = snapSelectionToLogLine(localStartTime, rawLogLines, fullDataRange, 'start');
+        const endParam = snapSelectionToLogLine(localEndTime, rawLogLines, fullDataRange, 'end');
         setTimeFilter(startParam, endParam);
       }
 
@@ -136,300 +117,31 @@ export function SummaryView() {
     
     const { startUs: globalStartUs, endUs: globalEndUs } = calculateTimeRangeMicros(startTime, endTime, fullDataRange.minTime, fullDataRange.maxTime);
     
-    // Show if selection differs from global filter (with 1000us = 1ms tolerance)
-    return Math.abs(localStartTime - globalStartUs) > 1000 || Math.abs(localEndTime - globalEndUs) > 1000;
+    // Show if selection differs from global filter (with 1ms tolerance)
+    return Math.abs(localStartTime - globalStartUs) > SNAP_TOLERANCE_US || Math.abs(localEndTime - globalEndUs) > SNAP_TOLERANCE_US;
   }, [localStartTime, localEndTime, startTime, endTime, fullDataRange]);
 
-  // Calculate log statistics
+  // Calculate log statistics via the pure domain function.
+  // SummaryView is a thin rendering shell; all the computation lives in summaryStats.ts.
   const stats = useMemo(() => {
-    if (rawLogLines.length === 0) {
-      return {
-        totalLogLines: 0,
-        filteredLogLines: [] as ParsedLogLine[],
-        timeSpan: { start: '', end: '' },
-        errors: 0,
-        warnings: 0,
-        errorsByType: [] as Array<{ type: string; count: number }>,
-        warningsByType: [] as Array<{ type: string; count: number }>,
-        sentryEvents: [] as SentryEvent[],
-        httpErrorsByStatus: [] as Array<{ status: string; count: number }>,
-        topFailedUrls: [] as Array<{ uri: string; count: number; statuses: string[] }>,
-        slowestHttpRequests: [] as Array<{
-          id: string;
-          duration: number;
-          method: string;
-          uri: string;
-          status: string;
-        }>,
-        syncRequestsByConnection: [] as Array<{ connId: string; count: number }>,
-        httpRequestsWithTimestamps: [] as HttpRequestWithTimestamp[],
-        incompleteRequestCount: 0,
-        totalUploadBytes: 0,
-        totalDownloadBytes: 0,
-        chartTimeRange: { minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros },
-      };
-    }
-
-    // Calculate time range if filters are set (in microseconds)
-    let timeRangeUs = getTimeRangeUs(rawLogLines, startTime, endTime);
-
-    // Apply local zoom if set
-    if (localStartTime !== null && localEndTime !== null) {
-      timeRangeUs = {
-        startUs: localStartTime,
-        endUs: localEndTime,
-      };
-    }
-
-    // Filter log lines by time range
-    const filteredLogLines = rawLogLines.filter((line) => {
-      if (!timeRangeUs) return true;
-      return line.timestampUs >= timeRangeUs.startUs && line.timestampUs <= timeRangeUs.endUs;
-    });
-
-
-    // Filter sentry events by time range
-    const filteredSentryEvents = sentryEvents.filter((event) => {
-      if (!timeRangeUs) return true;
-      const timestampUs = lineNumberIndex.get(event.lineNumber)?.timestampUs;
-      if (!timestampUs) return false;
-      return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
-    });
-
-    // Filter HTTP requests by time range and resolve timestamps
-    const filteredHttpRequests = allHttpRequests.filter((req) => {
-      if (!timeRangeUs) return true;
-      if (!req.responseLineNumber) return false;
-      const timestampUs = lineNumberIndex.get(req.responseLineNumber)?.timestampUs;
-      if (!timestampUs) return false;
-      return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
-    });
-
-    // Build timeout lookup from sync requests (requestId → timeout ms)
-    const timeoutByRequestId = new Map<string, number>();
-    for (const req of allRequests) {
-      if (req.timeout !== undefined) {
-        timeoutByRequestId.set(req.requestId, req.timeout);
-      }
-    }
-
-    // Create HTTP requests with resolved timestamps for the chart
-    const completedRequestsWithTimestamps: HttpRequestWithTimestamp[] = filteredHttpRequests
-      .filter(req => req.responseLineNumber)
-      .map(req => {
-        const timestampUs = lineNumberIndex.get(req.responseLineNumber)?.timestampUs ?? (0 as TimestampMicros);
-        const timeout = timeoutByRequestId.get(req.requestId);
-        return {
-          requestId: req.requestId,
-          status: req.clientError ? 'client-error' : (req.status ?? ''),
-          timestampUs,
-          ...(timeout !== undefined && { timeout }),
-        };
-      })
-      .filter(req => req.timestampUs > 0);
-
-    // Add incomplete requests (no response yet) using their send timestamp
-    const incompleteRequestsWithTimestamps: HttpRequestWithTimestamp[] = allHttpRequests
-      .filter(req => !req.status && !req.clientError)
-      .filter(req => {
-        if (!timeRangeUs) return true;
-        if (!req.sendLineNumber) return false;
-        const timestampUs = lineNumberIndex.get(req.sendLineNumber)?.timestampUs;
-        if (!timestampUs) return false;
-        return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
-      })
-      .map(req => ({
-        requestId: req.requestId,
-        status: '',
-        timestampUs: lineNumberIndex.get(req.sendLineNumber)?.timestampUs ?? (0 as TimestampMicros),
-      }))
-      .filter(req => req.timestampUs > 0);
-
-    const httpRequestsWithTimestamps = [...completedRequestsWithTimestamps, ...incompleteRequestsWithTimestamps];
-
-    // Filter sync requests by time range
-    const filteredSyncRequests = allRequests.filter((req) => {
-      if (!timeRangeUs) return true;
-      if (!req.responseLineNumber) return false;
-      const timestampUs = lineNumberIndex.get(req.responseLineNumber)?.timestampUs;
-      if (!timestampUs) return false;
-      return timestampUs >= timeRangeUs.startUs && timestampUs <= timeRangeUs.endUs;
-    });
-
-    // Calculate chart time range from filtered log lines (for alignment with LogActivityChart)
-    const { min: chartMinTime, max: chartMaxTime } = getMinMaxTimestamps(filteredLogLines);
-
-    // Time span (from filtered logs)
-    const firstTimestamp = filteredLogLines[0]?.displayTime || '';
-    const lastTimestamp = filteredLogLines[filteredLogLines.length - 1]?.displayTime || '';
-
-    // Helper function to extract the core error message without timestamp and log level
-    const extractCoreMessage = (message: string): string => {
-      // Remove timestamp prefix (e.g., "2026-01-28T13:24:43.950890Z")
-      // Pattern: ISO timestamp followed by log level
-      const match = message.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s+(.+)$/);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-      // If pattern doesn't match, return original message
-      return message;
-    };
-
-    // Count errors and warnings by level (from filtered logs)
-    const levelCounts: Record<LogLevel, number> = {
-      TRACE: 0,
-      DEBUG: 0,
-      INFO: 0,
-      WARN: 0,
-      ERROR: 0,
-      UNKNOWN: 0,
-    };
-
-    const errorMessages: Record<string, number> = {};
-    const warningMessages: Record<string, number> = {};
-
-    filteredLogLines.forEach((line) => {
-      levelCounts[line.level]++;
-      if (line.level === 'ERROR') {
-        const coreMessage = extractCoreMessage(line.message);
-        errorMessages[coreMessage] = (errorMessages[coreMessage] || 0) + 1;
-      } else if (line.level === 'WARN') {
-        const coreMessage = extractCoreMessage(line.message);
-        warningMessages[coreMessage] = (warningMessages[coreMessage] || 0) + 1;
-      }
-    });
-
-    // Sort errors and warnings by frequency
-    const errorsByType = Object.entries(errorMessages)
-      .map(([type, count]) => ({ type, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    const warningsByType = Object.entries(warningMessages)
-      .map(([type, count]) => ({ type, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    // HTTP errors by status (from filtered requests)
-    const httpStatusCounts: Record<string, number> = {};
-    filteredHttpRequests.forEach((req) => {
-      if (req.status) {
-        const statusCode = req.status.split(' ')[0]; // Extract just the number
-        httpStatusCounts[statusCode] =
-          (httpStatusCounts[statusCode] || 0) + 1;
-      }
-    });
-
-    // Filter for error statuses (4xx, 5xx)
-    const httpErrorsByStatus = Object.entries(httpStatusCounts)
-      .filter(([status]) => {
-        const code = parseInt(status, 10);
-        return code >= 400;
-      })
-      .map(([status, count]) => ({ status, count }))
-      .sort((a, b) => b.count - a.count);
-
-    // Failed URLs (4xx, 5xx, and client-side transport errors) grouped by URI
-    const failedUrlData: Record<string, { count: number; statuses: Set<string> }> = {};
-    filteredHttpRequests.forEach((req) => {
-      if (req.clientError) {
-        if (!failedUrlData[req.uri]) {
-          failedUrlData[req.uri] = { count: 0, statuses: new Set() };
-        }
-        failedUrlData[req.uri].count += 1;
-        failedUrlData[req.uri].statuses.add('Client Error');
-      } else if (req.status) {
-        const statusCode = parseInt(req.status, 10);
-        if (statusCode >= 400) {
-          if (!failedUrlData[req.uri]) {
-            failedUrlData[req.uri] = { count: 0, statuses: new Set() };
-          }
-          failedUrlData[req.uri].count += 1;
-          failedUrlData[req.uri].statuses.add(req.status.split(' ')[0]);
-        }
-      }
-    });
-
-    const topFailedUrls = Object.entries(failedUrlData)
-      .map(([uri, data]) => ({ uri, count: data.count, statuses: Array.from(data.statuses) }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    // Slowest HTTP requests (from filtered requests)
-    const slowestHttpRequests = filteredHttpRequests
-      .filter(req => !/\/sync(\?|$)/i.test(req.uri))
-      .map((req) => ({
-        id: req.requestId,
-        duration:
-          typeof req.requestDurationMs === 'number'
-            ? req.requestDurationMs
-            : parseInt(req.requestDurationMs as string, 10) || 0,
-        method: req.method,
-        uri: req.uri,
-        status: req.clientError ? 'Client Error' : req.status,
-      }))
-      .sort((a, b) => b.duration - a.duration)
-      .slice(0, 10);
-
-    // Sync requests by connection (from filtered requests)
-    const syncByConn: Record<string, number> = {};
-    filteredSyncRequests.forEach((req) => {
-      syncByConn[req.connId] = (syncByConn[req.connId] || 0) + 1;
-    });
-
-    const syncRequestsByConnection = connectionIds
-      .map((connId) => ({
-        connId,
-        count: syncByConn[connId] || 0,
-      }))
-      .filter((item) => item.count > 0)
-      .sort((a, b) => b.count - a.count);
-
-    // Sum uploaded and downloaded bytes over all charted requests (completed + incomplete in range)
-    // to match the set represented by the chart and the request count headline.
-    // Iterate allHttpRequests directly to avoid requestId-keyed map deduplication issues when
-    // multiple requests share the same requestId.
-    let totalUploadBytes = 0;
-    let totalDownloadBytes = 0;
-    for (const req of allHttpRequests) {
-      if (req.responseLineNumber) {
-        // Completed request: mirrors completedRequestsWithTimestamps filter
-        const ts = lineNumberIndex.get(req.responseLineNumber)?.timestampUs;
-        if (!ts || ts === 0) continue;
-        if (!timeRangeUs || (ts >= timeRangeUs.startUs && ts <= timeRangeUs.endUs)) {
-          totalUploadBytes += req.requestSize;
-          totalDownloadBytes += req.responseSize;
-        }
-      } else if (!req.status && req.sendLineNumber) {
-        // Incomplete request: mirrors incompleteRequestsWithTimestamps filter
-        const ts = lineNumberIndex.get(req.sendLineNumber)?.timestampUs;
-        if (!ts || ts === 0) continue;
-        if (!timeRangeUs || (ts >= timeRangeUs.startUs && ts <= timeRangeUs.endUs)) {
-          totalUploadBytes += req.requestSize;
-        }
-      }
-    }
-
-    return {
-      totalLogLines: filteredLogLines.length,
-      filteredLogLines, // Include for chart
-      timeSpan: { start: firstTimestamp, end: lastTimestamp },
-      errors: levelCounts.ERROR,
-      warnings: levelCounts.WARN,
-      errorsByType,
-      warningsByType,
-      sentryEvents: filteredSentryEvents,
-      httpErrorsByStatus,
-      topFailedUrls,
-      slowestHttpRequests,
-      syncRequestsByConnection,
-      httpRequestsWithTimestamps,
-      incompleteRequestCount: incompleteRequestsWithTimestamps.length,
-      totalUploadBytes,
-      totalDownloadBytes,
-      chartTimeRange: { minTime: chartMinTime, maxTime: chartMaxTime },
-    };
+    const localTimeRangeUs =
+      localStartTime !== null && localEndTime !== null
+        ? { startUs: localStartTime, endUs: localEndTime }
+        : null;
+    return computeSummaryStats(
+      rawLogLines,
+      allHttpRequests,
+      allRequests,
+      connectionIds,
+      sentryEvents,
+      startTime,
+      endTime,
+      localTimeRangeUs,
+      lineNumberIndex
+    );
   }, [rawLogLines, allHttpRequests, allRequests, connectionIds, sentryEvents, startTime, endTime, localStartTime, localEndTime, lineNumberIndex]);
+
+
 
   if (rawLogLines.length === 0) {
     return (
@@ -683,7 +395,7 @@ export function SummaryView() {
                           <span
                             className={styles.clickableHeading}
                             onClick={() => {
-                              const statuses = stats.httpErrorsByStatus.map(e => e.status);
+                              const statuses = stats.httpErrorsByStatus.map(e => e.type);
                               const hasClientErrors = stats.topFailedUrls.some(u => u.statuses.includes('Client Error'));
                               if (hasClientErrors) statuses.push('Client Error');
                               void navigate(`/http_requests?status=${encodeURIComponent(statuses.join(','))}`);
@@ -761,12 +473,12 @@ export function SummaryView() {
                       <tr key={idx}>
                         <td>
                           <button
-                            className={`${styles.actionLink} ${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(error.status)}`]}`}
+                            className={`${styles.actionLink} ${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(error.type)}`]}`}
                             onClick={() =>
-                              void navigate(`/http_requests?status=${error.status}`)
+                              void navigate(`/http_requests?status=${error.type}`)
                             }
                           >
-                            {error.status}
+                            {error.type}
                           </button>
                         </td>
                         <td className={styles.alignRight}>{error.count}</td>

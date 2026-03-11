@@ -24,6 +24,8 @@ import {
   isoToTime,
   applyTimeRangeFilterMicros,
   formatDuration,
+  snapSelectionToLogLine,
+  SNAP_TOLERANCE_US,
 } from '../timeUtils';
 
 describe('Time Filter Utilities', () => {
@@ -638,5 +640,73 @@ describe('parseTimeInput - invalid time component branches', () => {
   it('accepts valid ISO without trailing Z and appends Z', () => {
     const result = parseTimeInput('2026-01-26T10:00:00');
     expect(result).toBe('2026-01-26T10:00:00Z');
+  });
+});
+
+// =============================================================================
+// snapSelectionToLogLine
+// =============================================================================
+
+describe('snapSelectionToLogLine', () => {
+  // Sample log lines covering a 4-second window
+  const BASE = 1_700_000_000_000_000 as ReturnType<typeof isoToMicros>; // arbitrary
+  const STEP = 1_000_000 as ReturnType<typeof isoToMicros>; // 1 s
+
+  const lines = [0, 1, 2, 3, 4].map((i) => ({
+    timestampUs: (BASE + i * STEP) as ReturnType<typeof isoToMicros>,
+    isoTimestamp: `2023-11-14T22:13:${String(20 + i).padStart(2, '0')}.000000Z`,
+  }));
+
+  const fullDataRange = {
+    minTime: lines[0].timestampUs,
+    maxTime: lines[lines.length - 1].timestampUs,
+  };
+
+  it('returns "start" when selection is exactly at the data minimum', () => {
+    expect(
+      snapSelectionToLogLine(fullDataRange.minTime, lines, fullDataRange, 'start')
+    ).toBe('start');
+  });
+
+  it('returns "end" when selection is exactly at the data maximum', () => {
+    expect(
+      snapSelectionToLogLine(fullDataRange.maxTime, lines, fullDataRange, 'end')
+    ).toBe('end');
+  });
+
+  it('returns "start" when selection is within tolerance of the minimum', () => {
+    const nearMin = (fullDataRange.minTime + SNAP_TOLERANCE_US - 1) as ReturnType<typeof isoToMicros>;
+    expect(
+      snapSelectionToLogLine(nearMin, lines, fullDataRange, 'start')
+    ).toBe('start');
+  });
+
+  it('returns "end" when selection is within tolerance of the maximum', () => {
+    const nearMax = (fullDataRange.maxTime - SNAP_TOLERANCE_US + 1) as ReturnType<typeof isoToMicros>;
+    expect(
+      snapSelectionToLogLine(nearMax, lines, fullDataRange, 'end')
+    ).toBe('end');
+  });
+
+  it('returns ISO timestamp of closest line for a mid-range start boundary', () => {
+    // Value sits between line[1] and line[2]; line[2] is closer
+    const midUs = (lines[1].timestampUs + Math.floor(STEP * 0.7)) as ReturnType<typeof isoToMicros>;
+    const result = snapSelectionToLogLine(midUs, lines, fullDataRange, 'start');
+    expect(result).toBe(lines[2].isoTimestamp);
+  });
+
+  it('returns ISO timestamp of closest line for a mid-range end boundary', () => {
+    // Value is exactly at line[3]
+    const result = snapSelectionToLogLine(lines[3].timestampUs, lines, fullDataRange, 'end');
+    expect(result).toBe(lines[3].isoTimestamp);
+  });
+
+  it('does NOT return "end" for a start-edge selection near the minimum', () => {
+    // Regression: edge keyword must match the requested edge, not the opposite one
+    const nearMin = (fullDataRange.minTime + 100) as ReturnType<typeof isoToMicros>;
+    const result = snapSelectionToLogLine(nearMin, lines, fullDataRange, 'end');
+    // nearMin is far from maxTime so it should NOT return "end"
+    expect(result).not.toBe('end');
+    expect(result).toBe(lines[0].isoTimestamp);
   });
 });

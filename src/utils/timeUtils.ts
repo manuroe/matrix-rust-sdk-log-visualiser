@@ -545,3 +545,58 @@ export function formatDuration(ms: number): string {
   }
   return `${ms.toFixed(0)}ms`;
 }
+
+// =============================================================================
+// Selection Snapping
+// =============================================================================
+
+/**
+ * Maximum distance (in microseconds) within which a selection boundary is
+ * considered to "align" with the data edge and is therefore represented by the
+ * `"start"` / `"end"` URL keyword rather than an absolute timestamp.
+ *
+ * 1 000 µs = 1 ms — generous enough to absorb floating-point drift while still
+ * being much smaller than any real gap between consecutive log entries.
+ */
+export const SNAP_TOLERANCE_US = 1_000 as TimestampMicros;
+
+/**
+ * Snap a local selection boundary to the ISO timestamp string of the nearest
+ * log line, or to the `"start"` / `"end"` keyword when the value is within
+ * {@link SNAP_TOLERANCE_US} of the data edge.
+ *
+ * This is pure domain logic extracted from the `handleApplyGlobally` handler in
+ * `SummaryView` so that it can be tested independently of any React component.
+ *
+ * @param us - The selection boundary in microseconds.
+ * @param rawLogLines - All parsed log lines (used to find the nearest match).
+ * @param fullDataRange - The absolute min/max of the loaded log data.
+ * @param edge - Whether this boundary is the `"start"` or `"end"` of the
+ *   selection (controls which keyword is returned when within tolerance).
+ * @returns An ISO timestamp string from the nearest log line, or `"start"` /
+ *   `"end"` when the value aligns with the data edge.
+ *
+ * @example
+ * // Selection starts exactly at the data minimum → returns "start"
+ * snapSelectionToLogLine(minTime, lines, { minTime, maxTime }, "start")
+ * // => "start"
+ *
+ * // Selection starts mid-range → returns the ISO timestamp of the nearest line
+ * snapSelectionToLogLine(midTime, lines, { minTime, maxTime }, "start")
+ * // => "2026-01-28T13:24:43.950890Z"
+ */
+export function snapSelectionToLogLine(
+  us: TimestampMicros,
+  rawLogLines: Array<{ timestampUs: TimestampMicros; isoTimestamp: string }>,
+  fullDataRange: { minTime: TimestampMicros; maxTime: TimestampMicros },
+  edge: 'start' | 'end'
+): string {
+  const edgeTime = edge === 'start' ? fullDataRange.minTime : fullDataRange.maxTime;
+  if (Math.abs(us - edgeTime) <= SNAP_TOLERANCE_US) {
+    return edge;
+  }
+  const closestLine = rawLogLines.reduce((best, line) =>
+    Math.abs(line.timestampUs - us) < Math.abs(best.timestampUs - us) ? line : best
+  );
+  return closestLine.isoTimestamp;
+}
