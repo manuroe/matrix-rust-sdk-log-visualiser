@@ -127,6 +127,7 @@ export function RequestTable({
     expandedRows,
     openLogViewerIds,
     rawLogLines,
+    lineNumberIndex,
     toggleRowExpansion,
     closeLogViewer,
     setActiveRequest,
@@ -192,7 +193,7 @@ export function RequestTable({
   // Find the maximum extent: the latest point where any request bar ends
   const timeData = displayedRequests
     .map((r) => {
-      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      const sendLine = lineNumberIndex.get(r.sendLineNumber);
       const startTime = microsToMs(sendLine?.timestampUs ?? 0);
       const endTime = startTime + (r.requestDurationMs || 0);
       return { startTime, endTime };
@@ -214,7 +215,7 @@ export function RequestTable({
   const visibleTimes = displayedRequests
     .slice(0, 20)
     .map((r) => {
-      const sendLine = rawLogLines.find(l => l.lineNumber === r.sendLineNumber);
+      const sendLine = lineNumberIndex.get(r.sendLineNumber);
       return microsToMs(sendLine?.timestampUs ?? 0);
     })
     .filter((t) => t > 0);
@@ -274,7 +275,7 @@ export function RequestTable({
     // Scroll waterfall to show the request if we have the request object
     if (req && waterfallContainerRef.current) {
       setTimeout(() => {
-        const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+        const sendLine = lineNumberIndex.get(req.sendLineNumber);
         const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
         const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
         const container = waterfallContainerRef.current;
@@ -285,7 +286,7 @@ export function RequestTable({
         }
       }, 0);
     }
-  }, [openLogViewerIds, expandedRows, closeLogViewer, toggleRowExpansion, setActiveRequest, rawLogLines, minTime, totalDuration, timelineWidth, msPerPixel]);
+  }, [openLogViewerIds, expandedRows, closeLogViewer, toggleRowExpansion, setActiveRequest, lineNumberIndex, minTime, totalDuration, timelineWidth, msPerPixel]);
 
   /** Handle mouse enter on a row - highlight both panels */
   const handleRowMouseEnter = (rowKey: number) => {
@@ -308,7 +309,7 @@ export function RequestTable({
     if (!waterfallContainerRef.current) return;
 
     const container = waterfallContainerRef.current;
-    const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+    const sendLine = lineNumberIndex.get(req.sendLineNumber);
     const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
     const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
 
@@ -318,7 +319,7 @@ export function RequestTable({
 
     // Use direct scrollLeft assignment (scrollTo with smooth behavior doesn't work reliably)
     container.scrollLeft = Math.max(0, targetScroll);
-  }, [rawLogLines, minTime, totalDuration, timelineWidth, msPerPixel]);
+  }, [lineNumberIndex, minTime, totalDuration, timelineWidth, msPerPixel]);
 
   // Sum upload/download bytes for displayed requests
   const { totalUploadBytes, totalDownloadBytes } = useMemo(() => {
@@ -524,7 +525,7 @@ export function RequestTable({
                 <div className={styles.timelineRowsRight} ref={waterfallContainerRef}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
                     {displayedRequests.map((req) => {
-                      const sendLine = rawLogLines.find(l => l.lineNumber === req.sendLineNumber);
+                      const sendLine = lineNumberIndex.get(req.sendLineNumber);
                       const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
                       const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
                       const barWidth = getWaterfallBarWidth(

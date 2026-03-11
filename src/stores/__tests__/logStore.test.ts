@@ -606,4 +606,49 @@ describe('logStore', () => {
       expect(useLogStore.getState().detectedPlatform).toBe('ios');
     });
   });
+
+  describe('loadLogParserResult', () => {
+    it('populates all sub-states from a single call', () => {
+      const rawLines = createParsedLogLines(3);
+      const syncReqs = createSyncRequests(2);
+      const httpReqs = createHttpRequests(3);
+      const sentryEvents = [{ lineNumber: 1, message: 'Sentry error', platform: 'ios' as const }];
+
+      useLogStore.getState().loadLogParserResult({
+        requests: syncReqs,
+        connectionIds: ['room-list'],
+        rawLogLines: rawLines,
+        httpRequests: httpReqs,
+        sentryEvents,
+      });
+
+      const state = useLogStore.getState();
+      expect(state.allRequests).toHaveLength(2);
+      expect(state.allHttpRequests).toHaveLength(3);
+      expect(state.sentryEvents).toHaveLength(1);
+      expect(state.rawLogLines).toHaveLength(3);
+      expect(state.connectionIds).toEqual(['room-list']);
+    });
+
+    it('builds lineNumberIndex from rawLogLines', () => {
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 10, displayTime: '10:00:00.000000' }),
+        createParsedLogLine({ lineNumber: 20, displayTime: '10:00:01.000000' }),
+      ];
+
+      useLogStore.getState().loadLogParserResult({
+        requests: [],
+        connectionIds: [],
+        rawLogLines: rawLines,
+        httpRequests: [],
+        sentryEvents: [],
+      });
+
+      const { lineNumberIndex } = useLogStore.getState();
+      expect(lineNumberIndex.size).toBe(2);
+      expect(lineNumberIndex.get(10)?.displayTime).toBe('10:00:00.000000');
+      expect(lineNumberIndex.get(20)?.displayTime).toBe('10:00:01.000000');
+      expect(lineNumberIndex.get(99)).toBeUndefined();
+    });
+  });
 });

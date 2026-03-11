@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HttpRequest, SyncRequest, ParsedLogLine, SentryEvent } from '../types/log.types';
+import type { HttpRequest, SyncRequest, ParsedLogLine, SentryEvent, LogParserResult } from '../types/log.types';
 import { wrapError, type AppError } from '../utils/errorHandling';
 import { DEFAULT_MS_PER_PIXEL } from '../utils/timelineUtils';
 import { filterSyncRequests, filterHttpRequests } from '../utils/requestFilters';
@@ -38,6 +38,8 @@ interface LogStore {
   
   // Log display state
   rawLogLines: ParsedLogLine[];
+  /** Precomputed index for O(1) line-number → ParsedLogLine lookups. Built once in setRequests/setHttpRequests. */
+  lineNumberIndex: Map<number, ParsedLogLine>;
   openLogViewerIds: Set<number>;
   lastRoute: string | null;
 
@@ -83,9 +85,26 @@ interface LogStore {
   // Error handling
   setError: (error: AppError | null) => void;
   clearError: () => void;
+
+  /**
+   * Load all parsed log data in a single store update — sets requests, HTTP
+   * requests, Sentry events, and all derived fields (lineNumberIndex,
+   * detectedPlatform) together so subscribers never observe a partially-loaded
+   * state. Use this instead of calling the individual setters manually.
+   */
+  loadLogParserResult: (result: LogParserResult) => void;
   
   // Helper to get displayTime by line number
   getDisplayTime: (lineNumber: number) => string;
+}
+
+/** Build a Map from line number to ParsedLogLine for O(1) lookups. */
+function buildLineNumberIndex(rawLines: ParsedLogLine[]): Map<number, ParsedLogLine> {
+  const index = new Map<number, ParsedLogLine>();
+  for (const line of rawLines) {
+    index.set(line.lineNumber, line);
+  }
+  return index;
 }
 
 /** Scan parsed log lines to detect the host platform (Android or iOS). */
@@ -135,6 +154,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   expandedRows: new Set(),
   
   rawLogLines: [],
+  lineNumberIndex: new Map(),
   openLogViewerIds: new Set(),
   lastRoute: null,
   detectedPlatform: null,
@@ -149,6 +169,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
         connectionIds: connIds,
         selectedConnId: defaultConn,
         rawLogLines: rawLines,
+        lineNumberIndex: buildLineNumberIndex(rawLines),
         detectedPlatform: detectPlatform(rawLines),
         error: null
       });
@@ -178,6 +199,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
     set({ 
       allHttpRequests: requests,
       rawLogLines: rawLines,
+      lineNumberIndex: buildLineNumberIndex(rawLines),
       detectedPlatform: detectPlatform(rawLines),
     });
     get().filterHttpRequests();
@@ -276,6 +298,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       endTime: null,
       expandedRows: new Set(),
       rawLogLines: [],
+      lineNumberIndex: new Map(),
       openLogViewerIds: new Set(),
       detectedPlatform: null,
       sentryEvents: [],
@@ -311,8 +334,32 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   
   getDisplayTime: (lineNumber) => {
-    const { rawLogLines } = get();
-    const line = rawLogLines.find(l => l.lineNumber === lineNumber);
-    return line?.displayTime || '';
+    return get().lineNumberIndex.get(lineNumber)?.displayTime ?? '';
+  },
+
+  loadLogParserResult: (result) => {
+    try {
+      const lineNumberIndex = buildLineNumberIndex(result.rawLogLines);
+      const detectedPlatform = detectPlatform(result.rawLogLines);
+      const defaultConn = result.connectionIds.includes('room-list')
+        ? 'room-list'
+        : result.connectionIds[0] ?? '';
+      set({
+        allRequests: result.requests,
+        connectionIds: result.connectionIds,
+        selectedConnId: defaultConn,
+        allHttpRequests: result.httpRequests,
+        sentryEvents: result.sentryEvents,
+        rawLogLines: result.rawLogLines,
+        lineNumberIndex,
+        detectedPlatform,
+        error: null,
+      });
+      get().filterRequests();
+      get().filterHttpRequests();
+    } catch (error) {
+      const appError = wrapError(error, 'Failed to process log data');
+      set({ error: appError });
+    }
   },
 }));

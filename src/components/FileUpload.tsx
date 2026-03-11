@@ -14,9 +14,7 @@ import styles from './FileUpload.module.css';
 
 export function FileUpload() {
   const navigate = useNavigate();
-  const setRequests = useLogStore((state) => state.setRequests);
-  const setHttpRequests = useLogStore((state) => state.setHttpRequests);
-  const setSentryEvents = useLogStore((state) => state.setSentryEvents);
+  const loadLogParserResult = useLogStore((state) => state.loadLogParserResult);
   const lastRoute = useLogStore((state) => state.lastRoute);
   const [validationError, setValidationError] = useState<AppError | null>(null);
   const [validationWarnings, setValidationWarnings] = useState<AppError[]>([]);
@@ -108,11 +106,9 @@ export function FileUpload() {
         }
 
         // Parse once and derive both sync-specific and all HTTP requests
-        const { requests, connectionIds, rawLogLines, sentryEvents, httpRequests } = parseLogFile(logContent);
+        const result = parseLogFile(logContent);
 
-        setRequests(requests, connectionIds, rawLogLines);
-        setHttpRequests(httpRequests, rawLogLines);
-        setSentryEvents(sentryEvents);
+        loadLogParserResult(result);
         const targetRoute = lastRoute && lastRoute !== '/' ? lastRoute : '/summary';
         void navigate(targetRoute);
       } catch (error) {
@@ -122,7 +118,7 @@ export function FileUpload() {
         setValidationError(appError);
       }
     },
-    [setRequests, setHttpRequests, setSentryEvents, navigate, lastRoute, readFileAsText, readFileAsArrayBuffer]
+    [loadLogParserResult, navigate, lastRoute, readFileAsText, readFileAsArrayBuffer]
   );
 
   const handleDrop = useCallback(

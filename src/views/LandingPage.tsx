@@ -10,9 +10,7 @@ import uploadStyles from '../components/FileUpload.module.css';
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const setRequests = useLogStore((state) => state.setRequests);
-  const setHttpRequests = useLogStore((state) => state.setHttpRequests);
-  const setSentryEvents = useLogStore((state) => state.setSentryEvents);
+  const loadLogParserResult = useLogStore((state) => state.loadLogParserResult);
   const [demoError, setDemoError] = useState<AppError | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
 
@@ -30,10 +28,8 @@ export function LandingPage() {
         throw new Error(`HTTP ${response.status}`);
       }
       const content = await response.text();
-      const { requests, connectionIds, rawLogLines, sentryEvents, httpRequests } = parseLogFile(content);
-      setRequests(requests, connectionIds, rawLogLines);
-      setHttpRequests(httpRequests, rawLogLines);
-      setSentryEvents(sentryEvents);
+      const result = parseLogFile(content);
+      loadLogParserResult(result);
       void navigate('/summary');
     } catch (error) {
       setDemoError(wrapError(error, 'Failed to load demo. Please try again.'));
