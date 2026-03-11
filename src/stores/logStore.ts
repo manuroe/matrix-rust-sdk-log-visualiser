@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HttpRequest, SyncRequest, ParsedLogLine, SentryEvent } from '../types/log.types';
+import type { HttpRequest, SyncRequest, ParsedLogLine, SentryEvent, LogParserResult } from '../types/log.types';
 import { wrapError, type AppError } from '../utils/errorHandling';
 import { DEFAULT_MS_PER_PIXEL } from '../utils/timelineUtils';
 import { filterSyncRequests, filterHttpRequests } from '../utils/requestFilters';
@@ -38,6 +38,8 @@ interface LogStore {
   
   // Log display state
   rawLogLines: ParsedLogLine[];
+  /** Precomputed index for O(1) line-number → ParsedLogLine lookups. Built once in setRequests/setHttpRequests. */
+  lineNumberIndex: Map<number, ParsedLogLine>;
   openLogViewerIds: Set<number>;
   lastRoute: string | null;
 
@@ -83,9 +85,25 @@ interface LogStore {
   // Error handling
   setError: (error: AppError | null) => void;
   clearError: () => void;
+
+  /**
+   * Load all parsed log data atomically — equivalent to calling setRequests +
+   * setHttpRequests + setSentryEvents in one shot. Use this instead of calling
+   * the three actions separately to ensure a consistent store state after parsing.
+   */
+  loadLogParserResult: (result: LogParserResult) => void;
   
   // Helper to get displayTime by line number
   getDisplayTime: (lineNumber: number) => string;
+}
+
+/** Build a Map from line number to ParsedLogLine for O(1) lookups. */
+function buildLineNumberIndex(rawLines: ParsedLogLine[]): Map<number, ParsedLogLine> {
+  const index = new Map<number, ParsedLogLine>();
+  for (const line of rawLines) {
+    index.set(line.lineNumber, line);
+  }
+  return index;
 }
 
 /** Scan parsed log lines to detect the host platform (Android or iOS). */
@@ -135,6 +153,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   expandedRows: new Set(),
   
   rawLogLines: [],
+  lineNumberIndex: new Map(),
   openLogViewerIds: new Set(),
   lastRoute: null,
   detectedPlatform: null,
@@ -149,6 +168,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
         connectionIds: connIds,
         selectedConnId: defaultConn,
         rawLogLines: rawLines,
+        lineNumberIndex: buildLineNumberIndex(rawLines),
         detectedPlatform: detectPlatform(rawLines),
         error: null
       });
@@ -178,6 +198,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
     set({ 
       allHttpRequests: requests,
       rawLogLines: rawLines,
+      lineNumberIndex: buildLineNumberIndex(rawLines),
       detectedPlatform: detectPlatform(rawLines),
     });
     get().filterHttpRequests();
@@ -276,6 +297,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       endTime: null,
       expandedRows: new Set(),
       rawLogLines: [],
+      lineNumberIndex: new Map(),
       openLogViewerIds: new Set(),
       detectedPlatform: null,
       sentryEvents: [],
@@ -311,8 +333,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   
   getDisplayTime: (lineNumber) => {
-    const { rawLogLines } = get();
-    const line = rawLogLines.find(l => l.lineNumber === lineNumber);
-    return line?.displayTime || '';
+    return get().lineNumberIndex.get(lineNumber)?.displayTime ?? '';
+  },
+
+  loadLogParserResult: (result) => {
+    get().setRequests(result.requests, result.connectionIds, result.rawLogLines);
+    get().setHttpRequests(result.httpRequests, result.rawLogLines);
+    get().setSentryEvents(result.sentryEvents);
   },
 }));

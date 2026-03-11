@@ -7,7 +7,7 @@
 
 import type { HttpRequest, SyncRequest, ParsedLogLine } from '../types/log.types';
 import type { TimestampMicros, TimeFilterValue } from '../types/time.types';
-import { calculateTimeRangeMicros } from './timeUtils';
+import { calculateTimeRangeMicros, getMinMaxTimestamps } from './timeUtils';
 import { INCOMPLETE_STATUS_KEY, CLIENT_ERROR_STATUS_KEY } from './statusCodeUtils';
 
 export interface SyncRequestFilters {
@@ -38,11 +38,8 @@ export function getTimeRangeUs(
 ): { startUs: TimestampMicros; endUs: TimestampMicros } | null {
   if (!startFilter && !endFilter) return null;
 
-  const times = rawLogLines.map((l) => l.timestampUs).filter((t) => t > 0);
-  if (times.length === 0) return null;
-
-  const minLogTimeUs: TimestampMicros = Math.min(...times) as TimestampMicros;
-  const maxLogTimeUs: TimestampMicros = Math.max(...times) as TimestampMicros;
+  const { min: minLogTimeUs, max: maxLogTimeUs } = getMinMaxTimestamps(rawLogLines);
+  if (minLogTimeUs === 0 && maxLogTimeUs === 0) return null;
 
   return calculateTimeRangeMicros(startFilter, endFilter, minLogTimeUs, maxLogTimeUs);
 }

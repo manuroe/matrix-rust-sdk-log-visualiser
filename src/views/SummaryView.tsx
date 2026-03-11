@@ -6,7 +6,8 @@ import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
 import { HttpActivityChart, type HttpRequestWithTimestamp } from '../components/HttpActivityChart';
-import { calculateTimeRangeMicros, formatTimestamp, formatDuration } from '../utils/timeUtils';
+import { calculateTimeRangeMicros, formatTimestamp, formatDuration, getMinMaxTimestamps } from '../utils/timeUtils';
+import { getTimeRangeUs } from '../utils/requestFilters';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
 import { stripMatrixClientPath } from '../utils/uriUtils';
@@ -26,6 +27,7 @@ export function SummaryView() {
     startTime,
     endTime,
     detectedPlatform,
+    lineNumberIndex,
   } = useLogStore();
   const { setTimeFilter } = useURLParams();
 
@@ -37,9 +39,9 @@ export function SummaryView() {
 
   // Precompute min/max across ALL raw log lines (keyword anchor)
   const fullDataRange = useMemo(() => {
-    if (rawLogLines.length === 0) return { minTime: 0, maxTime: 0 };
-    const times = rawLogLines.map((l) => l.timestampUs);
-    return { minTime: Math.min(...times), maxTime: Math.max(...times) };
+    if (rawLogLines.length === 0) return { minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros };
+    const { min, max } = getMinMaxTimestamps(rawLogLines);
+    return { minTime: min, maxTime: max };
   }, [rawLogLines]);
 
   /**
@@ -169,13 +171,7 @@ export function SummaryView() {
     }
 
     // Calculate time range if filters are set (in microseconds)
-    let timeRangeUs: { startUs: TimestampMicros; endUs: TimestampMicros } | null = null;
-    if (startTime || endTime) {
-      const times = rawLogLines.map((line) => line.timestampUs).filter((t) => t > 0);
-      const minLogTimeUs = times.length > 0 ? Math.min(...times) : 0;
-      const maxLogTimeUs = times.length > 0 ? Math.max(...times) : 0;
-      timeRangeUs = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
-    }
+    let timeRangeUs = getTimeRangeUs(rawLogLines, startTime, endTime);
 
     // Apply local zoom if set
     if (localStartTime !== null && localEndTime !== null) {
@@ -192,11 +188,10 @@ export function SummaryView() {
     });
 
     // Build a map from line number to timestamp for efficient lookup
+    // Uses the precomputed lineNumberIndex from logStore (built once on parse).
     const lineNumberToTimestamp = new Map<number, TimestampMicros>();
-    rawLogLines.forEach(line => {
-      if (line.timestampUs) {
-        lineNumberToTimestamp.set(line.lineNumber, line.timestampUs);
-      }
+    lineNumberIndex.forEach((line, lineNumber) => {
+      if (line.timestampUs) lineNumberToTimestamp.set(lineNumber, line.timestampUs);
     });
 
     // Filter sentry events by time range
@@ -268,9 +263,7 @@ export function SummaryView() {
     });
 
     // Calculate chart time range from filtered log lines (for alignment with LogActivityChart)
-    const filteredTimestamps = filteredLogLines.map(line => line.timestampUs);
-    const chartMinTime = filteredTimestamps.length > 0 ? Math.min(...filteredTimestamps) as TimestampMicros : 0 as TimestampMicros;
-    const chartMaxTime = filteredTimestamps.length > 0 ? Math.max(...filteredTimestamps) as TimestampMicros : 0 as TimestampMicros;
+    const { min: chartMinTime, max: chartMaxTime } = getMinMaxTimestamps(filteredLogLines);
 
     // Time span (from filtered logs)
     const firstTimestamp = filteredLogLines[0]?.displayTime || '';
@@ -442,7 +435,7 @@ export function SummaryView() {
       totalDownloadBytes,
       chartTimeRange: { minTime: chartMinTime, maxTime: chartMaxTime },
     };
-  }, [rawLogLines, allHttpRequests, allRequests, connectionIds, sentryEvents, startTime, endTime, localStartTime, localEndTime]);
+  }, [rawLogLines, allHttpRequests, allRequests, connectionIds, sentryEvents, startTime, endTime, localStartTime, localEndTime, lineNumberIndex]);
 
   if (rawLogLines.length === 0) {
     return (

@@ -4,7 +4,7 @@ import { useURLParams } from '../hooks/useURLParams';
 import { LogDisplayView } from './LogDisplayView';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import { calculateTimeRangeMicros } from '../utils/timeUtils';
+import { calculateTimeRangeMicros, getMinMaxTimestamps } from '../utils/timeUtils';
 
 export function LogsView() {
   const { rawLogLines, startTime, endTime, uriFilter } = useLogStore();
@@ -22,23 +22,7 @@ export function LogsView() {
   const filteredLines = useMemo(() => {
     if (rawLogLines.length === 0) return [];
 
-    // Calculate time range with min/max log time as reference
-    let minLogTimeUs = Infinity;
-    let maxLogTimeUs = -Infinity;
-
-    for (const line of rawLogLines) {
-      const t = line.timestampUs;
-      if (t > 0) {
-        if (t < minLogTimeUs) minLogTimeUs = t;
-        if (t > maxLogTimeUs) maxLogTimeUs = t;
-      }
-    }
-
-    if (minLogTimeUs === Infinity) {
-      minLogTimeUs = 0;
-      maxLogTimeUs = 0;
-    }
-
+    const { min: minLogTimeUs, max: maxLogTimeUs } = getMinMaxTimestamps(rawLogLines);
     const { startUs, endUs } = calculateTimeRangeMicros(startTime, endTime, minLogTimeUs, maxLogTimeUs);
 
     return rawLogLines.filter((line) => {

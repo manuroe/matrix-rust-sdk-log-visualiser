@@ -375,6 +375,37 @@ export function getTimeDisplayName(timeValue: string | null): string {
 }
 
 // =============================================================================
+// Time Range Utilities
+// =============================================================================
+
+/**
+ * Compute the minimum and maximum `timestampUs` values from an array of log lines.
+ *
+ * Uses a linear scan instead of `Math.min(...spread)` / `Math.max(...spread)` to
+ * avoid stack-overflow errors on large log files (JS spread has a call-stack limit).
+ *
+ * @param lines - Array of objects carrying a `timestampUs` field (microseconds).
+ * @returns `{ min, max }` as `TimestampMicros`. Both are 0 when no line has `timestampUs > 0`.
+ *
+ * @example
+ * const { min, max } = getMinMaxTimestamps(rawLogLines);
+ * // min = earliest positive timestamp, max = latest positive timestamp
+ */
+export function getMinMaxTimestamps(lines: Array<{ timestampUs: TimestampMicros }>): { min: TimestampMicros; max: TimestampMicros } {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const line of lines) {
+    const t = line.timestampUs;
+    if (t > 0) {
+      if (t < min) min = t;
+      if (t > max) max = t;
+    }
+  }
+  if (min === Infinity) return { min: 0 as TimestampMicros, max: 0 as TimestampMicros };
+  return { min: min as TimestampMicros, max: max as TimestampMicros };
+}
+
+// =============================================================================
 // Time Range Calculation Functions
 // =============================================================================
 
