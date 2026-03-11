@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: codspeed-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.actor != 'github-actions[bot]' }}
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ permissions:
 jobs:
   benchmarks:
     name: Run CodSpeed benchmarks
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
     steps:
