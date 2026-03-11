@@ -1298,7 +1298,7 @@ describe('LogDisplayView sentry and HTTP error text coloring', () => {
     useLogStore.setState({ rawLogLines: [], sentryEvents: [] });
   });
 
-  it('colors logLineText purple for sentry lines', () => {
+  it('colors logLineText with sentry token for sentry lines', () => {
     const line = createParsedLogLine({
       lineNumber: 1,
       rawText: '2024-01-15T10:00:01.000000Z  WARN Sending error to Sentry',

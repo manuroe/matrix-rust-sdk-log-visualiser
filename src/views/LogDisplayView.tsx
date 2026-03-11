@@ -16,7 +16,7 @@ import { detectCollapseGroups, type CollapseGroupInfo } from '../utils/logCollap
 import { getHttpStatusColor } from '../utils/httpStatusColors';
 import styles from './LogDisplayView.module.css';
 
-const HTTP_ERROR_RE = /\bstatus=(\d{3,})\b/;
+const HTTP_ERROR_RE = /\bstatus=(\d{3})\b/;
 function getHttpErrorStatus(rawText: string): string | null {
   const m = rawText.match(HTTP_ERROR_RE);
   if (!m) return null;
