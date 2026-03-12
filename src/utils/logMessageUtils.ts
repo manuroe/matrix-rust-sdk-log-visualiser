@@ -39,8 +39,10 @@
 export function extractCoreMessage(message: string): string {
   // Pattern: ISO timestamp followed by TRACE|DEBUG|INFO|WARN|ERROR and the payload.
   // The timestamp and level are separated from the payload by arbitrary whitespace.
+  // Fractional seconds (".SSSSSS") and trailing "Z" are both made optional to match
+  // all formats that logParser's extractISOTimestamp accepts.
   const match = message.match(
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s+(.+)$/
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s+(.+)$/
   );
   if (match && match[1]) {
     return match[1].trim();

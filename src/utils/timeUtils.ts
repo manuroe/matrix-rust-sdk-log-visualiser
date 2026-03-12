@@ -391,7 +391,7 @@ export function getTimeDisplayName(timeValue: string | null): string {
  * const { min, max } = getMinMaxTimestamps(rawLogLines);
  * // min = earliest positive timestamp, max = latest positive timestamp
  */
-export function getMinMaxTimestamps(lines: Array<{ timestampUs: TimestampMicros }>): { min: TimestampMicros; max: TimestampMicros } {
+export function getMinMaxTimestamps(lines: ReadonlyArray<{ timestampUs: TimestampMicros }>): { min: TimestampMicros; max: TimestampMicros } {
   let min = Infinity;
   let max = -Infinity;
   for (const line of lines) {

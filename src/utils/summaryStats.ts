@@ -14,9 +14,8 @@
  *   once in `logStore` on parse — O(1) lookups instead of repeated `.find()`.
  */
 
-import type { HttpRequest, SyncRequest, ParsedLogLine, SentryEvent } from '../types/log.types';
+import type { HttpRequest, HttpRequestWithTimestamp, SyncRequest, ParsedLogLine, SentryEvent } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
-import type { HttpRequestWithTimestamp } from '../components/HttpActivityChart';
 import { getTimeRangeUs } from './requestFilters';
 import { getMinMaxTimestamps } from './timeUtils';
 import { extractCoreMessage } from './logMessageUtils';
@@ -102,26 +101,26 @@ export interface SummaryStats {
   readonly chartTimeRange: { readonly minTime: TimestampMicros; readonly maxTime: TimestampMicros };
 }
 
-/** Empty result returned when there is no loaded log data. */
-const EMPTY_STATS: SummaryStats = {
+/** Empty result returned when there is no loaded log data. Frozen to prevent cross-call mutation aliasing. */
+const EMPTY_STATS: SummaryStats = Object.freeze({
   totalLogLines: 0,
-  filteredLogLines: [],
-  timeSpan: { start: '', end: '' },
+  filteredLogLines: Object.freeze([]) as unknown as ParsedLogLine[],
+  timeSpan: Object.freeze({ start: '', end: '' }),
   errors: 0,
   warnings: 0,
-  errorsByType: [],
-  warningsByType: [],
-  sentryEvents: [],
-  httpErrorsByStatus: [],
-  topFailedUrls: [],
-  slowestHttpRequests: [],
-  syncRequestsByConnection: [],
-  httpRequestsWithTimestamps: [],
+  errorsByType: Object.freeze([]) as unknown as readonly MessageCount[],
+  warningsByType: Object.freeze([]) as unknown as readonly MessageCount[],
+  sentryEvents: Object.freeze([]) as unknown as SentryEvent[],
+  httpErrorsByStatus: Object.freeze([]) as unknown as readonly HttpStatusCount[],
+  topFailedUrls: Object.freeze([]) as unknown as readonly FailedUrl[],
+  slowestHttpRequests: Object.freeze([]) as unknown as readonly SlowHttpRequest[],
+  syncRequestsByConnection: Object.freeze([]) as unknown as readonly SyncByConnection[],
+  httpRequestsWithTimestamps: Object.freeze([]) as unknown as HttpRequestWithTimestamp[],
   incompleteRequestCount: 0,
   totalUploadBytes: 0,
   totalDownloadBytes: 0,
-  chartTimeRange: { minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros },
-};
+  chartTimeRange: Object.freeze({ minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros }),
+});
 
 /**
  * Compute all statistics shown in `SummaryView`.
@@ -153,7 +152,7 @@ export function computeSummaryStats(
   if (rawLogLines.length === 0) return EMPTY_STATS;
 
   // Resolve time range: local zoom wins over global store filter.
-  let timeRangeUs = getTimeRangeUs(rawLogLines as ParsedLogLine[], startTime, endTime);
+  let timeRangeUs = getTimeRangeUs(rawLogLines, startTime, endTime);
   if (localTimeRangeUs !== null) {
     timeRangeUs = localTimeRangeUs;
   }

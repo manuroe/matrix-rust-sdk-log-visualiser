@@ -1011,7 +1011,7 @@ describe('SummaryView', () => {
       expect(screen.getByText(/Summary/)).toBeInTheDocument();
     });
 
-    it('clicking an HTTP error status badge navigates to filtered HTTP requests view', () => {
+    it('exercises the HTTP error status badge onClick handler without crashing', () => {
       const lines = createParsedLogLines(2);
       const httpReq = createHttpRequest({
         requestId: 'ERR-STATUS-NAV',
@@ -1028,7 +1028,7 @@ describe('SummaryView', () => {
       expect(screen.getByText(/Summary/)).toBeInTheDocument();
     });
 
-    it('clicking a top failed URL button with a single matching request navigates with request_id param', () => {
+    it('exercises the top failed URL button onClick handler for a single matching request without crashing', () => {
       const lines = createParsedLogLines(2);
       const httpReq = createHttpRequest({
         requestId: 'SINGLE-FAIL-REQ',
@@ -1040,7 +1040,8 @@ describe('SummaryView', () => {
       useLogStore.getState().setHttpRequests([httpReq], lines);
       renderSummaryView();
 
-      // The top failed URL button navigates with request_id for single match (exercise the single-match branch)
+      // Exercises the single-match branch (navigates with request_id rather than filter param).
+      // Full navigation assertion would require replacing MemoryRouter with createMemoryRouter.
       const failedUrlBtn = screen.getByRole('button', { name: /single-fail/i });
       fireEvent.click(failedUrlBtn);
       expect(screen.getByText(/Summary/)).toBeInTheDocument();

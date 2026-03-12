@@ -37,4 +37,17 @@ describe('extractCoreMessage', () => {
     const raw = '2026-01-28T13:24:43.950890Z TRACE   indented payload';
     expect(extractCoreMessage(raw)).toBe('indented payload');
   });
+
+  it('strips prefix from a timestamp without fractional seconds', () => {
+    // logParser accepts timestamps without the fractional-seconds component;
+    // extractCoreMessage must normalise those lines too.
+    const raw = '2026-01-28T13:24:43Z WARN No fractions here';
+    expect(extractCoreMessage(raw)).toBe('No fractions here');
+  });
+
+  it('strips prefix from a timestamp without trailing Z', () => {
+    // Some log lines omit the trailing Z (local-time format).
+    const raw = '2026-01-28T13:24:43.123456 INFO Payload without Z';
+    expect(extractCoreMessage(raw)).toBe('Payload without Z');
+  });
 });
