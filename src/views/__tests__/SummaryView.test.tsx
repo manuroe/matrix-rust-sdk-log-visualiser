@@ -998,6 +998,54 @@ describe('SummaryView', () => {
       }
       expect(screen.getByText(/Summary/)).toBeInTheDocument();
     });
+
+    it('exercises the warning type button onClick handler without crashing', () => {
+      const lines = [
+        createParsedLogLine({ lineNumber: 90, level: 'WARN', message: 'some warning message' }),
+      ];
+      useLogStore.getState().setHttpRequests([], lines);
+      renderSummaryView();
+
+      const warnBtn = screen.getByRole('button', { name: /some warning message/i });
+      fireEvent.click(warnBtn);
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
+
+    it('exercises the HTTP error status badge onClick handler without crashing', () => {
+      const lines = createParsedLogLines(2);
+      const httpReq = createHttpRequest({
+        requestId: 'ERR-STATUS-NAV',
+        status: '404',
+        uri: '/api/missing',
+        sendLineNumber: 0,
+        responseLineNumber: 1,
+      });
+      useLogStore.getState().setHttpRequests([httpReq], lines);
+      renderSummaryView();
+
+      const statusBadge = screen.getByRole('button', { name: '404' });
+      fireEvent.click(statusBadge);
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
+
+    it('exercises the top failed URL button onClick handler for a single matching request without crashing', () => {
+      const lines = createParsedLogLines(2);
+      const httpReq = createHttpRequest({
+        requestId: 'SINGLE-FAIL-REQ',
+        status: '500',
+        uri: '/api/single-fail',
+        sendLineNumber: 0,
+        responseLineNumber: 1,
+      });
+      useLogStore.getState().setHttpRequests([httpReq], lines);
+      renderSummaryView();
+
+      // Exercises the single-match branch (navigates with request_id rather than filter param).
+      // Full navigation assertion would require replacing MemoryRouter with createMemoryRouter.
+      const failedUrlBtn = screen.getByRole('button', { name: /single-fail/i });
+      fireEvent.click(failedUrlBtn);
+      expect(screen.getByText(/Summary/)).toBeInTheDocument();
+    });
   });
 
   // ============================================================================

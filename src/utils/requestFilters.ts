@@ -32,7 +32,7 @@ export interface HttpRequestFilters {
  * Returns null when no filter is active (callers treat null as "no time constraint").
  */
 export function getTimeRangeUs(
-  rawLogLines: Array<{ timestampUs: TimestampMicros }>,
+  rawLogLines: ReadonlyArray<{ timestampUs: TimestampMicros }>,
   startFilter: TimeFilterValue | null,
   endFilter: TimeFilterValue | null
 ): { startUs: TimestampMicros; endUs: TimestampMicros } | null {

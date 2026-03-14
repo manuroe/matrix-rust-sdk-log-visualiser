@@ -4,14 +4,9 @@ import { MICROS_PER_SECOND, MICROS_PER_MILLISECOND } from '../types/time.types';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
 import { BaseActivityChart, type ActivityBucket } from './BaseActivityChart';
 
-/** HTTP request with resolved timestamp */
-export interface HttpRequestWithTimestamp {
-  requestId: string;
-  status: string;
-  timestampUs: TimestampMicros;
-  /** timeout in ms if this is a /sync request; 0=catchup, ≥30000=long-poll */
-  timeout?: number;
-}
+import type { HttpRequestWithTimestamp } from '../types/log.types';
+// Re-exported so that existing consumers importing from this module are unaffected.
+export type { HttpRequestWithTimestamp } from '../types/log.types';
 
 interface HttpActivityChartProps {
   httpRequests: HttpRequestWithTimestamp[];

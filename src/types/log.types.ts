@@ -21,6 +21,19 @@ export interface SyncRequest extends HttpRequest {
   timeout?: number;
 }
 
+/**
+ * An HTTP request enriched with its resolved timestamp in microseconds.
+ * Stored in {@link SummaryStats.httpRequestsWithTimestamps} and consumed by
+ * `HttpActivityChart` to plot request density over time.
+ */
+export interface HttpRequestWithTimestamp {
+  readonly requestId: string;
+  readonly status: string;
+  readonly timestampUs: TimestampMicros;
+  /** Timeout in ms when this is a /sync request; 0 = catch-up, ≥30000 = long-poll. */
+  readonly timeout?: number;
+}
+
 export interface SentryEvent {
   platform: 'android' | 'ios';
   lineNumber: number;
