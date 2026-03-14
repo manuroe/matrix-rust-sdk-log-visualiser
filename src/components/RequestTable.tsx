@@ -20,6 +20,7 @@ import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
+import { buildAttemptSegments } from '../utils/requestBarUtils';
 import type { HttpRequest } from '../types/log.types';
 import styles from './RequestTable.module.css';
 
@@ -548,6 +549,14 @@ export function RequestTable({
                         : getHttpStatusColor(statusCode);
                       const barColor = getBarColor ? getBarColor(req, defaultBarColor) : defaultBarColor;
 
+                      const hasSegments =
+                        (req.numAttempts ?? 1) > 1
+                        && req.attemptOutcomes?.length === (req.numAttempts ?? 1)
+                        && req.attemptTimestampsUs?.length === (req.numAttempts ?? 1);
+                      const attemptSegments = hasSegments
+                        ? buildAttemptSegments(req.attemptOutcomes!, req.attemptTimestampsUs as number[], req.requestDurationMs, barWidth)
+                        : null;
+
                       const rowKey = getRowKey(req);
                       return (
                         <div
@@ -579,9 +588,29 @@ export function RequestTable({
                                 title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}
                               >
                                 {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
+                                {attemptSegments && attemptSegments.map(({ leftPx, widthPx, color }, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      position: 'absolute',
+                                      top: 0,
+                                      bottom: 0,
+                                      left: `${leftPx}px`,
+                                      width: `${widthPx}px`,
+                                      background: color,
+                                    }}
+                                  />
+                                ))}
                               </div>
                               <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}>
-                                {resolvedIsIncomplete ? '...' : statusCode === '200' ? `${req.requestDurationMs}ms` : `${resolvedStatus} - ${req.requestDurationMs}ms`}
+                                {resolvedIsIncomplete
+                                  ? '...'
+                                  : `${
+                                      (req.numAttempts ?? 1) > 1 ? `↻${req.numAttempts} · ` : ''
+                                    }${
+                                      statusCode === '200' ? `${req.requestDurationMs}ms` : `${resolvedStatus} - ${req.requestDurationMs}ms`
+                                    }`
+                                }
                               </span>
                             </div>
                           </div>

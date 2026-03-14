@@ -7,6 +7,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import { RequestTable } from '../RequestTable';
 import type { RequestTableProps, ColumnDef } from '../RequestTable';
+import { getAttemptSegmentColor, buildAttemptSegments } from '../../utils/requestBarUtils';
 import { useLogStore } from '../../stores/logStore';
 import { createHttpRequest, createParsedLogLine } from '../../test/fixtures';
 import { mockVirtualizer } from '../../test/mocks';
@@ -780,3 +781,95 @@ function createRequests(count: number) {
     })
   );
 }
+
+describe('getAttemptSegmentColor', () => {
+  it('returns HTTP status color for numeric outcome', () => {
+    const color = getAttemptSegmentColor('200');
+    expect(color).toContain('var(--http-');
+  });
+
+  it('returns client-error color for non-numeric outcome', () => {
+    expect(getAttemptSegmentColor('TimedOut')).toBe('var(--http-client-error)');
+    expect(getAttemptSegmentColor('Connect')).toBe('var(--http-client-error)');
+  });
+
+  it('treats 503 as HTTP status code (not client error)', () => {
+    const color = getAttemptSegmentColor('503');
+    expect(color).toContain('var(--http-');
+    expect(color).not.toBe('var(--http-client-error)');
+  });
+});
+
+describe('buildAttemptSegments', () => {
+  const BASE_TS = 1_000_000_000 as unknown as number; // arbitrary base microseconds
+
+  it('produces segments whose widths sum to barWidthPx', () => {
+    const timestamps = [BASE_TS, BASE_TS + 30_000_000, BASE_TS + 31_000_000] as number[];
+    const outcomes = ['TimedOut', '503', '200'];
+    const barWidthPx = 300;
+    const segments = buildAttemptSegments(outcomes, timestamps, 62000, barWidthPx);
+
+    expect(segments).toHaveLength(3);
+    const totalWidth = segments.reduce((sum, s) => sum + s.widthPx, 0);
+    expect(totalWidth).toBe(barWidthPx);
+  });
+
+  it('assigns correct colors per attempt outcome', () => {
+    const timestamps = [BASE_TS, BASE_TS + 30_000_000] as number[];
+    const outcomes = ['TimedOut', '200'];
+    const segments = buildAttemptSegments(outcomes, timestamps, 31000, 100);
+
+    expect(segments[0].color).toBe('var(--http-client-error)');
+    expect(segments[1].color).toContain('var(--http-');
+  });
+
+  it('sets leftPx to 0 for the first segment', () => {
+    const timestamps = [BASE_TS, BASE_TS + 1_000_000] as number[];
+    const segments = buildAttemptSegments(['TimedOut', '200'], timestamps, 2000, 200);
+    expect(segments[0].leftPx).toBe(0);
+  });
+
+  it('second segment leftPx equals first segment widthPx', () => {
+    const timestamps = [BASE_TS, BASE_TS + 1_000_000] as number[];
+    const segments = buildAttemptSegments(['503', '200'], timestamps, 2000, 200);
+    expect(segments[1].leftPx).toBe(segments[0].widthPx);
+  });
+});
+
+describe('RequestTable — multi-attempt segment rendering', () => {
+  beforeEach(() => {
+    useLogStore.getState().clearData();
+  });
+
+  it('renders colored segment divs inside the bar for a fully-resolved retry request', () => {
+    const BASE_TS = 1_700_000_000_000_000;
+    const req = createHttpRequest({
+      requestId: 'RETRY-REQ',
+      uri: 'https://example.org/rooms/messages',
+      status: '200',
+      sendLineNumber: 0,
+      responseLineNumber: 5,
+      requestDurationMs: 62000,
+      numAttempts: 2,
+      attemptTimestampsUs: [BASE_TS, BASE_TS + 30_000_000] as unknown as readonly import('../../types/time.types').TimestampMicros[],
+      attemptOutcomes: ['TimedOut', '200'],
+    });
+    const rawLines = [
+      createParsedLogLine({ lineNumber: 0, timestampUs: BASE_TS }),
+      createParsedLogLine({ lineNumber: 5, timestampUs: BASE_TS + 62_000_000 }),
+    ];
+    useLogStore.getState().setHttpRequests([req], rawLines);
+
+    renderWithRouter(
+      <RequestTable
+        {...createProps({ filteredRequests: [req], totalCount: 1, msPerPixel: 10 })}
+      />
+    );
+
+    // The bar container should contain 2 absolutely-positioned segment divs
+    const allAbsoluteDivs = Array.from(document.querySelectorAll('div')).filter(
+      (el) => el.style.position === 'absolute' && el.style.background !== ''
+    );
+    expect(allAbsoluteDivs.length).toBeGreaterThanOrEqual(2);
+  });
+});
