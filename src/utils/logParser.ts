@@ -15,6 +15,10 @@ const HTTP_CLIENT_ERROR_RE = /Error while sending request.*send\{request_id="(?<
 // Extracts the specific error source from reqwest-style errors (e.g. "source: TimedOut")
 const CLIENT_ERROR_SOURCE_RE = /\bsource:\s*([A-Za-z]\w*)/;
 
+// Extracts the attempt number from "Sending request num_attempt=N" log lines.
+// The SDK emits num_attempt=1 on the first send and increments on each retry.
+const NUM_ATTEMPT_RE = /\bnum_attempt=(\d+)/;
+
 // Pattern for extracting log level - matches common Rust log formats
 const LOG_LEVEL_RE = /\s(TRACE|DEBUG|INFO|WARN|ERROR)\s/;
 
@@ -213,6 +217,16 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       rec.requestSizeString = rec.requestSizeString || respMatch.groups.req_size;
       rec.requestDurationMs = rec.requestDurationMs || durationMs;
       rec.responseLineNumber = i + 1;
+
+      // For retried requests the SDK-reported request_duration covers only the last
+      // attempt. Override with the wall-clock elapsed time from the first send so
+      // the waterfall bar spans the full retry sequence.
+      if ((rec.numAttempts ?? 1) > 1 && rec.attemptTimestampsUs?.length) {
+        const responseTsUs = rawLogLines[rawLogLines.length - 1].timestampUs as number;
+        if (responseTsUs && rec.attemptTimestampsUs[0]) {
+          rec.requestDurationMs = Math.max(1, Math.round((responseTsUs - rec.attemptTimestampsUs[0]) / 1000));
+        }
+      }
       continue;
     }
 
@@ -225,11 +239,64 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     const sendMatch = !HTTP_CLIENT_ERROR_RE.test(line) ? line.match(HTTP_SEND_RE) : null;
     if (sendMatch && sendMatch.groups) {
       const requestId = sendMatch.groups.id;
+      const sendMethod = sendMatch.groups.method;
+      const sendUri = sendMatch.groups.uri;
+
+      // Extract attempt number (defaults to 1 when absent for backward compat)
+      const numAttemptMatch = line.match(NUM_ATTEMPT_RE);
+      const numAttempt = numAttemptMatch ? parseInt(numAttemptMatch[1], 10) : 1;
+
+      // The current line's timestamp is already in the last rawLogLines entry
+      // (rawLogLines.push runs before HTTP matching in this same loop iteration).
+      const lineTimestampUs: TimestampMicros = rawLogLines.length > 0
+        ? rawLogLines[rawLogLines.length - 1].timestampUs
+        : 0 as TimestampMicros;
 
       if (!recordsByRequestId.has(requestId)) {
         recordsByRequestId.set(requestId, []);
       }
       const bucket = recordsByRequestId.get(requestId)!;
+
+      // When num_attempt > 1 this is a retry of an existing record.
+      // Fold it into the most-recent record for this request_id+method+uri
+      // that already has a sendLineNumber (the prior attempt).
+      // Keep sendLineNumber pointing at the first attempt (bar start);
+      // only push the new timestamp and update the attempt counter.
+      if (numAttempt > 1) {
+        let priorRec: Partial<HttpRequest> | undefined;
+        for (let j = bucket.length - 1; j >= 0; j--) {
+          const candidate = bucket[j];
+          if (candidate.sendLineNumber && candidate.method === sendMethod && candidate.uri === sendUri) {
+            priorRec = candidate;
+            break;
+          }
+        }
+        if (priorRec) {
+          // If the previous attempt already has a resolved response/error, capture its
+          // outcome before clearing, so the final response can fill these fields again.
+          const intermediateStatus = priorRec.status
+            ? priorRec.status.split(' ')[0]
+            : priorRec.clientError || undefined;
+          if (intermediateStatus !== undefined) {
+            if (!priorRec.attemptOutcomes) {
+              (priorRec as Partial<HttpRequest>).attemptOutcomes = [];
+            }
+            (priorRec.attemptOutcomes as string[]).push(intermediateStatus);
+            // Reset response fields so the next attempt's result fills them.
+            priorRec.status = undefined;
+            priorRec.clientError = undefined;
+            priorRec.responseLineNumber = undefined;
+            priorRec.requestDurationMs = undefined;
+            priorRec.responseSizeString = undefined;
+          }
+          priorRec.numAttempts = numAttempt;
+          if (lineTimestampUs && priorRec.attemptTimestampsUs) {
+            (priorRec.attemptTimestampsUs as TimestampMicros[]).push(lineTimestampUs);
+          }
+          continue;
+        }
+        // No prior record found (e.g. log starts mid-retry) — fall through to create a new one
+      }
 
       // Pair this send with the best compatible response-only record by scanning
       // backwards (most-recent first) in a single pass.
@@ -237,8 +304,6 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       //   1. Last response-only record with matching method+uri.
       //   2. Last response-only record with no method/uri yet.
       //   3. Otherwise create a new record.
-      const sendMethod = sendMatch.groups.method;
-      const sendUri = sendMatch.groups.uri;
       let rec: Partial<HttpRequest> | null = null;
       let fallbackEmpty: Partial<HttpRequest> | null = null;
       for (let j = bucket.length - 1; j >= 0; j--) {
@@ -260,10 +325,12 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       }
 
       rec.requestId = requestId;
-      rec.method = sendMatch.groups.method;
-      rec.uri = sendMatch.groups.uri;
+      rec.method = sendMethod;
+      rec.uri = sendUri;
       rec.requestSizeString = sendMatch.groups.req_size;
       rec.sendLineNumber = i + 1;
+      rec.numAttempts = numAttempt;
+      rec.attemptTimestampsUs = lineTimestampUs ? [lineTimestampUs] : [];
     } else {
       // Try to match client-side error pattern (no HTTP response: timeout, connection failure, etc.).
       // These lines contain "Error while sending request" and are skipped by HTTP_SEND_RE above.
@@ -306,6 +373,10 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
         rec.uri = rec.uri || errUri;
         rec.clientError = clientError;
         rec.responseLineNumber = i + 1;
+        // For retried requests that end in a client error, duration is computed from
+        // timestamps in finalization (sendLineNumber → first send, responseLineNumber →
+        // error line). No override needed here; finalization handles it correctly because
+        // sendLineNumber points to the first attempt's send line.
       }
     }
   }
@@ -340,6 +411,21 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     rec.requestDurationMs = rec.requestDurationMs || 0;
     rec.sendLineNumber = rec.sendLineNumber || 0;
     rec.responseLineNumber = rec.responseLineNumber || 0;
+    rec.numAttempts = rec.numAttempts ?? 1;
+    rec.attemptTimestampsUs = rec.attemptTimestampsUs ?? [];
+    rec.attemptOutcomes = rec.attemptOutcomes ?? [];
+    // Append the final attempt's outcome to complete per-segment colour data when
+    // all preceding attempts have already been captured (i.e. the log contained
+    // intermediate response spans between every retry).
+    if ((rec.numAttempts ?? 1) > 1) {
+      const prevCount = (rec.attemptOutcomes as string[]).length;
+      if (prevCount === (rec.numAttempts ?? 1) - 1) {
+        const finalOutcome = rec.status
+          ? rec.status.split(' ')[0]
+          : rec.clientError ?? 'Incomplete';
+        (rec.attemptOutcomes as string[]).push(finalOutcome);
+      }
+    }
 
     // Compute duration from timestamps for client-error requests (no request_duration= field in error lines)
     if (rec.clientError && rec.requestDurationMs === 0 && rec.sendLineNumber && rec.responseLineNumber) {
