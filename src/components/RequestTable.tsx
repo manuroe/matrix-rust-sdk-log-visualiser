@@ -556,6 +556,22 @@ export function RequestTable({
                       const attemptSegments = hasSegments
                         ? buildAttemptSegments(req.attemptOutcomes!, req.attemptTimestampsUs as number[], req.requestDurationMs, barWidth)
                         : null;
+                      // For retry requests, build a tooltip listing each attempt outcome with its
+                      // individual duration, e.g. "↻3: 503 (20ms) → 503 (100ms) → 200 OK (1500ms) — 1620ms"
+                      const retryTooltip = hasSegments && req.attemptOutcomes
+                        ? (() => {
+                            const outcomes = req.attemptOutcomes!;
+                            const timestamps = req.attemptTimestampsUs as number[];
+                            const parts = outcomes.map((outcome, i) => {
+                              const endUs = i < outcomes.length - 1
+                                ? timestamps[i + 1]
+                                : timestamps[0] + req.requestDurationMs * 1000;
+                              const ms = Math.round((endUs - timestamps[i]) / 1000);
+                              return `${outcome} (${ms}ms)`;
+                            });
+                            return `↻${req.numAttempts}: ${parts.join(' → ')} — ${req.requestDurationMs}ms`;
+                          })()
+                        : null;
 
                       const rowKey = getRowKey(req);
                       return (
@@ -585,7 +601,7 @@ export function RequestTable({
                                   width: `${barWidth}px`,
                                   background: barColor,
                                 }}
-                                title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}
+                                title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}
                               >
                                 {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
                                 {attemptSegments && attemptSegments.flatMap(({ leftPx, widthPx, color }, idx) => {
@@ -624,14 +640,14 @@ export function RequestTable({
                                   return [segment];
                                 })}
                               </div>
-                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}>
+                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}>
                                 {resolvedIsIncomplete
                                   ? '...'
-                                  : `${
-                                      (req.numAttempts ?? 1) > 1 ? `↻${req.numAttempts} · ` : ''
-                                    }${
-                                      statusCode === '200' ? `${req.requestDurationMs}ms` : `${resolvedStatus} - ${req.requestDurationMs}ms`
-                                    }`
+                                  : retryTooltip
+                                  ? retryTooltip
+                                  : statusCode === '200'
+                                  ? `${req.requestDurationMs}ms`
+                                  : `${resolvedStatus} - ${req.requestDurationMs}ms`
                                 }
                               </span>
                             </div>
