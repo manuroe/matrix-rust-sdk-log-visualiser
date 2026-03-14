@@ -85,6 +85,10 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
       isSyncingFromProp.current = true;
       setFilterQueryInput(requestFilter);
     }
+    // filterQueryInput is intentionally excluded: this effect must only react to
+    // prop changes from the parent. Including it would cause every local keystroke
+    // to re-run the effect and reset the input back to the prop value, clobbering
+    // the user's in-progress edits.
   }, [requestFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Debounce inputs to avoid recalculating on every keystroke
