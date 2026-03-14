@@ -141,8 +141,6 @@ export function SummaryView() {
     );
   }, [rawLogLines, allHttpRequests, allRequests, connectionIds, sentryEvents, startTime, endTime, localStartTime, localEndTime, lineNumberIndex]);
 
-
-
   if (rawLogLines.length === 0) {
     return (
       <div className="app">
