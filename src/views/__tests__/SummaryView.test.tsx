@@ -507,6 +507,51 @@ describe('SummaryView', () => {
   });
 
   // ============================================================================
+  // Retried requests (intermediate attempt outcomes) in summary stats
+  // ============================================================================
+
+  describe('retried request intermediate outcomes in summary', () => {
+    it('counts intermediate 503 in Top Failed URLs even when final status is 200', () => {
+      // REQ-1: retried, first attempt got 503, second attempt got 200
+      const httpRequests = [
+        createHttpRequest({
+          requestId: 'REQ-1',
+          uri: 'https://matrix.example.com/_matrix/client/v3/sync',
+          status: '200',
+          numAttempts: 2,
+          attemptOutcomes: ['503', '200'],
+        }),
+      ];
+      const logLines = createParsedLogLines(3);
+      useLogStore.getState().setHttpRequests(httpRequests, logLines);
+      renderSummaryView();
+
+      // Top Failed URLs section should appear (503 from the retry counts as a failure)
+      const failedSection = screen.queryByText(/Top Failed URLs/i);
+      expect(failedSection).toBeInTheDocument();
+    });
+
+    it('does not count intermediate 503 in Top Failed URLs when none failed', () => {
+      // REQ-1: clean 200 with no retries
+      const httpRequests = [
+        createHttpRequest({
+          requestId: 'REQ-1',
+          uri: 'https://matrix.example.com/_matrix/client/v3/sync',
+          status: '200',
+          numAttempts: 1,
+          attemptOutcomes: ['200'],
+        }),
+      ];
+      const logLines = createParsedLogLines(1);
+      useLogStore.getState().setHttpRequests(httpRequests, logLines);
+      renderSummaryView();
+
+      // Top Failed URLs section should NOT appear
+      expect(screen.queryByText(/Top Failed URLs/i)).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
   // Chart selection boundary keywords (start / end)
   // ============================================================================
 

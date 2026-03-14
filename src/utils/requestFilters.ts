@@ -86,10 +86,14 @@ export function filterSyncRequests(
     // Incomplete filter
     if (!showIncomplete && !r.status) return false;
 
-    // Status code filter (null = all enabled)
+    // Status code filter (null = all enabled).
+    // A request matches if its final status matches OR any intermediate attempt outcome matches,
+    // so retried requests (e.g. 503 → 200) appear when filtering for either code.
     if (statusCodeFilter !== null) {
       const statusKey = r.status || 'Incomplete';
-      if (!statusCodeFilter.has(statusKey)) return false;
+      const matchesFinal = statusCodeFilter.has(statusKey);
+      const matchesAttempt = r.attemptOutcomes?.some((o) => statusCodeFilter.has(o)) ?? false;
+      if (!matchesFinal && !matchesAttempt) return false;
     }
 
     // Time filter
@@ -117,10 +121,14 @@ export function filterHttpRequests(
     // Incomplete filter — client errors always show (they are resolved, not truly incomplete)
     if (!showIncompleteHttp && !r.status && !r.clientError) return false;
 
-    // Status code filter (null = all enabled)
+    // Status code filter (null = all enabled).
+    // A request matches if its final status matches OR any intermediate attempt outcome matches,
+    // so retried requests (e.g. 503 → 200) appear when filtering for either code.
     if (statusCodeFilter !== null) {
       const statusKey = r.status || (r.clientError ? CLIENT_ERROR_STATUS_KEY : INCOMPLETE_STATUS_KEY);
-      if (!statusCodeFilter.has(statusKey)) return false;
+      const matchesFinal = statusCodeFilter.has(statusKey);
+      const matchesAttempt = r.attemptOutcomes?.some((o) => statusCodeFilter.has(o)) ?? false;
+      if (!matchesFinal && !matchesAttempt) return false;
     }
 
     // URI filter (case-insensitive substring match)

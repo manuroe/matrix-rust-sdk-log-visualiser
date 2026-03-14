@@ -8,6 +8,10 @@ import { ParsingError } from './errorHandling';
 // request_size= is optional: some SDK log lines (e.g. API error responses) omit it from the span.
 const HTTP_RESP_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"(?:\s+request_size="(?<req_size>[^"]+)")?\s+status=(?<status>\S+)\s+response_size="(?<resp_size>[^"]+)"\s+request_duration=(?<duration_val>[0-9.]+)(?<duration_unit>ms|s)/;
 const HTTP_SEND_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"(?:\s+request_size="(?<req_size>[^"]+)")?(?![^}]*(?:status=|response_size=|request_duration=))/;
+// Like HTTP_SEND_RE but without the negative lookahead — used for retry send lines
+// (num_attempt > 1) whose span context already contains status/response fields from
+// the previous attempt, which would otherwise prevent HTTP_SEND_RE from matching.
+const HTTP_RETRY_SEND_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"(?:\s+request_size="(?<req_size>[^"]+)")?/;
 
 // Regex for client-side transport errors (no HTTP response received, e.g. timeout, connection failure).
 // These log lines have the send{} span without request_size=.
@@ -163,12 +167,33 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       continue;
     }
 
-    // Try to match response pattern first
-    const respMatch = line.match(HTTP_RESP_RE);
+    // Retry send lines (num_attempt > 1) carry span data accumulated from prior attempts,
+    // including status=/response_size=/request_duration= fields from the previous response.
+    // Detect them early so HTTP_RESP_RE does not mistake them for actual responses.
+    const numAttemptEarlyMatch = line.match(NUM_ATTEMPT_RE);
+    const isRetrySend = numAttemptEarlyMatch !== null && parseInt(numAttemptEarlyMatch[1], 10) > 1;
+
+    // Try to match response pattern first (skip for retry sends)
+    const respMatch = !isRetrySend ? line.match(HTTP_RESP_RE) : null;
     if (respMatch && respMatch.groups) {
       const requestId = respMatch.groups.id;
-      const durationVal = parseFloat(respMatch.groups.duration_val);
-      const durationUnit = respMatch.groups.duration_unit;
+
+      // A span context may contain duplicate fields when the SDK accumulates data
+      // from prior attempts (e.g. status=503 ... status=200 ...).  Always use the
+      // last occurrence, which represents the final response outcome.
+      const allStatuses = [...line.matchAll(/\bstatus=(\S+)/g)];
+      const finalStatus = allStatuses.length > 0
+        ? allStatuses[allStatuses.length - 1][1]
+        : respMatch.groups.status;
+      const allDurations = [...line.matchAll(/\brequest_duration=([0-9.]+)(ms|s)/g)];
+      const lastDuration = allDurations.length > 0 ? allDurations[allDurations.length - 1] : null;
+      const durationVal = lastDuration ? parseFloat(lastDuration[1]) : parseFloat(respMatch.groups.duration_val);
+      const durationUnit = lastDuration ? lastDuration[2] : respMatch.groups.duration_unit;
+      const allRespSizes = [...line.matchAll(/\bresponse_size="([^"]+)"/g)];
+      const finalRespSize = allRespSizes.length > 0
+        ? allRespSizes[allRespSizes.length - 1][1]
+        : respMatch.groups.resp_size;
+
       const durationMs = Math.round(durationVal * (durationUnit === 's' ? 1000.0 : 1.0));
 
       if (!recordsByRequestId.has(requestId)) {
@@ -212,8 +237,8 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       rec.requestId = requestId;
       rec.method = rec.method || respMatch.groups.method;
       rec.uri = rec.uri || respMatch.groups.uri;
-      rec.status = rec.status || respMatch.groups.status;
-      rec.responseSizeString = rec.responseSizeString || respMatch.groups.resp_size;
+      rec.status = rec.status || finalStatus;
+      rec.responseSizeString = rec.responseSizeString || finalRespSize;
       rec.requestSizeString = rec.requestSizeString || respMatch.groups.req_size;
       rec.requestDurationMs = rec.requestDurationMs || durationMs;
       rec.responseLineNumber = i + 1;
@@ -236,15 +261,18 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     // (no request_size=, no status=). Skipping them here prevents the updated
     // HTTP_SEND_RE (which no longer requires request_size=) from stealing those
     // lines before the client-error path can mark them as clientError records.
-    const sendMatch = !HTTP_CLIENT_ERROR_RE.test(line) ? line.match(HTTP_SEND_RE) : null;
+    // For retry sends use the broader HTTP_RETRY_SEND_RE (tolerates span fields from prior attempts).
+    const sendMatch = !HTTP_CLIENT_ERROR_RE.test(line)
+      ? (isRetrySend ? line.match(HTTP_RETRY_SEND_RE) : line.match(HTTP_SEND_RE))
+      : null;
     if (sendMatch && sendMatch.groups) {
       const requestId = sendMatch.groups.id;
       const sendMethod = sendMatch.groups.method;
       const sendUri = sendMatch.groups.uri;
 
-      // Extract attempt number (defaults to 1 when absent for backward compat)
-      const numAttemptMatch = line.match(NUM_ATTEMPT_RE);
-      const numAttempt = numAttemptMatch ? parseInt(numAttemptMatch[1], 10) : 1;
+      // Extract attempt number (defaults to 1 when absent for backward compat).
+      // Reuse numAttemptEarlyMatch computed above (avoids a second regex run on the same line).
+      const numAttempt = numAttemptEarlyMatch ? parseInt(numAttemptEarlyMatch[1], 10) : 1;
 
       // The current line's timestamp is already in the last rawLogLines entry
       // (rawLogLines.push runs before HTTP matching in this same loop iteration).
@@ -274,9 +302,19 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
         if (priorRec) {
           // If the previous attempt already has a resolved response/error, capture its
           // outcome before clearing, so the final response can fill these fields again.
-          const intermediateStatus = priorRec.status
+          let intermediateStatus: string | undefined = priorRec.status
             ? priorRec.status.split(' ')[0]
             : priorRec.clientError || undefined;
+          // When no explicit intermediate "Got response" / error line was logged between
+          // retries (common in real SDK logs), the retry-send span accumulates the
+          // previous attempt's outcome as the last status= field in the span context.
+          // Extract it here so attemptOutcomes is populated for waterfall coloring.
+          if (intermediateStatus === undefined) {
+            const spanStatuses = [...line.matchAll(/\bstatus=(\S+)/g)];
+            if (spanStatuses.length > 0) {
+              intermediateStatus = spanStatuses[spanStatuses.length - 1][1];
+            }
+          }
           if (intermediateStatus !== undefined) {
             if (!priorRec.attemptOutcomes) {
               (priorRec as Partial<HttpRequest>).attemptOutcomes = [];
