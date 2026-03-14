@@ -717,7 +717,7 @@ describe('snapSelectionToLogLine', () => {
     expect(snapSelectionToLogLine(BASE, [], fullDataRange, 'end')).toBe('end');
   });
 
-  it('returns "start" when a boundary is just outside tolerance of the minimum (start edge)', () => {
+  it('does NOT snap to "start" when just outside tolerance of the minimum (start edge)', () => {
     // Value is SNAP_TOLERANCE_US + 1 away from the minimum — must NOT snap to "start".
     const outsideTolerance = (fullDataRange.minTime + SNAP_TOLERANCE_US + 1) as ReturnType<typeof isoToMicros>;
     const result = snapSelectionToLogLine(outsideTolerance, lines, fullDataRange, 'start');
@@ -725,7 +725,7 @@ describe('snapSelectionToLogLine', () => {
     expect(result).toBe(lines[0].isoTimestamp);
   });
 
-  it('returns "end" when a boundary is just outside tolerance of the maximum (end edge)', () => {
+  it('does NOT snap to "end" when just outside tolerance of the maximum (end edge)', () => {
     // Value is SNAP_TOLERANCE_US + 1 away from the maximum — must NOT snap to "end".
     const outsideTolerance = (fullDataRange.maxTime - SNAP_TOLERANCE_US - 1) as ReturnType<typeof isoToMicros>;
     const result = snapSelectionToLogLine(outsideTolerance, lines, fullDataRange, 'end');
