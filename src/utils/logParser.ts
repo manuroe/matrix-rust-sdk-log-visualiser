@@ -245,10 +245,12 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       rec.requestId = requestId;
       rec.method = rec.method || respMatch.groups.method;
       rec.uri = rec.uri || respMatch.groups.uri;
-      rec.status = rec.status || finalStatus;
-      rec.responseSizeString = rec.responseSizeString || finalRespSize;
+      // Unconditionally overwrite so the final response always wins over any
+      // intermediate attempt value that was folded into the record earlier.
+      rec.status = finalStatus;
+      rec.responseSizeString = finalRespSize;
       rec.requestSizeString = rec.requestSizeString || respMatch.groups.req_size;
-      rec.requestDurationMs = rec.requestDurationMs || durationMs;
+      rec.requestDurationMs = durationMs;
       rec.responseLineNumber = i + 1;
 
       // For retried requests the SDK-reported request_duration covers only the last

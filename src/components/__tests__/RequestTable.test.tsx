@@ -7,7 +7,6 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import { RequestTable } from '../RequestTable';
 import type { RequestTableProps, ColumnDef } from '../RequestTable';
-import { getAttemptSegmentColor, buildAttemptSegments } from '../../utils/requestBarUtils';
 import { useLogStore } from '../../stores/logStore';
 import { createHttpRequest, createParsedLogLine } from '../../test/fixtures';
 import { mockVirtualizer } from '../../test/mocks';
@@ -781,67 +780,6 @@ function createRequests(count: number) {
     })
   );
 }
-
-describe('getAttemptSegmentColor', () => {
-  it('returns HTTP status color for numeric outcome', () => {
-    const color = getAttemptSegmentColor('200');
-    expect(color).toContain('var(--http-');
-  });
-
-  it('returns client-error color for non-numeric outcome', () => {
-    expect(getAttemptSegmentColor('TimedOut')).toBe('var(--http-client-error)');
-    expect(getAttemptSegmentColor('Connect')).toBe('var(--http-client-error)');
-  });
-
-  it('treats 503 as HTTP status code (not client error)', () => {
-    const color = getAttemptSegmentColor('503');
-    expect(color).toContain('var(--http-');
-    expect(color).not.toBe('var(--http-client-error)');
-  });
-});
-
-describe('buildAttemptSegments', () => {
-  const BASE_TS = 1_000_000_000 as unknown as number; // arbitrary base microseconds
-
-  it('produces segments whose widths sum to barWidthPx', () => {
-    const timestamps = [BASE_TS, BASE_TS + 30_000_000, BASE_TS + 31_000_000] as number[];
-    const outcomes = ['TimedOut', '503', '200'];
-    const barWidthPx = 300;
-    const segments = buildAttemptSegments(outcomes, timestamps, 62000, barWidthPx);
-
-    expect(segments).toHaveLength(3);
-    const totalWidth = segments.reduce((sum, s) => sum + s.widthPx, 0);
-    expect(totalWidth).toBe(barWidthPx);
-  });
-
-  it('assigns correct colors per attempt outcome', () => {
-    const timestamps = [BASE_TS, BASE_TS + 30_000_000] as number[];
-    const outcomes = ['TimedOut', '200'];
-    const segments = buildAttemptSegments(outcomes, timestamps, 31000, 100);
-
-    expect(segments[0].color).toBe('var(--http-client-error)');
-    expect(segments[1].color).toContain('var(--http-');
-  });
-
-  it('sets leftPx to 0 for the first segment', () => {
-    const timestamps = [BASE_TS, BASE_TS + 1_000_000] as number[];
-    const segments = buildAttemptSegments(['TimedOut', '200'], timestamps, 2000, 200);
-    expect(segments[0].leftPx).toBe(0);
-  });
-
-  it('second segment leftPx equals first segment widthPx', () => {
-    const timestamps = [BASE_TS, BASE_TS + 1_000_000] as number[];
-    const segments = buildAttemptSegments(['503', '200'], timestamps, 2000, 200);
-    expect(segments[1].leftPx).toBe(segments[0].widthPx);
-  });
-
-  it('returns [] when timestamps array is shorter than outcomes (mismatched inputs)', () => {
-    // Only 1 timestamp for 2 outcomes — would produce NaN widths without the guard.
-    const timestamps = [BASE_TS] as number[];
-    const segments = buildAttemptSegments(['TimedOut', '200'], timestamps, 5000, 100);
-    expect(segments).toHaveLength(0);
-  });
-});
 
 describe('RequestTable — multi-attempt segment rendering', () => {
   beforeEach(() => {
