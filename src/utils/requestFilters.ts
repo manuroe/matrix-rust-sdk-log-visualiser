@@ -92,7 +92,11 @@ export function filterSyncRequests(
     if (statusCodeFilter !== null) {
       const statusKey = r.status || 'Incomplete';
       const matchesFinal = statusCodeFilter.has(statusKey);
-      const matchesAttempt = r.attemptOutcomes?.some((o) => statusCodeFilter.has(o)) ?? false;
+      // Map non-numeric outcomes (e.g. 'TimedOut') to CLIENT_ERROR_STATUS_KEY so filtering
+      // for 'Client Error' also includes requests with intermediate transport failures.
+      const matchesAttempt = r.attemptOutcomes?.some((o) =>
+        statusCodeFilter.has(/^\d+$/.test(o) ? o : CLIENT_ERROR_STATUS_KEY)
+      ) ?? false;
       if (!matchesFinal && !matchesAttempt) return false;
     }
 
@@ -127,7 +131,11 @@ export function filterHttpRequests(
     if (statusCodeFilter !== null) {
       const statusKey = r.status || (r.clientError ? CLIENT_ERROR_STATUS_KEY : INCOMPLETE_STATUS_KEY);
       const matchesFinal = statusCodeFilter.has(statusKey);
-      const matchesAttempt = r.attemptOutcomes?.some((o) => statusCodeFilter.has(o)) ?? false;
+      // Map non-numeric outcomes (e.g. 'TimedOut') to CLIENT_ERROR_STATUS_KEY so filtering
+      // for 'Client Error' also includes requests with intermediate transport failures.
+      const matchesAttempt = r.attemptOutcomes?.some((o) =>
+        statusCodeFilter.has(/^\d+$/.test(o) ? o : CLIENT_ERROR_STATUS_KEY)
+      ) ?? false;
       if (!matchesFinal && !matchesAttempt) return false;
     }
 
