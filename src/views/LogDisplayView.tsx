@@ -75,11 +75,11 @@ interface LogDisplayViewProps {
   /** Override the line source; when absent, falls back to `rawLogLines` from the store. */
   logLines?: ParsedLogLine[];
   /**
-    * Inclusive line-number range `[start, end]`. When set, the initial
-    * rendered set is restricted to lines whose `lineNumber` falls within
-    * this range. Gap expansion may reveal lines outside the range. Applied after the
-   * `logLines` / store selection — see interface-level JSDoc for the full
-   * precedence table.
+   * Inclusive line-number range `[start, end]`. When set, the initial
+   * rendered set is restricted to lines whose `lineNumber` falls within
+   * this range. Gap expansion may reveal lines outside the range. Applied
+   * after the `logLines` / store selection — see interface-level JSDoc for
+   * the full precedence table.
    */
   lineRange?: { start: number; end: number };
 }

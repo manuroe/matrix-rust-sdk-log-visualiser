@@ -27,7 +27,9 @@ function extractRelativeUri(uri: string): string {
  * For non-Matrix URLs falls back to the relative path (scheme+host stripped).
  *
  * @param uri - The full URL string (e.g. from an HTTP request log entry)
- * @returns The endpoint path beginning with `/`, e.g. `/keys/query`
+ * @returns The endpoint path (e.g. `/keys/query`). Begins with `/` for valid
+ *   absolute URLs; returns the input string unchanged when it is not a
+ *   recognisable URL (e.g. a raw path or placeholder value).
  *
  * @example
  * stripMatrixClientPath('https://matrix-client.matrix.org/_matrix/client/v3/keys/query')

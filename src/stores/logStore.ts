@@ -46,7 +46,7 @@ interface LogStore {
   showIncompleteHttp: boolean;
   
   /**
-    * Controls which status-code buckets are visible in request lists.
+   * Controls which status-code buckets are visible in request lists.
    *
    * - `null` — all codes are shown (default; no filtering applied).
    * - `Set<string>` — only requests whose status matches a value in the set
@@ -54,8 +54,8 @@ interface LogStore {
    *   `"404"`) as well as the synthetic keys `INCOMPLETE_STATUS_KEY` and
    *   `CLIENT_ERROR_STATUS_KEY` defined in `statusCodeUtils.ts`.
    *
-    * This filter is consumed by both sync-request and HTTP-request filtering.
-    *
+   * This filter is consumed by both sync-request and HTTP-request filtering.
+   *
    * The "null = all enabled" convention avoids enumerating every possible
    * code at store initialisation time.
    */
