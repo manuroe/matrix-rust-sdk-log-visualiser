@@ -301,7 +301,7 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
       // Keep sendLineNumber pointing at the first attempt (bar start);
       // only push the new timestamp and update the attempt counter.
       if (numAttempt > 1) {
-        let priorRec: Partial<HttpRequest> | undefined;
+        let priorRec: HttpRequestRecord | undefined;
         for (let j = bucket.length - 1; j >= 0; j--) {
           const candidate = bucket[j];
           if (candidate.sendLineNumber && candidate.method === sendMethod && candidate.uri === sendUri) {
@@ -327,7 +327,7 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
           }
           if (intermediateStatus !== undefined) {
             if (!priorRec.attemptOutcomes) {
-              (priorRec as Partial<HttpRequest>).attemptOutcomes = [];
+              priorRec.attemptOutcomes = [];
             }
             (priorRec.attemptOutcomes as string[]).push(intermediateStatus);
             // Reset response fields so the next attempt's result fills them.
