@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildAttemptSegments, getAttemptSegmentColor } from '../requestBarUtils';
+import { buildAttemptSegments, buildRetryTooltip, computeHasSegments, getAttemptSegmentColor } from '../requestBarUtils';
+import { INCOMPLETE_STATUS_KEY } from '../statusCodeUtils';
 
 describe('getAttemptSegmentColor', () => {
   it('returns the HTTP status color for numeric outcome strings', () => {
@@ -8,8 +9,8 @@ describe('getAttemptSegmentColor', () => {
     expect(color).toBe('var(--http-200)');
   });
 
-  it('returns the incomplete color for "Incomplete"', () => {
-    expect(getAttemptSegmentColor('Incomplete')).toBe('var(--http-incomplete)');
+  it('returns the incomplete color for INCOMPLETE_STATUS_KEY', () => {
+    expect(getAttemptSegmentColor(INCOMPLETE_STATUS_KEY)).toBe('var(--http-incomplete)');
   });
 
   it('returns the client-error color for non-numeric, non-Incomplete outcomes', () => {
@@ -87,5 +88,76 @@ describe('buildAttemptSegments', () => {
     const segs = buildAttemptSegments(['TimedOut', '200'], ts, 1000, 100);
     expect(segs[0].color).toBe('var(--http-client-error)');
     expect(segs[1].color).toBe('var(--http-200)');
+  });
+});
+
+describe('buildRetryTooltip', () => {
+  it('formats a two-attempt tooltip correctly', () => {
+    // ts0=0µs, ts1=120_000µs → seg0=120ms, seg1=1500ms (totalMs=1620)
+    const ts = [0, 120_000];
+    expect(buildRetryTooltip(['503', '200'], ts, 1620, 2)).toBe('↻2: 503 (120ms) → 200 (1500ms) — 1620ms');
+  });
+
+  it('formats a three-attempt tooltip correctly', () => {
+    const ts = [0, 100_000, 300_000]; // 100ms, 200ms, 700ms (total 1000ms)
+    expect(buildRetryTooltip(['503', 'TimedOut', '200'], ts, 1000, 3))
+      .toBe('↻3: 503 (100ms) → TimedOut (200ms) → 200 (700ms) — 1000ms');
+  });
+
+  it('handles INCOMPLETE_STATUS_KEY outcome in tooltip', () => {
+    const ts = [0, 0]; // zero-duration first segment
+    const result = buildRetryTooltip([INCOMPLETE_STATUS_KEY, '200'], ts, 500, 2);
+    expect(result).toContain(INCOMPLETE_STATUS_KEY);
+  });
+});
+
+describe('computeHasSegments', () => {
+  const base = {
+    requestId: 'r1',
+    method: 'GET',
+    uri: '/test',
+    status: '200 OK',
+    requestDurationMs: 500,
+    requestSize: 0,
+    responseSize: 0,
+    requestSizeString: '',
+    responseSizeString: '',
+    sendLineNumber: 1,
+    responseLineNumber: 2,
+  } as const;
+
+  it('returns false for a single-attempt request', () => {
+    expect(computeHasSegments({ ...base, numAttempts: 1 })).toBe(false);
+  });
+
+  it('returns false when numAttempts is undefined (defaults to 1)', () => {
+    expect(computeHasSegments({ ...base })).toBe(false);
+  });
+
+  it('returns false when attemptOutcomes length does not match numAttempts', () => {
+    expect(computeHasSegments({
+      ...base,
+      numAttempts: 2,
+      attemptOutcomes: ['503'],
+      attemptTimestampsUs: [0, 500_000],
+    })).toBe(false);
+  });
+
+  it('returns false when attemptTimestampsUs length does not match numAttempts', () => {
+    expect(computeHasSegments({
+      ...base,
+      numAttempts: 2,
+      attemptOutcomes: ['503', '200'],
+      attemptTimestampsUs: [0],
+    })).toBe(false);
+  });
+
+  it('returns true when numAttempts > 1 and both arrays match length', () => {
+    expect(computeHasSegments({
+      ...base,
+      numAttempts: 2,
+      attemptOutcomes: ['503', '200'],
+      attemptTimestampsUs: [0, 500_000],
+    })).toBe(true);
   });
 });

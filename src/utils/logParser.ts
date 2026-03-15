@@ -3,6 +3,7 @@ import type { ISODateTimeString, TimestampMicros } from '../types/time.types';
 import { isoToMicros, extractTimeFromISO } from './timeUtils';
 import { parseSizeString } from './sizeUtils';
 import { ParsingError } from './errorHandling';
+import { INCOMPLETE_STATUS_KEY } from './statusCodeUtils';
 
 /**
  * Mutable builder record used during log parsing before all fields have been
@@ -467,15 +468,15 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     if ((rec.numAttempts ?? 1) > 1) {
       const finalOutcome = rec.status
         ? rec.status.split(' ')[0]
-        : rec.clientError ?? 'Incomplete';
+        : rec.clientError ?? INCOMPLETE_STATUS_KEY;
       // Backfill any missing intermediate outcomes. This happens when no
       // "Got response" or error line was logged between consecutive retries
       // (e.g. all attempts timed out with no intermediate SDK response span).
       // A retry only occurs after failure, so the same failure mode
-      // (clientError when available, otherwise 'Incomplete') is the
+      // (clientError when available, otherwise INCOMPLETE_STATUS_KEY) is the
       // best-available inference for each unfilled slot.
       while ((rec.attemptOutcomes as string[]).length < (rec.numAttempts ?? 1) - 1) {
-        (rec.attemptOutcomes as string[]).push(rec.clientError ?? 'Incomplete');
+        (rec.attemptOutcomes as string[]).push(rec.clientError ?? INCOMPLETE_STATUS_KEY);
       }
       // Append the final outcome so the total count equals numAttempts.
       if ((rec.attemptOutcomes as string[]).length === (rec.numAttempts ?? 1) - 1) {

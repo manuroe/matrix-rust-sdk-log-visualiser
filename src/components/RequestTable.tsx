@@ -20,7 +20,7 @@ import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
-import { buildAttemptSegments } from '../utils/requestBarUtils';
+import { buildAttemptSegments, buildRetryTooltip, computeHasSegments } from '../utils/requestBarUtils';
 import type { HttpRequest } from '../types/log.types';
 import styles from './RequestTable.module.css';
 
@@ -549,28 +549,14 @@ export function RequestTable({
                         : getHttpStatusColor(statusCode);
                       const barColor = getBarColor ? getBarColor(req, defaultBarColor) : defaultBarColor;
 
-                      const hasSegments =
-                        (req.numAttempts ?? 1) > 1
-                        && req.attemptOutcomes?.length === (req.numAttempts ?? 1)
-                        && req.attemptTimestampsUs?.length === (req.numAttempts ?? 1);
+                      const hasSegments = computeHasSegments(req);
                       const attemptSegments = hasSegments
                         ? buildAttemptSegments(req.attemptOutcomes!, req.attemptTimestampsUs as number[], req.requestDurationMs, barWidth)
                         : null;
                       // For retry requests, build a tooltip listing each attempt outcome with its
                       // individual duration, e.g. "↻3: 503 (20ms) → 503 (100ms) → 200 OK (1500ms) — 1620ms"
-                      const retryTooltip = hasSegments && req.attemptOutcomes
-                        ? (() => {
-                            const outcomes = req.attemptOutcomes!;
-                            const timestamps = req.attemptTimestampsUs as number[];
-                            const parts = outcomes.map((outcome, i) => {
-                              const endUs = i < outcomes.length - 1
-                                ? timestamps[i + 1]
-                                : timestamps[0] + req.requestDurationMs * 1000;
-                              const ms = Math.round((endUs - timestamps[i]) / 1000);
-                              return `${outcome} (${ms}ms)`;
-                            });
-                            return `↻${req.numAttempts}: ${parts.join(' → ')} — ${req.requestDurationMs}ms`;
-                          })()
+                      const retryTooltip = hasSegments
+                        ? buildRetryTooltip(req.attemptOutcomes!, req.attemptTimestampsUs as number[], req.requestDurationMs, req.numAttempts!)
                         : null;
 
                       const rowKey = getRowKey(req);

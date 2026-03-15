@@ -3,7 +3,9 @@
  * requests. These are kept in `src/utils/` so they can be tested in isolation.
  */
 
+import type { HttpRequest } from '../types/log.types';
 import { getHttpStatusColor } from './httpStatusColors';
+import { INCOMPLETE_STATUS_KEY } from './statusCodeUtils';
 
 /**
  * Returns the CSS color string for a single retry-attempt outcome.
@@ -16,11 +18,11 @@ import { getHttpStatusColor } from './httpStatusColors';
  * @example
  * getAttemptSegmentColor('TimedOut') // → 'var(--http-client-error)'
  * @example
- * getAttemptSegmentColor('Incomplete') // → 'var(--http-incomplete)'
+ * getAttemptSegmentColor(INCOMPLETE_STATUS_KEY) // → 'var(--http-incomplete)'
  */
 export function getAttemptSegmentColor(outcome: string): string {
   if (/^\d+$/.test(outcome)) return getHttpStatusColor(outcome);
-  if (outcome === 'Incomplete') return 'var(--http-incomplete)';
+  if (outcome === INCOMPLETE_STATUS_KEY) return 'var(--http-incomplete)';
   return 'var(--http-client-error)';
 }
 
@@ -60,4 +62,44 @@ export function buildAttemptSegments(
     usedPx += widthPx;
   }
   return segments;
+}
+
+/**
+ * Returns `true` when a request has complete per-attempt segment data that can
+ * be rendered as colored bar segments in the waterfall view.
+ * Extracted here so render functions stay lightweight and the check is testable.
+ *
+ * @example
+ * computeHasSegments(singleAttemptReq) // → false
+ */
+export function computeHasSegments(req: HttpRequest): boolean {
+  const n = req.numAttempts ?? 1;
+  return n > 1
+    && req.attemptOutcomes?.length === n
+    && (req.attemptTimestampsUs?.length ?? 0) === n;
+}
+
+/**
+ * Builds the retry tooltip string listing each attempt's outcome and duration,
+ * e.g. `"↻3: 503 (20ms) → 503 (100ms) → 200 (1500ms) — 1620ms"`.
+ * Extracted from component render so per-row computation stays in domain utils.
+ *
+ * @example
+ * buildRetryTooltip(['503', '200'], [t0, t1], 1620, 2)
+ * // → '↻2: 503 (120ms) → 200 (1500ms) — 1620ms'
+ */
+export function buildRetryTooltip(
+  outcomes: readonly string[],
+  timestamps: readonly number[],
+  totalMs: number,
+  numAttempts: number,
+): string {
+  const parts = outcomes.map((outcome, i) => {
+    const endUs = i < outcomes.length - 1
+      ? timestamps[i + 1]
+      : timestamps[0] + totalMs * 1000;
+    const ms = Math.round((endUs - timestamps[i]) / 1000);
+    return `${outcome} (${ms}ms)`;
+  });
+  return `↻${numAttempts}: ${parts.join(' → ')} — ${totalMs}ms`;
 }
