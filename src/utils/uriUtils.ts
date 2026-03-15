@@ -24,11 +24,23 @@ function extractRelativeUri(uri: string): string {
  * Strip the Matrix homeserver and client-server API path prefix from a URI,
  * returning only the meaningful endpoint path.
  *
- * e.g.:
- *   https://matrix-client.matrix.org/_matrix/client/v3/keys/query  -> /keys/query
- *   https://example.org/_matrix/client/unstable/org.matrix.simplified_msc3575/sync -> /org.matrix.simplified_msc3575/sync
- *
  * For non-Matrix URLs falls back to the relative path (scheme+host stripped).
+ *
+ * @param uri - The full URL string (e.g. from an HTTP request log entry)
+ * @returns The endpoint path beginning with `/`, e.g. `/keys/query`
+ *
+ * @example
+ * stripMatrixClientPath('https://matrix-client.matrix.org/_matrix/client/v3/keys/query')
+ * // => '/keys/query'
+ *
+ * @example
+ * stripMatrixClientPath('https://example.org/_matrix/client/unstable/org.matrix.simplified_msc3575/sync')
+ * // => '/org.matrix.simplified_msc3575/sync'
+ *
+ * @example
+ * // Non-Matrix URL: strips scheme + host only
+ * stripMatrixClientPath('https://example.org/api/v1/resource?foo=bar')
+ * // => '/api/v1/resource?foo=bar'
  */
 export function stripMatrixClientPath(uri: string): string {
   const match = uri.match(MATRIX_CLIENT_PATH_RE);

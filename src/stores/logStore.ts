@@ -1,3 +1,28 @@
+/**
+ * Central Zustand store for all parsed log data, filters, and UI state.
+ *
+ * ## Dual `setRequests` / `setHttpRequests` pattern
+ *
+ * The log parser produces two independent datasets from the same file:
+ * sync requests (`SyncRequest[]`) and HTTP requests (`HttpRequest[]`). Each
+ * setter receives the **full** `rawLogLines` array because:
+ *
+ * 1. Either setter may be called first (the parser resolves them in parallel),
+ *    and `rawLogLines` must be available as soon as the first dataset lands.
+ * 2. Both sync and HTTP views need the complete line array for timestamp
+ *    lookups and gap navigation — not a subset scoped to their own requests.
+ *
+ * `loadLogParserResult` wraps both setters in a single store update so
+ * subscribers never observe a half-loaded state.
+ *
+ * ## `statusCodeFilter` semantics
+ *
+ * `null` means **all status codes are enabled** (no filter applied, show
+ * everything). A non-null `Set<string>` means only the listed codes are
+ * shown. This "null = all" convention avoids enumerating every possible
+ * code upfront; the filter only materialises when the user explicitly
+ * restricts to a subset.
+ */
 import { create } from 'zustand';
 import type { HttpRequest, SyncRequest, ParsedLogLine, SentryEvent, LogParserResult } from '../types/log.types';
 import { wrapError, type AppError } from '../utils/errorHandling';
@@ -19,8 +44,18 @@ interface LogStore {
   filteredHttpRequests: HttpRequest[];
   showIncompleteHttp: boolean;
   
-  // Status code filter (null = all enabled, Set = specific codes enabled)
-  // Special value 'Incomplete' represents requests without a status
+  /**
+   * Controls which HTTP status codes are visible in the requests table.
+   *
+   * - `null` — all codes are shown (default; no filtering applied).
+   * - `Set<string>` — only requests whose status matches a value in the set
+   *   are shown. The set may contain numeric status strings (e.g. `"200"`,
+   *   `"404"`) as well as the synthetic keys `INCOMPLETE_STATUS_KEY` and
+   *   `CLIENT_ERROR_STATUS_KEY` defined in `statusCodeUtils.ts`.
+   *
+   * The "null = all enabled" convention avoids enumerating every possible
+   * code at store initialisation time.
+   */
   statusCodeFilter: Set<string> | null;
   
   // URI filter for HTTP requests (null = no filter, string = substring match)
