@@ -419,4 +419,55 @@ describe('computeSummaryStats — topFailedUrls with client errors', () => {
     const entry = result.topFailedUrls.find((u) => u.uri === '/send');
     expect(entry?.statuses).toContain('Client Error');
   });
+
+  it('does not count Incomplete attemptOutcomes as Client Error in topFailedUrls', () => {
+    // 'Incomplete' is a parser placeholder for unknown intermediate outcomes and must
+    // not inflate Top Failed URLs with a spurious 'Client Error' entry.
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'RETRY_INC',
+      uri: '/send/incomplete',
+      status: '200',
+      responseLineNumber: 2,
+      numAttempts: 2,
+      attemptOutcomes: ['Incomplete', '200'],
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    const entry = result.topFailedUrls.find((u) => u.uri === '/send/incomplete');
+    expect(entry).toBeUndefined();
+  });
+
+  it('maps Incomplete intermediate chart entries to empty status, not client-error', () => {
+    // An 'Incomplete' placeholder in attemptOutcomes must produce an empty-string
+    // status (treated as incomplete in the chart) rather than 'client-error'.
+    const rawLines = makeLines(5);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'RETRY_INC_CHART',
+      uri: '/send/incomplete-chart',
+      status: '200',
+      responseLineNumber: 2,
+      numAttempts: 2,
+      attemptOutcomes: ['Incomplete', '200'],
+      attemptTimestampsUs: [
+        rawLines[0].timestampUs,
+        rawLines[1].timestampUs,
+      ],
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    // The intermediate entry uses the *next* attempt timestamp as its ts proxy.
+    const intermediateEntry = result.httpRequestsWithTimestamps.find(
+      (e) => e.requestId === 'RETRY_INC_CHART' && e.status === ''
+    );
+    expect(intermediateEntry).toBeDefined();
+    const clientErrorEntry = result.httpRequestsWithTimestamps.find(
+      (e) => e.requestId === 'RETRY_INC_CHART' && e.status === 'client-error'
+    );
+    expect(clientErrorEntry).toBeUndefined();
+  });
 });
