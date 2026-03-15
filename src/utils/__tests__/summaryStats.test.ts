@@ -350,3 +350,73 @@ describe('computeSummaryStats — byte totals', () => {
     expect(result.totalDownloadBytes).toBe(1500);
   });
 });
+
+// ---------------------------------------------------------------------------
+// httpRequestCount — unique request headline count
+// ---------------------------------------------------------------------------
+
+describe('computeSummaryStats — httpRequestCount', () => {
+  it('equals completed requests with valid timestamps plus incomplete requests', () => {
+    const rawLines = makeLines(4);
+    const index = buildIndex(rawLines);
+
+    const completed = createHttpRequest({ requestId: 'R1', status: '200', responseLineNumber: 1 });
+    // responseLineNumber 999 → no line → finalTs = 0 → skipped
+    const missingTimestamp = createHttpRequest({ requestId: 'R2', status: '200', responseLineNumber: 999 });
+    const incomplete = createHttpRequest({ requestId: 'R3', status: '', sendLineNumber: 2, responseLineNumber: 0 });
+
+    const result = computeSummaryStats(rawLines, [completed, missingTimestamp, incomplete], [], [], [], null, null, null, index);
+    // Only 'completed' contributes to the completed count; 'missingTimestamp' is excluded.
+    expect(result.httpRequestCount).toBe(2); // 1 completed + 1 incomplete
+  });
+
+  it('counts client-error requests towards httpRequestCount', () => {
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const clientError = createHttpRequest({ requestId: 'CE', clientError: 'TimedOut', responseLineNumber: 1 });
+    const result = computeSummaryStats(rawLines, [clientError], [], [], [], null, null, null, index);
+    expect(result.httpRequestCount).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// topFailedUrls — clientError and non-numeric attemptOutcomes
+// ---------------------------------------------------------------------------
+
+describe('computeSummaryStats — topFailedUrls with client errors', () => {
+  it('includes requests with clientError in topFailedUrls', () => {
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'CE',
+      uri: '/rooms/join',
+      clientError: 'TimedOut',
+      responseLineNumber: 1,
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    const entry = result.topFailedUrls.find((u) => u.uri === '/rooms/join');
+    expect(entry?.count).toBe(1);
+    expect(entry?.statuses).toContain('Client Error');
+  });
+
+  it('includes non-numeric attemptOutcomes as Client Error in topFailedUrls', () => {
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'RETRY',
+      uri: '/send',
+      status: '200',
+      responseLineNumber: 2,
+      numAttempts: 2,
+      attemptOutcomes: ['TimedOut', '200'],
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    const entry = result.topFailedUrls.find((u) => u.uri === '/send');
+    expect(entry?.statuses).toContain('Client Error');
+  });
+});

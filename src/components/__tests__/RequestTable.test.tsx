@@ -834,6 +834,13 @@ describe('buildAttemptSegments', () => {
     const segments = buildAttemptSegments(['503', '200'], timestamps, 2000, 200);
     expect(segments[1].leftPx).toBe(segments[0].widthPx);
   });
+
+  it('returns [] when timestamps array is shorter than outcomes (mismatched inputs)', () => {
+    // Only 1 timestamp for 2 outcomes — would produce NaN widths without the guard.
+    const timestamps = [BASE_TS] as number[];
+    const segments = buildAttemptSegments(['TimedOut', '200'], timestamps, 5000, 100);
+    expect(segments).toHaveLength(0);
+  });
 });
 
 describe('RequestTable — multi-attempt segment rendering', () => {
