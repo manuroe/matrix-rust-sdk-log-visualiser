@@ -7,16 +7,21 @@ import { getHttpStatusColor } from './httpStatusColors';
 
 /**
  * Returns the CSS color string for a single retry-attempt outcome.
- * Numeric strings are treated as HTTP status codes; anything else is a client
- * error (transport failure such as a timeout or a connection refusal).
+ * Numeric strings are treated as HTTP status codes; `'Incomplete'` maps to
+ * the incomplete color; anything else is a client error (transport failure
+ * such as a timeout or a connection refusal).
  *
  * @example
  * getAttemptSegmentColor('503') // → 'var(--http-503)'
  * @example
  * getAttemptSegmentColor('TimedOut') // → 'var(--http-client-error)'
+ * @example
+ * getAttemptSegmentColor('Incomplete') // → 'var(--http-incomplete)'
  */
 export function getAttemptSegmentColor(outcome: string): string {
-  return /^\d+$/.test(outcome) ? getHttpStatusColor(outcome) : 'var(--http-client-error)';
+  if (/^\d+$/.test(outcome)) return getHttpStatusColor(outcome);
+  if (outcome === 'Incomplete') return 'var(--http-incomplete)';
+  return 'var(--http-client-error)';
 }
 
 /**
@@ -35,6 +40,8 @@ export function buildAttemptSegments(
   totalMs: number,
   barWidthPx: number,
 ): Array<{ leftPx: number; widthPx: number; color: string }> {
+  // Guard against zero or negative totalMs to avoid NaN widths.
+  if (totalMs <= 0 || outcomes.length === 0) return [];
   const segments: Array<{ leftPx: number; widthPx: number; color: string }> = [];
   let usedPx = 0;
   for (let i = 0; i < outcomes.length; i++) {

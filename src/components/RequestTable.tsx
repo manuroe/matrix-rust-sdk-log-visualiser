@@ -603,11 +603,11 @@ export function RequestTable({
                                 }}
                                 title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}
                               >
-                                {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
                                 {attemptSegments && attemptSegments.flatMap(({ leftPx, widthPx, color }, idx) => {
                                   const segment = (
                                     <div
                                       key={`seg-${idx}`}
+                                      data-testid="attempt-segment"
                                       style={{
                                         position: 'absolute',
                                         top: 0,
@@ -618,7 +618,7 @@ export function RequestTable({
                                       }}
                                     />
                                   );
-                                  if (idx < attemptSegments.length - 1) {
+                                  if (idx < attemptSegments.length - 1 && widthPx > 0) {
                                     return [
                                       segment,
                                       // Separator line between retry attempts
@@ -639,6 +639,7 @@ export function RequestTable({
                                   }
                                   return [segment];
                                 })}
+                                {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
                               </div>
                               <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}>
                                 {resolvedIsIncomplete

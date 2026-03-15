@@ -866,11 +866,9 @@ describe('RequestTable — multi-attempt segment rendering', () => {
       />
     );
 
-    // The bar container should contain 2 absolutely-positioned segment divs
-    const allAbsoluteDivs = Array.from(document.querySelectorAll('div')).filter(
-      (el) => el.style.position === 'absolute' && el.style.background !== ''
-    );
-    expect(allAbsoluteDivs.length).toBeGreaterThanOrEqual(2);
+    // The bar should contain 2 attempt segment divs (one per attempt)
+    const segments = document.querySelectorAll('[data-testid="attempt-segment"]');
+    expect(segments.length).toBeGreaterThanOrEqual(2);
   });
 
   it('shows per-attempt durations and total in the waterfall duration label for retry requests', () => {
