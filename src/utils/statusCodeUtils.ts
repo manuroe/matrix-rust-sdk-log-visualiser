@@ -52,9 +52,13 @@ export function extractAvailableStatusCodes(
     }
     // Include intermediate attempt statuses (e.g. 503 from a retried request)
     req.attemptOutcomes?.forEach((outcome) => {
-      // Numeric-looking strings are HTTP status codes; skip client-error names
       if (/^\d+$/.test(outcome)) {
+        // Numeric-looking strings are HTTP status codes
         codes.add(outcome);
+      } else {
+        // Non-numeric outcome (e.g. 'TimedOut') is a transport failure — expose the
+        // 'Client Error' filter even when the request's final status resolved successfully.
+        hasClientError = true;
       }
     });
   });

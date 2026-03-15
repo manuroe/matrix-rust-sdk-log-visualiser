@@ -615,6 +615,7 @@ export function RequestTable({
                                         left: `${leftPx}px`,
                                         width: `${widthPx}px`,
                                         background: color,
+                                        pointerEvents: 'none',
                                       }}
                                     />
                                   );
@@ -633,6 +634,7 @@ export function RequestTable({
                                           width: '1px',
                                           background: 'rgba(255, 255, 255, 0.75)',
                                           zIndex: 1,
+                                          pointerEvents: 'none',
                                         }}
                                       />,
                                     ];

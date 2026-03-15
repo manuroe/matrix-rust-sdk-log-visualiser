@@ -93,6 +93,12 @@ export interface SummaryStats {
   readonly syncRequestsByConnection: readonly SyncByConnection[];
   /** HTTP requests with resolved timestamps (used by `HttpActivityChart`). */
   readonly httpRequestsWithTimestamps: HttpRequestWithTimestamp[];
+  /**
+   * Total number of unique HTTP requests (completed + incomplete), used for the
+   * "N requests" headline. Distinct from `httpRequestsWithTimestamps.length`,
+   * which can be larger when retried requests contribute intermediate entries.
+   */
+  readonly httpRequestCount: number;
   /** Number of HTTP requests that have not yet received a response. */
   readonly incompleteRequestCount: number;
   readonly totalUploadBytes: number;
@@ -120,6 +126,7 @@ const EMPTY_STATS: SummaryStats = Object.freeze({
   slowestHttpRequests: [] as readonly SlowHttpRequest[],
   syncRequestsByConnection: [] as readonly SyncByConnection[],
   httpRequestsWithTimestamps: [] as HttpRequestWithTimestamp[],
+  httpRequestCount: 0,
   incompleteRequestCount: 0,
   totalUploadBytes: 0,
   totalDownloadBytes: 0,
@@ -306,10 +313,19 @@ export function computeSummaryStats(
     if (req.timeout !== undefined) timeoutByRequestId.set(req.requestId, req.timeout);
   }
 
+  // Track the number of unique completed HTTP requests (each RequestTable row)
+  // separately from chart entries, because retried requests emit multiple entries
+  // to the chart (one per intermediate attempt) which would inflate the count.
+  let completedHttpRequestCount = 0;
+
   const completedRequestsWithTimestamps: HttpRequestWithTimestamp[] = filteredHttpRequests
     .filter((req) => req.responseLineNumber)
     .flatMap((req) => {
       const finalTs = lineNumberIndex.get(req.responseLineNumber)?.timestampUs ?? (0 as TimestampMicros);
+      // Skip requests whose response line has no valid timestamp; they can't appear
+      // on the chart and should not contribute to the displayed request count.
+      if (finalTs === 0) return [];
+      completedHttpRequestCount++;
       const timeout = timeoutByRequestId.get(req.requestId);
       const finalEntry: HttpRequestWithTimestamp = {
         requestId: req.requestId,
@@ -401,6 +417,7 @@ export function computeSummaryStats(
     slowestHttpRequests,
     syncRequestsByConnection,
     httpRequestsWithTimestamps,
+    httpRequestCount: completedHttpRequestCount + incompleteRequestsWithTimestamps.length,
     incompleteRequestCount: incompleteRequestsWithTimestamps.length,
     totalUploadBytes,
     totalDownloadBytes,

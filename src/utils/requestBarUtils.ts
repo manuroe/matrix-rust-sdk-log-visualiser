@@ -40,8 +40,9 @@ export function buildAttemptSegments(
   totalMs: number,
   barWidthPx: number,
 ): Array<{ leftPx: number; widthPx: number; color: string }> {
-  // Guard against zero or negative totalMs to avoid NaN widths.
-  if (totalMs <= 0 || outcomes.length === 0) return [];
+  // Guard against zero or negative totalMs, empty outcomes, or mismatched arrays
+  // (missing timestamps would produce NaN widths).
+  if (totalMs <= 0 || outcomes.length === 0 || timestamps.length < outcomes.length) return [];
   const segments: Array<{ leftPx: number; widthPx: number; color: string }> = [];
   let usedPx = 0;
   for (let i = 0; i < outcomes.length; i++) {
