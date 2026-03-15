@@ -111,6 +111,9 @@ export function createHttpRequest(
     sendLineNumber: lineNumber,
     responseLineNumber: overrides.responseLineNumber ?? lineNumber + 1,
     clientError: overrides.clientError,
+    numAttempts: overrides.numAttempts ?? 1,
+    attemptTimestampsUs: overrides.attemptTimestampsUs ?? [],
+    attemptOutcomes: overrides.attemptOutcomes ?? [],
   };
 }
 

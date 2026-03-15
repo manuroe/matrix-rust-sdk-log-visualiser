@@ -17,6 +17,7 @@
 import type { HttpRequest, HttpRequestWithTimestamp, SyncRequest, ParsedLogLine, SentryEvent } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
 import { getTimeRangeUs } from './requestFilters';
+import { INCOMPLETE_STATUS_KEY } from './statusCodeUtils';
 import { getMinMaxTimestamps } from './timeUtils';
 import { extractCoreMessage } from './logMessageUtils';
 import type { TimeFilterValue } from '../types/time.types';
@@ -93,6 +94,12 @@ export interface SummaryStats {
   readonly syncRequestsByConnection: readonly SyncByConnection[];
   /** HTTP requests with resolved timestamps (used by `HttpActivityChart`). */
   readonly httpRequestsWithTimestamps: HttpRequestWithTimestamp[];
+  /**
+   * Total number of unique HTTP requests (completed + incomplete), used for the
+   * "N requests" headline. Distinct from `httpRequestsWithTimestamps.length`,
+   * which can be larger when retried requests contribute intermediate entries.
+   */
+  readonly httpRequestCount: number;
   /** Number of HTTP requests that have not yet received a response. */
   readonly incompleteRequestCount: number;
   readonly totalUploadBytes: number;
@@ -120,6 +127,7 @@ const EMPTY_STATS: SummaryStats = Object.freeze({
   slowestHttpRequests: [] as readonly SlowHttpRequest[],
   syncRequestsByConnection: [] as readonly SyncByConnection[],
   httpRequestsWithTimestamps: [] as HttpRequestWithTimestamp[],
+  httpRequestCount: 0,
   incompleteRequestCount: 0,
   totalUploadBytes: 0,
   totalDownloadBytes: 0,
@@ -223,6 +231,14 @@ export function computeSummaryStats(
       const code = req.status.split(' ')[0];
       httpStatusCounts[code] = (httpStatusCounts[code] ?? 0) + 1;
     }
+    // Count intermediate attempt outcomes separately (e.g. 503 from a retry that
+    // eventually succeeded with 200) so they appear in the error breakdown.
+    // Slice stops before the last element to avoid double-counting the final outcome.
+    req.attemptOutcomes?.slice(0, (req.numAttempts ?? 1) - 1).forEach((outcome) => {
+      if (/^\d+$/.test(outcome)) {
+        httpStatusCounts[outcome] = (httpStatusCounts[outcome] ?? 0) + 1;
+      }
+    });
   }
 
   const httpErrorsByStatus: HttpStatusCount[] = Object.entries(httpStatusCounts)
@@ -232,19 +248,31 @@ export function computeSummaryStats(
 
   // ── Failed URL grouping ────────────────────────────────────────────────────
   const failedUrlData: Record<string, { count: number; statuses: Set<string> }> = {};
+  const recordFailedUrl = (uri: string, statusLabel: string) => {
+    if (!failedUrlData[uri]) failedUrlData[uri] = { count: 0, statuses: new Set() };
+    failedUrlData[uri].count += 1;
+    failedUrlData[uri].statuses.add(statusLabel);
+  };
   for (const req of filteredHttpRequests) {
     if (req.clientError) {
-      if (!failedUrlData[req.uri]) failedUrlData[req.uri] = { count: 0, statuses: new Set() };
-      failedUrlData[req.uri].count += 1;
-      failedUrlData[req.uri].statuses.add('Client Error');
+      recordFailedUrl(req.uri, 'Client Error');
     } else if (req.status) {
       const code = parseInt(req.status, 10);
       if (code >= 400) {
-        if (!failedUrlData[req.uri]) failedUrlData[req.uri] = { count: 0, statuses: new Set() };
-        failedUrlData[req.uri].count += 1;
-        failedUrlData[req.uri].statuses.add(req.status.split(' ')[0]);
+        recordFailedUrl(req.uri, req.status.split(' ')[0]);
       }
     }
+    // Count intermediate failed attempt outcomes from retried requests
+    // (e.g. a 503 → 200 request still surfaces its URI in Top Failed URLs).
+    req.attemptOutcomes?.slice(0, (req.numAttempts ?? 1) - 1).forEach((outcome) => {
+      if (/^\d+$/.test(outcome)) {
+        const attemptCode = parseInt(outcome, 10);
+        if (attemptCode >= 400) recordFailedUrl(req.uri, outcome);
+      } else if (outcome !== INCOMPLETE_STATUS_KEY) {
+        // Non-numeric outcome is a client error name (e.g. 'TimedOut'); skip 'Incomplete' placeholders.
+        recordFailedUrl(req.uri, 'Client Error');
+      }
+    });
   }
 
   const topFailedUrls: FailedUrl[] = Object.entries(failedUrlData)
@@ -286,17 +314,43 @@ export function computeSummaryStats(
     if (req.timeout !== undefined) timeoutByRequestId.set(req.requestId, req.timeout);
   }
 
+  // Track the number of unique completed HTTP requests (each RequestTable row)
+  // separately from chart entries, because retried requests emit multiple entries
+  // to the chart (one per intermediate attempt) which would inflate the count.
+  let completedHttpRequestCount = 0;
+
   const completedRequestsWithTimestamps: HttpRequestWithTimestamp[] = filteredHttpRequests
     .filter((req) => req.responseLineNumber)
-    .map((req) => {
-      const ts = lineNumberIndex.get(req.responseLineNumber)?.timestampUs ?? (0 as TimestampMicros);
+    .flatMap((req) => {
+      const finalTs = lineNumberIndex.get(req.responseLineNumber)?.timestampUs ?? (0 as TimestampMicros);
+      // Skip requests whose response line has no valid timestamp; they can't appear
+      // on the chart and should not contribute to the displayed request count.
+      if (finalTs === 0) return [];
+      completedHttpRequestCount++;
       const timeout = timeoutByRequestId.get(req.requestId);
-      return {
+      const finalEntry: HttpRequestWithTimestamp = {
         requestId: req.requestId,
         status: req.clientError ? 'client-error' : (req.status ?? ''),
-        timestampUs: ts,
+        timestampUs: finalTs,
         ...(timeout !== undefined && { timeout }),
       };
+      // For retried requests, also emit one entry per intermediate failed attempt
+      // so that e.g. a 503 → 200 request contributes both statuses to the chart.
+      // Slice stops before the last element to avoid double-counting the final outcome.
+      const intermediateOutcomes = req.attemptOutcomes?.slice(0, (req.numAttempts ?? 1) - 1) ?? [];
+      const intermediateEntries: HttpRequestWithTimestamp[] = intermediateOutcomes
+        .map((outcome, i) => {
+          // Use the next attempt's send timestamp as a proxy for when this attempt's
+          // response was received (best approximation without a stored response ts).
+          const ts = (req.attemptTimestampsUs?.[i + 1] ?? req.attemptTimestampsUs?.[i] ?? 0) as TimestampMicros;
+          return {
+            requestId: req.requestId,
+            status: /^\d+$/.test(outcome) ? outcome : outcome === INCOMPLETE_STATUS_KEY ? '' : 'client-error',
+            timestampUs: ts,
+          };
+        })
+        .filter((e) => e.timestampUs > 0);
+      return [...intermediateEntries, finalEntry];
     })
     .filter((req) => req.timestampUs > 0);
 
@@ -364,6 +418,7 @@ export function computeSummaryStats(
     slowestHttpRequests,
     syncRequestsByConnection,
     httpRequestsWithTimestamps,
+    httpRequestCount: completedHttpRequestCount + incompleteRequestsWithTimestamps.length,
     incompleteRequestCount: incompleteRequestsWithTimestamps.length,
     totalUploadBytes,
     totalDownloadBytes,

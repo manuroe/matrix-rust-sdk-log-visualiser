@@ -450,6 +450,69 @@ describe('filterHttpRequests', () => {
     expect(result[0].requestId).toBe('A');
   });
 
+  it('includes retried request when statusCodeFilter matches an intermediate attemptOutcome', () => {
+    // Request ended 200 but had a 503 on attempt 1
+    const requests = [
+      createHttpRequest({ requestId: 'A', status: '200', numAttempts: 2, attemptOutcomes: ['503', '200'] }),
+      createHttpRequest({ requestId: 'B', status: '200' }),
+    ];
+    const result = filterHttpRequests(
+      requests,
+      [],
+      makeFilters({ statusCodeFilter: new Set(['503']) })
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].requestId).toBe('A');
+  });
+
+  it('still shows retried request when statusCodeFilter matches final status', () => {
+    const requests = [
+      createHttpRequest({ requestId: 'A', status: '200', numAttempts: 2, attemptOutcomes: ['503', '200'] }),
+    ];
+    const result = filterHttpRequests(
+      requests,
+      [],
+      makeFilters({ statusCodeFilter: new Set(['200']) })
+    );
+
+    expect(result).toHaveLength(1);
+  });
+
+  it('excludes retried request when statusCodeFilter matches neither final nor intermediate outcomes', () => {
+    const requests = [
+      createHttpRequest({ requestId: 'A', status: '200', numAttempts: 2, attemptOutcomes: ['503', '200'] }),
+    ];
+    const result = filterHttpRequests(
+      requests,
+      [],
+      makeFilters({ statusCodeFilter: new Set(['404']) })
+    );
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('treats Incomplete attemptOutcome as INCOMPLETE_STATUS_KEY, not CLIENT_ERROR', () => {
+    // 'Incomplete' is a parser placeholder for unknown intermediate outcomes.
+    // It must match the Incomplete filter \u2014 and must NOT match the Client Error filter.
+    const requests = [
+      createHttpRequest({ requestId: 'A', status: '200', numAttempts: 2, attemptOutcomes: ['Incomplete', '200'] }),
+    ];
+    const incompleteResult = filterHttpRequests(
+      requests,
+      [],
+      makeFilters({ statusCodeFilter: new Set(['Incomplete']) })
+    );
+    expect(incompleteResult).toHaveLength(1);
+
+    const clientErrorResult = filterHttpRequests(
+      requests,
+      [],
+      makeFilters({ statusCodeFilter: new Set(['Client Error']) })
+    );
+    expect(clientErrorResult).toHaveLength(0);
+  });
+
   it('performs case-insensitive URI filter', () => {
     const requests = [
       createHttpRequest({ requestId: 'A', uri: 'https://example.com/SYNC?timeout=30000' }),

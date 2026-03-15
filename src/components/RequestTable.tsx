@@ -20,6 +20,8 @@ import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
+import { buildAttemptSegments, buildRetryTooltip, computeHasSegments } from '../utils/requestBarUtils';
+import { INCOMPLETE_STATUS_KEY } from '../utils/statusCodeUtils';
 import type { HttpRequest } from '../types/log.types';
 import styles from './RequestTable.module.css';
 
@@ -539,7 +541,7 @@ export function RequestTable({
                       );
                       const isClientError = !req.status && !!req.clientError;
                       const resolvedIsIncomplete = !req.status && !req.clientError;
-                      const resolvedStatus = req.status ? req.status : (req.clientError ?? 'Incomplete');
+                      const resolvedStatus = req.status ? req.status : (req.clientError ?? INCOMPLETE_STATUS_KEY);
                       const statusCode = req.status ? req.status.split(' ')[0] : '';
                       const defaultBarColor = isClientError
                         ? 'var(--http-client-error)'
@@ -547,6 +549,16 @@ export function RequestTable({
                         ? 'var(--http-incomplete)'
                         : getHttpStatusColor(statusCode);
                       const barColor = getBarColor ? getBarColor(req, defaultBarColor) : defaultBarColor;
+
+                      const hasSegments = computeHasSegments(req);
+                      const attemptSegments = hasSegments
+                        ? buildAttemptSegments(req.attemptOutcomes!, req.attemptTimestampsUs as number[], req.requestDurationMs, barWidth)
+                        : null;
+                      // For retry requests, build a tooltip listing each attempt outcome with its
+                      // individual duration, e.g. "↻3: 503 (20ms) → 503 (100ms) → 200 (1500ms) — 1620ms"
+                      const retryTooltip = hasSegments
+                        ? buildRetryTooltip(req.attemptOutcomes!, req.attemptTimestampsUs as number[], req.requestDurationMs, req.numAttempts!)
+                        : null;
 
                       const rowKey = getRowKey(req);
                       return (
@@ -576,12 +588,57 @@ export function RequestTable({
                                   width: `${barWidth}px`,
                                   background: barColor,
                                 }}
-                                title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}
+                                title={resolvedIsIncomplete ? INCOMPLETE_STATUS_KEY : (retryTooltip ?? resolvedStatus)}
                               >
+                                {attemptSegments && attemptSegments.flatMap(({ leftPx, widthPx, color }, idx) => {
+                                  const segment = (
+                                    <div
+                                      key={`seg-${idx}`}
+                                      data-testid="attempt-segment"
+                                      style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        bottom: 0,
+                                        left: `${leftPx}px`,
+                                        width: `${widthPx}px`,
+                                        background: color,
+                                        pointerEvents: 'none',
+                                      }}
+                                    />
+                                  );
+                                  if (idx < attemptSegments.length - 1 && widthPx > 0) {
+                                    return [
+                                      segment,
+                                      // Separator line between retry attempts
+                                      <div
+                                        key={`sep-${idx}`}
+                                        aria-hidden="true"
+                                        style={{
+                                          position: 'absolute',
+                                          top: 0,
+                                          bottom: 0,
+                                          left: `${leftPx + widthPx - 1}px`,
+                                          width: '1px',
+                                          background: 'rgba(255, 255, 255, 0.75)',
+                                          zIndex: 1,
+                                          pointerEvents: 'none',
+                                        }}
+                                      />,
+                                    ];
+                                  }
+                                  return [segment];
+                                })}
                                 {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
                               </div>
-                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}>
-                                {resolvedIsIncomplete ? '...' : statusCode === '200' ? `${req.requestDurationMs}ms` : `${resolvedStatus} - ${req.requestDurationMs}ms`}
+                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? INCOMPLETE_STATUS_KEY : (retryTooltip ?? resolvedStatus)}>
+                                {resolvedIsIncomplete
+                                  ? '...'
+                                  : retryTooltip
+                                  ? retryTooltip
+                                  : statusCode === '200'
+                                  ? `${req.requestDurationMs}ms`
+                                  : `${resolvedStatus} - ${req.requestDurationMs}ms`
+                                }
                               </span>
                             </div>
                           </div>

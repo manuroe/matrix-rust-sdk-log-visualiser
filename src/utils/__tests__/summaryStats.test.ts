@@ -350,3 +350,124 @@ describe('computeSummaryStats — byte totals', () => {
     expect(result.totalDownloadBytes).toBe(1500);
   });
 });
+
+// ---------------------------------------------------------------------------
+// httpRequestCount — unique request headline count
+// ---------------------------------------------------------------------------
+
+describe('computeSummaryStats — httpRequestCount', () => {
+  it('equals completed requests with valid timestamps plus incomplete requests', () => {
+    const rawLines = makeLines(4);
+    const index = buildIndex(rawLines);
+
+    const completed = createHttpRequest({ requestId: 'R1', status: '200', responseLineNumber: 1 });
+    // responseLineNumber 999 → no line → finalTs = 0 → skipped
+    const missingTimestamp = createHttpRequest({ requestId: 'R2', status: '200', responseLineNumber: 999 });
+    const incomplete = createHttpRequest({ requestId: 'R3', status: '', sendLineNumber: 2, responseLineNumber: 0 });
+
+    const result = computeSummaryStats(rawLines, [completed, missingTimestamp, incomplete], [], [], [], null, null, null, index);
+    // Only 'completed' contributes to the completed count; 'missingTimestamp' is excluded.
+    expect(result.httpRequestCount).toBe(2); // 1 completed + 1 incomplete
+  });
+
+  it('counts client-error requests towards httpRequestCount', () => {
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const clientError = createHttpRequest({ requestId: 'CE', clientError: 'TimedOut', responseLineNumber: 1 });
+    const result = computeSummaryStats(rawLines, [clientError], [], [], [], null, null, null, index);
+    expect(result.httpRequestCount).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// topFailedUrls — clientError and non-numeric attemptOutcomes
+// ---------------------------------------------------------------------------
+
+describe('computeSummaryStats — topFailedUrls with client errors', () => {
+  it('includes requests with clientError in topFailedUrls', () => {
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'CE',
+      uri: '/rooms/join',
+      clientError: 'TimedOut',
+      responseLineNumber: 1,
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    const entry = result.topFailedUrls.find((u) => u.uri === '/rooms/join');
+    expect(entry?.count).toBe(1);
+    expect(entry?.statuses).toContain('Client Error');
+  });
+
+  it('includes non-numeric attemptOutcomes as Client Error in topFailedUrls', () => {
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'RETRY',
+      uri: '/send',
+      status: '200',
+      responseLineNumber: 2,
+      numAttempts: 2,
+      attemptOutcomes: ['TimedOut', '200'],
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    const entry = result.topFailedUrls.find((u) => u.uri === '/send');
+    expect(entry?.statuses).toContain('Client Error');
+  });
+
+  it('does not count Incomplete attemptOutcomes as Client Error in topFailedUrls', () => {
+    // 'Incomplete' is a parser placeholder for unknown intermediate outcomes and must
+    // not inflate Top Failed URLs with a spurious 'Client Error' entry.
+    const rawLines = makeLines(3);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'RETRY_INC',
+      uri: '/send/incomplete',
+      status: '200',
+      responseLineNumber: 2,
+      numAttempts: 2,
+      attemptOutcomes: ['Incomplete', '200'],
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    const entry = result.topFailedUrls.find((u) => u.uri === '/send/incomplete');
+    expect(entry).toBeUndefined();
+  });
+
+  it('maps Incomplete intermediate chart entries to empty status, not client-error', () => {
+    // An 'Incomplete' placeholder in attemptOutcomes must produce an empty-string
+    // status (treated as incomplete in the chart) rather than 'client-error'.
+    const rawLines = makeLines(5);
+    const index = buildIndex(rawLines);
+
+    const req = createHttpRequest({
+      requestId: 'RETRY_INC_CHART',
+      uri: '/send/incomplete-chart',
+      status: '200',
+      responseLineNumber: 2,
+      numAttempts: 2,
+      attemptOutcomes: ['Incomplete', '200'],
+      attemptTimestampsUs: [
+        rawLines[0].timestampUs,
+        rawLines[1].timestampUs,
+      ],
+    });
+
+    const result = computeSummaryStats(rawLines, [req], [], [], [], null, null, null, index);
+    // The intermediate entry uses the *next* attempt timestamp as its ts proxy.
+    const intermediateEntry = result.httpRequestsWithTimestamps.find(
+      (e) => e.requestId === 'RETRY_INC_CHART' && e.status === ''
+    );
+    expect(intermediateEntry).toBeDefined();
+    const clientErrorEntry = result.httpRequestsWithTimestamps.find(
+      (e) => e.requestId === 'RETRY_INC_CHART' && e.status === 'client-error'
+    );
+    expect(clientErrorEntry).toBeUndefined();
+  });
+});

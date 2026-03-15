@@ -141,8 +141,6 @@ export function SummaryView() {
     );
   }, [rawLogLines, allHttpRequests, allRequests, connectionIds, sentryEvents, startTime, endTime, localStartTime, localEndTime, lineNumberIndex]);
 
-
-
   if (rawLogLines.length === 0) {
     return (
       <div className="app">
@@ -368,7 +366,7 @@ export function SummaryView() {
         {/* HTTP Requests Activity Chart */}
         {stats.httpRequestsWithTimestamps.length > 0 && (
           <section className={styles.summarySection}>
-            <h2>HTTP Requests Over Time: {stats.httpRequestsWithTimestamps.length} requests{stats.incompleteRequestCount > 0 ? ` (${stats.incompleteRequestCount} incomplete)` : ''}{(stats.totalUploadBytes > 0 || stats.totalDownloadBytes > 0) ? ` — ↑ ${formatBytes(stats.totalUploadBytes)} / ↓ ${formatBytes(stats.totalDownloadBytes)}` : ''}</h2>
+            <h2>HTTP Requests Over Time: {stats.httpRequestCount} requests{stats.incompleteRequestCount > 0 ? ` (${stats.incompleteRequestCount} incomplete)` : ''}{(stats.totalUploadBytes > 0 || stats.totalDownloadBytes > 0) ? ` — ↑ ${formatBytes(stats.totalUploadBytes)} / ↓ ${formatBytes(stats.totalDownloadBytes)}` : ''}</h2>
             <div className={styles.activityChartContainer}>
               <HttpActivityChart
                 httpRequests={stats.httpRequestsWithTimestamps}

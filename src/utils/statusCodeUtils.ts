@@ -16,8 +16,13 @@ export const CLIENT_ERROR_STATUS_KEY = 'Client Error';
  * at the end when at least one matching request is present. This ordering
  * keeps the filter dropdown predictable for users.
  *
+ * Codes from `attemptOutcomes` are included so that intermediate statuses from
+ * retried requests (e.g. 503 on attempt 1 before a successful 200 on attempt 2)
+ * appear in the filter even when the final `status` field resolved to a different code.
+ *
  * @param requests - Array of requests with optional `status` (HTTP status code
- *   string, e.g. `"200"`) and `clientError` (transport-level error string) fields.
+ *   string, e.g. `"200"`), `clientError` (transport-level error string), and
+ *   `attemptOutcomes` (intermediate attempt statuses for retried requests).
  * @returns Sorted array of unique status code strings, ready for display in the
  *   status-filter dropdown.
  *
@@ -31,7 +36,7 @@ export const CLIENT_ERROR_STATUS_KEY = 'Client Error';
  * // => ['200', '404', 'Client Error', 'Incomplete']
  */
 export function extractAvailableStatusCodes(
-  requests: Array<{ status?: string; clientError?: string }>
+  requests: Array<{ status?: string; clientError?: string; attemptOutcomes?: readonly string[] }>
 ): string[] {
   const codes = new Set<string>();
   let hasIncomplete = false;
@@ -45,6 +50,20 @@ export function extractAvailableStatusCodes(
     } else {
       hasIncomplete = true;
     }
+    // Include intermediate attempt statuses (e.g. 503 from a retried request)
+    req.attemptOutcomes?.forEach((outcome) => {
+      if (/^\d+$/.test(outcome)) {
+        // Numeric-looking strings are HTTP status codes
+        codes.add(outcome);
+      } else if (outcome === INCOMPLETE_STATUS_KEY) {
+        // 'Incomplete' is a placeholder for an unknown intermediate outcome — not a transport failure.
+        hasIncomplete = true;
+      } else {
+        // Non-numeric outcome (e.g. 'TimedOut') is a transport failure — expose the
+        // 'Client Error' filter even when the request's final status resolved successfully.
+        hasClientError = true;
+      }
+    });
   });
 
   // Sort numeric codes, put special keys at the end

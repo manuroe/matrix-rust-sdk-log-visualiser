@@ -14,6 +14,27 @@ export interface HttpRequest {
   readonly responseLineNumber: number;
   /** Client-side transport error (e.g., "TimedOut", "Connect") when the request failed without receiving an HTTP response */
   readonly clientError?: string;
+  /**
+   * Total number of send attempts made for this request (1 = no retry).
+   * Populated from the `num_attempt=N` field logged by the SDK on each "Sending request" line.
+   * Defaults to 1 when the field is absent (older SDK versions or single-attempt requests).
+   */
+  readonly numAttempts?: number;
+  /**
+   * Microsecond timestamps for each attempt's send line, in attempt order.
+   * Index 0 = first attempt (same time as `sendLineNumber`), index N-1 = last attempt.
+   * Used to compute per-attempt segment widths inside the waterfall bar.
+   */
+  readonly attemptTimestampsUs?: readonly TimestampMicros[];
+  /**
+   * Per-attempt outcome strings, one per attempt, in attempt order.
+   * Each entry is either an HTTP status code (e.g. `'503'`) or a client error
+   * name (e.g. `'TimedOut'`). Always initialised to an array by the parser;
+   * may be empty for single-attempt requests. For retried requests it is
+   * backfilled to length `numAttempts`, using `INCOMPLETE_STATUS_KEY` for
+   * any attempt whose outcome could not be determined from the log.
+   */
+  readonly attemptOutcomes?: readonly string[];
 }
 
 export interface SyncRequest extends HttpRequest {
