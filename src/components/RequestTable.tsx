@@ -21,6 +21,7 @@ import { microsToMs } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
 import { buildAttemptSegments, buildRetryTooltip, computeHasSegments } from '../utils/requestBarUtils';
+import { INCOMPLETE_STATUS_KEY } from '../utils/statusCodeUtils';
 import type { HttpRequest } from '../types/log.types';
 import styles from './RequestTable.module.css';
 
@@ -540,7 +541,7 @@ export function RequestTable({
                       );
                       const isClientError = !req.status && !!req.clientError;
                       const resolvedIsIncomplete = !req.status && !req.clientError;
-                      const resolvedStatus = req.status ? req.status : (req.clientError ?? 'Incomplete');
+                      const resolvedStatus = req.status ? req.status : (req.clientError ?? INCOMPLETE_STATUS_KEY);
                       const statusCode = req.status ? req.status.split(' ')[0] : '';
                       const defaultBarColor = isClientError
                         ? 'var(--http-client-error)'
@@ -587,7 +588,7 @@ export function RequestTable({
                                   width: `${barWidth}px`,
                                   background: barColor,
                                 }}
-                                title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}
+                                title={resolvedIsIncomplete ? INCOMPLETE_STATUS_KEY : (retryTooltip ?? resolvedStatus)}
                               >
                                 {attemptSegments && attemptSegments.flatMap(({ leftPx, widthPx, color }, idx) => {
                                   const segment = (
@@ -629,7 +630,7 @@ export function RequestTable({
                                 })}
                                 {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
                               </div>
-                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}>
+                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? INCOMPLETE_STATUS_KEY : (retryTooltip ?? resolvedStatus)}>
                                 {resolvedIsIncomplete
                                   ? '...'
                                   : retryTooltip
