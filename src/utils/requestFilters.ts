@@ -83,13 +83,21 @@ export function filterSyncRequests(
     // Timeout filter
     if (selectedTimeout !== null && r.timeout !== selectedTimeout) return false;
 
-    // Incomplete filter
-    if (!showIncomplete && !r.status) return false;
+    // Incomplete filter — client errors are resolved outcomes, not truly incomplete
+    if (!showIncomplete && !r.status && !r.clientError) return false;
 
-    // Status code filter (null = all enabled)
+    // Status code filter (null = all enabled).
+    // A request matches if its final status matches OR any intermediate attempt outcome matches,
+    // so retried requests (e.g. 503 → 200) appear when filtering for either code.
     if (statusCodeFilter !== null) {
-      const statusKey = r.status || 'Incomplete';
-      if (!statusCodeFilter.has(statusKey)) return false;
+      const statusKey = r.status || (r.clientError ? CLIENT_ERROR_STATUS_KEY : INCOMPLETE_STATUS_KEY);
+      const matchesFinal = statusCodeFilter.has(statusKey);
+      // Map non-numeric outcomes (e.g. 'TimedOut') to CLIENT_ERROR_STATUS_KEY so filtering
+      // for 'Client Error' also includes requests with intermediate transport failures.
+      const matchesAttempt = r.attemptOutcomes?.some((o) =>
+        statusCodeFilter.has(/^\d+$/.test(o) ? o : CLIENT_ERROR_STATUS_KEY)
+      ) ?? false;
+      if (!matchesFinal && !matchesAttempt) return false;
     }
 
     // Time filter
@@ -117,10 +125,18 @@ export function filterHttpRequests(
     // Incomplete filter — client errors always show (they are resolved, not truly incomplete)
     if (!showIncompleteHttp && !r.status && !r.clientError) return false;
 
-    // Status code filter (null = all enabled)
+    // Status code filter (null = all enabled).
+    // A request matches if its final status matches OR any intermediate attempt outcome matches,
+    // so retried requests (e.g. 503 → 200) appear when filtering for either code.
     if (statusCodeFilter !== null) {
       const statusKey = r.status || (r.clientError ? CLIENT_ERROR_STATUS_KEY : INCOMPLETE_STATUS_KEY);
-      if (!statusCodeFilter.has(statusKey)) return false;
+      const matchesFinal = statusCodeFilter.has(statusKey);
+      // Map non-numeric outcomes (e.g. 'TimedOut') to CLIENT_ERROR_STATUS_KEY so filtering
+      // for 'Client Error' also includes requests with intermediate transport failures.
+      const matchesAttempt = r.attemptOutcomes?.some((o) =>
+        statusCodeFilter.has(/^\d+$/.test(o) ? o : CLIENT_ERROR_STATUS_KEY)
+      ) ?? false;
+      if (!matchesFinal && !matchesAttempt) return false;
     }
 
     // URI filter (case-insensitive substring match)

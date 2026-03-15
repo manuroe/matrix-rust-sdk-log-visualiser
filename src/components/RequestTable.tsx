@@ -20,6 +20,7 @@ import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
+import { buildAttemptSegments } from '../utils/requestBarUtils';
 import type { HttpRequest } from '../types/log.types';
 import styles from './RequestTable.module.css';
 
@@ -548,6 +549,30 @@ export function RequestTable({
                         : getHttpStatusColor(statusCode);
                       const barColor = getBarColor ? getBarColor(req, defaultBarColor) : defaultBarColor;
 
+                      const hasSegments =
+                        (req.numAttempts ?? 1) > 1
+                        && req.attemptOutcomes?.length === (req.numAttempts ?? 1)
+                        && req.attemptTimestampsUs?.length === (req.numAttempts ?? 1);
+                      const attemptSegments = hasSegments
+                        ? buildAttemptSegments(req.attemptOutcomes!, req.attemptTimestampsUs as number[], req.requestDurationMs, barWidth)
+                        : null;
+                      // For retry requests, build a tooltip listing each attempt outcome with its
+                      // individual duration, e.g. "↻3: 503 (20ms) → 503 (100ms) → 200 OK (1500ms) — 1620ms"
+                      const retryTooltip = hasSegments && req.attemptOutcomes
+                        ? (() => {
+                            const outcomes = req.attemptOutcomes!;
+                            const timestamps = req.attemptTimestampsUs as number[];
+                            const parts = outcomes.map((outcome, i) => {
+                              const endUs = i < outcomes.length - 1
+                                ? timestamps[i + 1]
+                                : timestamps[0] + req.requestDurationMs * 1000;
+                              const ms = Math.round((endUs - timestamps[i]) / 1000);
+                              return `${outcome} (${ms}ms)`;
+                            });
+                            return `↻${req.numAttempts}: ${parts.join(' → ')} — ${req.requestDurationMs}ms`;
+                          })()
+                        : null;
+
                       const rowKey = getRowKey(req);
                       return (
                         <div
@@ -576,12 +601,57 @@ export function RequestTable({
                                   width: `${barWidth}px`,
                                   background: barColor,
                                 }}
-                                title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}
+                                title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}
                               >
+                                {attemptSegments && attemptSegments.flatMap(({ leftPx, widthPx, color }, idx) => {
+                                  const segment = (
+                                    <div
+                                      key={`seg-${idx}`}
+                                      data-testid="attempt-segment"
+                                      style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        bottom: 0,
+                                        left: `${leftPx}px`,
+                                        width: `${widthPx}px`,
+                                        background: color,
+                                        pointerEvents: 'none',
+                                      }}
+                                    />
+                                  );
+                                  if (idx < attemptSegments.length - 1 && widthPx > 0) {
+                                    return [
+                                      segment,
+                                      // Separator line between retry attempts
+                                      <div
+                                        key={`sep-${idx}`}
+                                        aria-hidden="true"
+                                        style={{
+                                          position: 'absolute',
+                                          top: 0,
+                                          bottom: 0,
+                                          left: `${leftPx + widthPx - 1}px`,
+                                          width: '1px',
+                                          background: 'rgba(255, 255, 255, 0.75)',
+                                          zIndex: 1,
+                                          pointerEvents: 'none',
+                                        }}
+                                      />,
+                                    ];
+                                  }
+                                  return [segment];
+                                })}
                                 {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
                               </div>
-                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : resolvedStatus}>
-                                {resolvedIsIncomplete ? '...' : statusCode === '200' ? `${req.requestDurationMs}ms` : `${resolvedStatus} - ${req.requestDurationMs}ms`}
+                              <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? 'Incomplete' : (retryTooltip ?? resolvedStatus)}>
+                                {resolvedIsIncomplete
+                                  ? '...'
+                                  : retryTooltip
+                                  ? retryTooltip
+                                  : statusCode === '200'
+                                  ? `${req.requestDurationMs}ms`
+                                  : `${resolvedStatus} - ${req.requestDurationMs}ms`
+                                }
                               </span>
                             </div>
                           </div>

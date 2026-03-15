@@ -780,3 +780,73 @@ function createRequests(count: number) {
     })
   );
 }
+
+describe('RequestTable — multi-attempt segment rendering', () => {
+  beforeEach(() => {
+    useLogStore.getState().clearData();
+  });
+
+  it('renders colored segment divs inside the bar for a fully-resolved retry request', () => {
+    const BASE_TS = 1_700_000_000_000_000;
+    const req = createHttpRequest({
+      requestId: 'RETRY-REQ',
+      uri: 'https://example.org/rooms/messages',
+      status: '200',
+      sendLineNumber: 0,
+      responseLineNumber: 5,
+      requestDurationMs: 62000,
+      numAttempts: 2,
+      attemptTimestampsUs: [BASE_TS, BASE_TS + 30_000_000] as unknown as readonly import('../../types/time.types').TimestampMicros[],
+      attemptOutcomes: ['TimedOut', '200'],
+    });
+    const rawLines = [
+      createParsedLogLine({ lineNumber: 0, timestampUs: BASE_TS }),
+      createParsedLogLine({ lineNumber: 5, timestampUs: BASE_TS + 62_000_000 }),
+    ];
+    useLogStore.getState().setHttpRequests([req], rawLines);
+
+    renderWithRouter(
+      <RequestTable
+        {...createProps({ filteredRequests: [req], totalCount: 1, msPerPixel: 10 })}
+      />
+    );
+
+    // The bar should contain 2 attempt segment divs (one per attempt)
+    const segments = document.querySelectorAll('[data-testid="attempt-segment"]');
+    expect(segments.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows per-attempt durations and total in the waterfall duration label for retry requests', () => {
+    const BASE_TS = 1_700_000_000_000_000;
+    // Attempt 1: 30 000 ms (TimedOut), Attempt 2: 32 000 ms (200 OK), total: 62 000 ms
+    const req = createHttpRequest({
+      requestId: 'RETRY-TOOLTIP',
+      uri: 'https://example.org/rooms/messages',
+      status: '200',
+      sendLineNumber: 0,
+      responseLineNumber: 5,
+      requestDurationMs: 62000,
+      numAttempts: 2,
+      attemptTimestampsUs: [BASE_TS, BASE_TS + 30_000_000] as unknown as readonly import('../../types/time.types').TimestampMicros[],
+      attemptOutcomes: ['TimedOut', '200'],
+    });
+    const rawLines = [
+      createParsedLogLine({ lineNumber: 0, timestampUs: BASE_TS }),
+      createParsedLogLine({ lineNumber: 5, timestampUs: BASE_TS + 62_000_000 }),
+    ];
+    useLogStore.getState().setHttpRequests([req], rawLines);
+
+    renderWithRouter(
+      <RequestTable
+        {...createProps({ filteredRequests: [req], totalCount: 1, msPerPixel: 10 })}
+      />
+    );
+
+    // The duration label next to the bar should list each attempt with its own duration
+    const expectedLabel = '↻2: TimedOut (30000ms) → 200 (32000ms) — 62000ms';
+    const durationSpans = Array.from(document.querySelectorAll('span')).filter(
+      (el) => el.textContent === expectedLabel
+    );
+    expect(durationSpans.length).toBeGreaterThanOrEqual(1);
+  });
+});

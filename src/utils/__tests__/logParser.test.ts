@@ -24,6 +24,22 @@ const CLIENT_ERROR_TIMEOUT_LINE = '2026-01-26T17:02:55.100000Z ERROR matrix_sdk:
 // Client-error log line (ConnectError)
 const CLIENT_ERROR_CONNECT_LINE = '2026-01-26T17:02:56.000000Z ERROR matrix_sdk::http_client: Error while sending request: Reqwest(reqwest::Error { kind: Connect, url: "https://matrix-client.matrix.org/_matrix/client/v3/keys/upload", source: ConnectError("tcp connect error", ...) }) | crates/matrix-sdk/src/http_client/mod.rs:218 | spans: root > send{request_id="REQ-100" method=POST uri="https://matrix-client.matrix.org/_matrix/client/v3/keys/upload"}';
 
+// Retry test fixtures: REQ-1096 with 3 send attempts followed by a TimedOut error.
+// Timestamps chosen to give known inter-attempt gaps.
+const RETRY_URI = 'https://example.org/_matrix/client/v3/rooms/!room:example.org/messages';
+const RETRY_SEND_1 = `2026-03-11T08:15:10.000000Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=1 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}"}`;
+const RETRY_SEND_2 = `2026-03-11T08:15:40.000000Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=2 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}"}`;
+const RETRY_SEND_3 = `2026-03-11T08:16:10.000000Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=3 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}"}`;
+const RETRY_ERROR  = `2026-03-11T08:16:40.000000Z ERROR matrix_sdk::http_client: Error while sending request: Reqwest(reqwest::Error { kind: Request, url: "${RETRY_URI}", source: TimedOut }) | crates/matrix-sdk/src/http_client/mod.rs:218 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}"}`;
+const RETRY_RESPONSE_200 = `2026-03-11T08:15:42.000000Z DEBUG matrix_sdk::http_client: Got response | crates/matrix-sdk/src/http_client/mod.rs:210 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}" request_size="0" status=200 response_size="2k" request_duration=2000ms}`;
+// Real-world SDK behavior: the num_attempt=2 "Sending request" line carries span context
+// accumulated from the first attempt (status=503, response_size, request_duration).
+// Without the fix this line is mistaken for a 503 response by HTTP_RESP_RE.
+const RETRY_SEND_2_WITH_503_SPAN = `2026-03-11T08:15:40.000000Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=2 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}" request_size="0" status=503 response_size="71B" request_duration=30000ms}`;
+// "Got response" line that carries both the 503 span context and the final 200 response
+// data in the same span field list (SDK accumulates fields from each nested span).
+const RETRY_RESPONSE_200_WITH_503_SPAN = `2026-03-11T08:15:42.000000Z DEBUG matrix_sdk::http_client: Got response | crates/matrix-sdk/src/http_client/mod.rs:214 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}" request_size="0" status=503 response_size="71B" request_duration=30000ms status=200 response_size="2k" request_duration=2000ms}`;
+
 // Send line for REQ-99 (appears before the error)
 const SEND_LINE_REQ99 = '2026-01-26T17:02:45.000000Z  INFO matrix_sdk::http_client::native: Sending request | crates/matrix-sdk/src/http_client/native.rs:89 | spans: root > send{request_id="REQ-99" method=GET uri="https://matrix-client.matrix.org/_matrix/client/v3/rooms/!room:matrix.org/members" request_size="0"}';
 
@@ -546,6 +562,151 @@ describe('logParser', () => {
         });
         expect(result.httpRequests[0].clientError).toBeUndefined();
       });
+    });
+  });
+
+  describe('retry attempts (num_attempt)', () => {
+    it('defaults numAttempts to 1 when num_attempt is absent', () => {
+      const result = parseAllHttpRequests(SEND_LINE_REQ99);
+
+      expect(result.httpRequests[0].numAttempts).toBe(1);
+      expect(result.httpRequests[0].attemptTimestampsUs).toHaveLength(1);
+    });
+
+    it('records numAttempts=1 for a single num_attempt=1 send line', () => {
+      const result = parseAllHttpRequests(SEND_LINE);
+
+      expect(result.httpRequests[0].numAttempts).toBe(1);
+      expect(result.httpRequests[0].attemptTimestampsUs).toHaveLength(1);
+    });
+
+    it('collapses three retry sends + client-error into one record', () => {
+      const content = [RETRY_SEND_1, RETRY_SEND_2, RETRY_SEND_3, RETRY_ERROR].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      expect(result.httpRequests).toHaveLength(1);
+      const req = result.httpRequests[0];
+      expect(req.requestId).toBe('REQ-1096');
+      expect(req.numAttempts).toBe(3);
+      expect(req.clientError).toBe('TimedOut');
+      // sendLineNumber must point to the FIRST attempt
+      expect(req.sendLineNumber).toBe(1);
+      expect(req.responseLineNumber).toBe(4);
+    });
+
+    it('backfills attemptOutcomes with clientError when all retries time out with no intermediate response', () => {
+      // Real-world case: SDK emits 3 send lines with no "Got response" between them,
+      // then a final TimedOut error. The retry-send spans carry no status= field
+      // because there was never a response line to accumulate from. The parser must
+      // infer the intermediate outcomes from the final clientError.
+      const content = [RETRY_SEND_1, RETRY_SEND_2, RETRY_SEND_3, RETRY_ERROR].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      const req = result.httpRequests[0];
+      expect(req.numAttempts).toBe(3);
+      // All three attempts timed out — outcoms array must have 3 entries
+      expect(req.attemptOutcomes).toHaveLength(3);
+      expect(req.attemptOutcomes).toEqual(['TimedOut', 'TimedOut', 'TimedOut']);
+    });
+
+    it('records a timestamp per attempt for separator positioning', () => {
+      const content = [RETRY_SEND_1, RETRY_SEND_2, RETRY_SEND_3, RETRY_ERROR].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      const ts = result.httpRequests[0].attemptTimestampsUs!;
+      expect(ts).toHaveLength(3);
+      // Attempt 2 is 30 000 ms after attempt 1
+      expect((ts[1] - ts[0]) / 1000).toBeCloseTo(30000, 0);
+      // Attempt 3 is 30 000 ms after attempt 2
+      expect((ts[2] - ts[1]) / 1000).toBeCloseTo(30000, 0);
+    });
+
+    it('collapses two retry sends + 200 response into one record', () => {
+      const content = [RETRY_SEND_1, RETRY_SEND_2, RETRY_RESPONSE_200].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      expect(result.httpRequests).toHaveLength(1);
+      const req = result.httpRequests[0];
+      expect(req.numAttempts).toBe(2);
+      expect(req.status).toBe('200');
+      expect(req.clientError).toBeUndefined();
+      // sendLineNumber must point to the first send
+      expect(req.sendLineNumber).toBe(1);
+    });
+
+    it('does not collapse sends for different request_ids', () => {
+      const otherSend = RETRY_SEND_2.replace('REQ-1096', 'REQ-9999');
+      const content = [RETRY_SEND_1, otherSend].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      expect(result.httpRequests).toHaveLength(2);
+    });
+
+    it('captures intermediate client error as attemptOutcomes[0] when response span present', () => {
+      // Intermediate error line (TimedOut client error) between attempt 1 send and attempt 2 send
+      const INTERMEDIATE_ERROR = `2026-03-11T08:15:40.000000Z ERROR matrix_sdk::http_client: Error while sending request: Reqwest(reqwest::Error { kind: Request, url: "${RETRY_URI}", source: TimedOut }) | crates/matrix-sdk/src/http_client/mod.rs:218 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}"}`;
+      const content = [RETRY_SEND_1, INTERMEDIATE_ERROR, RETRY_SEND_2, RETRY_RESPONSE_200].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      expect(result.httpRequests).toHaveLength(1);
+      const req = result.httpRequests[0];
+      expect(req.numAttempts).toBe(2);
+      expect(req.status).toBe('200');
+      expect(req.attemptOutcomes).toHaveLength(2);
+      expect(req.attemptOutcomes![0]).toBe('TimedOut');
+      expect(req.attemptOutcomes![1]).toBe('200');
+    });
+
+    it('captures intermediate HTTP response as attemptOutcomes[0] and [1] for three attempts', () => {
+      // Attempt 1 → TimedOut, attempt 2 → 503, attempt 3 → 200
+      const INTERMEDIATE_ERROR = `2026-03-11T08:15:40.000000Z ERROR matrix_sdk::http_client: Error while sending request: Reqwest(reqwest::Error { kind: Request, url: "${RETRY_URI}", source: TimedOut }) | crates/matrix-sdk/src/http_client/mod.rs:218 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}"}`;
+      const RESPONSE_503 = `2026-03-11T08:16:10.000000Z DEBUG matrix_sdk::http_client: Got response | crates/matrix-sdk/src/http_client/mod.rs:210 | spans: root > send{request_id="REQ-1096" method=GET uri="${RETRY_URI}" request_size="0" status=503 response_size="0" request_duration=30000ms}`;
+      const content = [RETRY_SEND_1, INTERMEDIATE_ERROR, RETRY_SEND_2, RESPONSE_503, RETRY_SEND_3, RETRY_RESPONSE_200].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      expect(result.httpRequests).toHaveLength(1);
+      const req = result.httpRequests[0];
+      expect(req.numAttempts).toBe(3);
+      expect(req.attemptOutcomes).toHaveLength(3);
+      expect(req.attemptOutcomes![0]).toBe('TimedOut');
+      expect(req.attemptOutcomes![1]).toBe('503');
+      expect(req.attemptOutcomes![2]).toBe('200');
+      // Since intermediate responses are present, requestDurationMs reflects total elapsed time
+      // (from attemptTimestampsUs[0] to final response timestamp), not just the last HTTP call.
+      expect(req.requestDurationMs).toBeGreaterThan(2000); // >2s total (RETRY_RESPONSE_200 is 2000ms)
+    });
+
+    it('treats num_attempt=2 line with accumulated 503 span context as a retry send, not a response', () => {
+      // Real SDK behavior: the "Sending request num_attempt=2" line has the 503 span data
+      // from the previous attempt already in its span context. HTTP_RESP_RE must not treat
+      // it as a response — the retry-fold logic must run instead.
+      const content = [RETRY_SEND_1, RETRY_SEND_2_WITH_503_SPAN, RETRY_RESPONSE_200_WITH_503_SPAN].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      expect(result.httpRequests).toHaveLength(1);
+      const req = result.httpRequests[0];
+      expect(req.requestId).toBe('REQ-1096');
+      expect(req.numAttempts).toBe(2);
+      expect(req.status).toBe('200');
+      expect(req.requestDurationMs).toBeGreaterThan(0);
+      // sendLineNumber must point to the first send (line 1), not the retry line
+      expect(req.sendLineNumber).toBe(1);
+      // The 503 baked into the retry-send span must be captured so bar segments are colored
+      expect(req.attemptOutcomes).toEqual(['503', '200']);
+    });
+
+    it('uses last status/duration when "Got response" span contains duplicate fields from a retry', () => {
+      // The final "Got response" line carries both the 503 span context (from the prior
+      // attempt) and the 200 outcome in the same span field list. The parser must use
+      // the last occurrence of status=, response_size=, and request_duration=.
+      const content = [RETRY_SEND_1, RETRY_RESPONSE_200_WITH_503_SPAN].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      expect(result.httpRequests).toHaveLength(1);
+      const req = result.httpRequests[0];
+      expect(req.status).toBe('200');
+      expect(req.requestDurationMs).toBe(2000); // last duration (2000ms), not the first (30000ms)
+      expect(req.responseSizeString).toBe('2k'); // last response_size, not '71B'
     });
   });
 });
