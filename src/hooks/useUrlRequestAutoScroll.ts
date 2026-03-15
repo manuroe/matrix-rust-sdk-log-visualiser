@@ -43,8 +43,11 @@ export function useUrlRequestAutoScroll(
   const scrolledIdRef = useRef<string | null>(null);
   /**
    * Tracks all pending `setTimeout` IDs so they can be cancelled when the
-   * component unmounts or the effect re-runs, preventing state updates on an
-   * already-unmounted component.
+   * component unmounts, preventing state updates on an already-unmounted
+   * component. A separate unmount-only effect handles the cancellation (see
+   * below); the main scroll effect intentionally has no cleanup so that timers
+   * started by one run are not cancelled when a dependency change triggers a
+   * re-run before the timers fire.
    */
   const pendingTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
