@@ -465,11 +465,20 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     // all preceding attempts have already been captured (i.e. the log contained
     // intermediate response spans between every retry).
     if ((rec.numAttempts ?? 1) > 1) {
-      const prevCount = (rec.attemptOutcomes as string[]).length;
-      if (prevCount === (rec.numAttempts ?? 1) - 1) {
-        const finalOutcome = rec.status
-          ? rec.status.split(' ')[0]
-          : rec.clientError ?? 'Incomplete';
+      const finalOutcome = rec.status
+        ? rec.status.split(' ')[0]
+        : rec.clientError ?? 'Incomplete';
+      // Backfill any missing intermediate outcomes. This happens when no
+      // "Got response" or error line was logged between consecutive retries
+      // (e.g. all attempts timed out with no intermediate SDK response span).
+      // A retry only occurs after failure, so the same failure mode
+      // (clientError when available, otherwise 'Incomplete') is the
+      // best-available inference for each unfilled slot.
+      while ((rec.attemptOutcomes as string[]).length < (rec.numAttempts ?? 1) - 1) {
+        (rec.attemptOutcomes as string[]).push(rec.clientError ?? 'Incomplete');
+      }
+      // Append the final outcome so the total count equals numAttempts.
+      if ((rec.attemptOutcomes as string[]).length === (rec.numAttempts ?? 1) - 1) {
         (rec.attemptOutcomes as string[]).push(finalOutcome);
       }
     }
