@@ -594,6 +594,21 @@ describe('logParser', () => {
       expect(req.responseLineNumber).toBe(4);
     });
 
+    it('backfills attemptOutcomes with clientError when all retries time out with no intermediate response', () => {
+      // Real-world case: SDK emits 3 send lines with no "Got response" between them,
+      // then a final TimedOut error. The retry-send spans carry no status= field
+      // because there was never a response line to accumulate from. The parser must
+      // infer the intermediate outcomes from the final clientError.
+      const content = [RETRY_SEND_1, RETRY_SEND_2, RETRY_SEND_3, RETRY_ERROR].join('\n');
+      const result = parseAllHttpRequests(content);
+
+      const req = result.httpRequests[0];
+      expect(req.numAttempts).toBe(3);
+      // All three attempts timed out — outcoms array must have 3 entries
+      expect(req.attemptOutcomes).toHaveLength(3);
+      expect(req.attemptOutcomes).toEqual(['TimedOut', 'TimedOut', 'TimedOut']);
+    });
+
     it('records a timestamp per attempt for separator positioning', () => {
       const content = [RETRY_SEND_1, RETRY_SEND_2, RETRY_SEND_3, RETRY_ERROR].join('\n');
       const result = parseAllHttpRequests(content);
