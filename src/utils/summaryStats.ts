@@ -17,6 +17,7 @@
 import type { HttpRequest, HttpRequestWithTimestamp, SyncRequest, ParsedLogLine, SentryEvent } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
 import { getTimeRangeUs } from './requestFilters';
+import { INCOMPLETE_STATUS_KEY } from './statusCodeUtils';
 import { getMinMaxTimestamps } from './timeUtils';
 import { extractCoreMessage } from './logMessageUtils';
 import type { TimeFilterValue } from '../types/time.types';
@@ -267,8 +268,8 @@ export function computeSummaryStats(
       if (/^\d+$/.test(outcome)) {
         const attemptCode = parseInt(outcome, 10);
         if (attemptCode >= 400) recordFailedUrl(req.uri, outcome);
-      } else {
-        // Non-numeric outcome is a client error name (e.g. 'TimedOut')
+      } else if (outcome !== INCOMPLETE_STATUS_KEY) {
+        // Non-numeric outcome is a client error name (e.g. 'TimedOut'); skip 'Incomplete' placeholders.
         recordFailedUrl(req.uri, 'Client Error');
       }
     });
@@ -344,7 +345,7 @@ export function computeSummaryStats(
           const ts = (req.attemptTimestampsUs?.[i + 1] ?? req.attemptTimestampsUs?.[i] ?? 0) as TimestampMicros;
           return {
             requestId: req.requestId,
-            status: /^\d+$/.test(outcome) ? outcome : 'client-error',
+            status: /^\d+$/.test(outcome) ? outcome : outcome === INCOMPLETE_STATUS_KEY ? '' : 'client-error',
             timestampUs: ts,
           };
         })

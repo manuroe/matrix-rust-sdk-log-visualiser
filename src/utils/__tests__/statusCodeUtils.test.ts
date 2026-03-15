@@ -129,5 +129,16 @@ describe('extractAvailableStatusCodes', () => {
     const result = extractAvailableStatusCodes(requests);
     expect(result).not.toContain('TimedOut');
   });
+
+  it('treats INCOMPLETE_STATUS_KEY in attemptOutcomes as incomplete, not client error', () => {
+    // 'Incomplete' is a placeholder backfilled by the parser for unknown intermediate outcomes.
+    // It must surface the 'Incomplete' filter entry — not 'Client Error'.
+    const requests = [
+      { status: '200', attemptOutcomes: ['Incomplete', '200'] },
+    ];
+    const result = extractAvailableStatusCodes(requests);
+    expect(result).toContain(INCOMPLETE_STATUS_KEY);
+    expect(result).not.toContain(CLIENT_ERROR_STATUS_KEY);
+  });
 });
 

@@ -55,6 +55,9 @@ export function extractAvailableStatusCodes(
       if (/^\d+$/.test(outcome)) {
         // Numeric-looking strings are HTTP status codes
         codes.add(outcome);
+      } else if (outcome === INCOMPLETE_STATUS_KEY) {
+        // 'Incomplete' is a placeholder for an unknown intermediate outcome — not a transport failure.
+        hasIncomplete = true;
       } else {
         // Non-numeric outcome (e.g. 'TimedOut') is a transport failure — expose the
         // 'Client Error' filter even when the request's final status resolved successfully.
