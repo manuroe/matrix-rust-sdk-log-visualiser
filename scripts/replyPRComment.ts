@@ -19,6 +19,9 @@ import { join, dirname } from 'path';
 
 const commitRefPattern = /\b([0-9a-f]{7,40})\b/gi;
 
+/** Default output file for batch reply results, relative to cwd. */
+const DEFAULT_RESULTS_FILE = join('agent-workspace', 'pr-reply-results.json');
+
 type ReplyEndpointType = 'reviewCommentReply' | 'issueCommentCreate';
 
 interface BatchReplyItem {
@@ -94,7 +97,7 @@ function parseArgs(): SingleArgs | BatchArgs {
       continueOnError: !failOnAnyError,
       resultsFile: resultsFileIdx !== -1 && args[resultsFileIdx + 1]
         ? args[resultsFileIdx + 1]
-        : 'agent-workspace/pr-reply-results.json',
+        : DEFAULT_RESULTS_FILE,
     };
   }
 
