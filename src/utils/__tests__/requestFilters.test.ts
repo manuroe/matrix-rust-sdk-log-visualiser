@@ -566,6 +566,23 @@ describe('filterHttpRequests', () => {
     expect(result.map((r) => r.requestId)).not.toContain('incomplete');
   });
 
+  it('does not match line 0 for records missing a send line (sendLineNumber === 0 sentinel)', () => {
+    // Line 0 exists in rawLines — it must NOT be consulted when sendLineNumber is 0.
+    const rawLines = [
+      createParsedLogLine({ lineNumber: 0, rawText: '2024-01-01 INFO target-keyword on line-zero' }),
+      createParsedLogLine({ lineNumber: 11, rawText: '2024-01-01 INFO Received 200 OK for keys/upload' }),
+    ];
+    const requests = [
+      // Complete request whose response line matches → should appear
+      createHttpRequest({ requestId: 'complete', sendLineNumber: 10, responseLineNumber: 11 }),
+      // Record with no send line: sendLineNumber is 0 (sentinel), response line does not match
+      createHttpRequest({ requestId: 'nosend', sendLineNumber: 0, responseLineNumber: 99 }),
+    ];
+    const result = filterHttpRequests(requests, rawLines, makeFilters({ logFilter: 'target-keyword' }));
+
+    expect(result.map((r) => r.requestId)).not.toContain('nosend');
+  });
+
   it('null logFilter shows all requests', () => {
     const requests = [
       createHttpRequest({ requestId: 'A', sendLineNumber: 0 }),

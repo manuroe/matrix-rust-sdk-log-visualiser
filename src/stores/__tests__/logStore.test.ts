@@ -470,17 +470,17 @@ describe('logStore', () => {
   describe('setLogFilter', () => {
     it('sets the log filter and triggers filterHttpRequests', () => {
       const rawLines = [
-        createParsedLogLine({ lineNumber: 0, rawText: '2024-01-01 INFO Sending request https://matrix.org/sync' }),
-        createParsedLogLine({ lineNumber: 1, rawText: '2024-01-01 INFO Received 200 OK' }),
-        createParsedLogLine({ lineNumber: 2, rawText: '2024-01-01 INFO Sending request https://matrix.org/keys/upload' }),
-        createParsedLogLine({ lineNumber: 3, rawText: '2024-01-01 INFO Received 200 OK' }),
-        createParsedLogLine({ lineNumber: 4, rawText: '2024-01-01 INFO Sending request https://matrix.org/rooms/join' }),
-        createParsedLogLine({ lineNumber: 5, rawText: '2024-01-01 INFO Received 200 OK' }),
+        createParsedLogLine({ lineNumber: 10, rawText: '2024-01-01 INFO Sending request https://matrix.org/sync' }),
+        createParsedLogLine({ lineNumber: 11, rawText: '2024-01-01 INFO Received 200 OK' }),
+        createParsedLogLine({ lineNumber: 20, rawText: '2024-01-01 INFO Sending request https://matrix.org/keys/upload' }),
+        createParsedLogLine({ lineNumber: 21, rawText: '2024-01-01 INFO Received 200 OK' }),
+        createParsedLogLine({ lineNumber: 30, rawText: '2024-01-01 INFO Sending request https://matrix.org/rooms/join' }),
+        createParsedLogLine({ lineNumber: 31, rawText: '2024-01-01 INFO Received 200 OK' }),
       ];
       const requests = [
-        createHttpRequest({ requestId: 'A', sendLineNumber: 0, responseLineNumber: 1 }),
-        createHttpRequest({ requestId: 'B', sendLineNumber: 2, responseLineNumber: 3 }),
-        createHttpRequest({ requestId: 'C', sendLineNumber: 4, responseLineNumber: 5 }),
+        createHttpRequest({ requestId: 'A', sendLineNumber: 10, responseLineNumber: 11 }),
+        createHttpRequest({ requestId: 'B', sendLineNumber: 20, responseLineNumber: 21 }),
+        createHttpRequest({ requestId: 'C', sendLineNumber: 30, responseLineNumber: 31 }),
       ];
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
@@ -495,14 +495,14 @@ describe('logStore', () => {
 
     it('performs case-insensitive substring matching', () => {
       const rawLines = [
-        createParsedLogLine({ lineNumber: 0, rawText: '2024-01-01 INFO Sending request https://matrix.org/SYNC' }),
-        createParsedLogLine({ lineNumber: 1, rawText: '2024-01-01 INFO Received 200 OK' }),
-        createParsedLogLine({ lineNumber: 2, rawText: '2024-01-01 INFO Sending request https://matrix.org/keys' }),
-        createParsedLogLine({ lineNumber: 3, rawText: '2024-01-01 INFO Received 200 OK' }),
+        createParsedLogLine({ lineNumber: 10, rawText: '2024-01-01 INFO Sending request https://matrix.org/SYNC' }),
+        createParsedLogLine({ lineNumber: 11, rawText: '2024-01-01 INFO Received 200 OK' }),
+        createParsedLogLine({ lineNumber: 20, rawText: '2024-01-01 INFO Sending request https://matrix.org/keys' }),
+        createParsedLogLine({ lineNumber: 21, rawText: '2024-01-01 INFO Received 200 OK' }),
       ];
       const requests = [
-        createHttpRequest({ requestId: 'A', sendLineNumber: 0, responseLineNumber: 1 }),
-        createHttpRequest({ requestId: 'B', sendLineNumber: 2, responseLineNumber: 3 }),
+        createHttpRequest({ requestId: 'A', sendLineNumber: 10, responseLineNumber: 11 }),
+        createHttpRequest({ requestId: 'B', sendLineNumber: 20, responseLineNumber: 21 }),
       ];
       useLogStore.getState().setHttpRequests(requests, rawLines);
 
@@ -534,17 +534,17 @@ describe('logStore', () => {
 
     it('combines with other filters', () => {
       const rawLines = [
-        createParsedLogLine({ lineNumber: 0, rawText: '2024-01-01 INFO Sending request https://matrix.org/sync' }),
-        createParsedLogLine({ lineNumber: 1, rawText: '2024-01-01 INFO Received 200 OK' }),
-        createParsedLogLine({ lineNumber: 2, rawText: '2024-01-01 INFO Sending request https://matrix.org/sync' }),
-        createParsedLogLine({ lineNumber: 3, rawText: '2024-01-01 INFO Received 500 Internal Server Error' }),
-        createParsedLogLine({ lineNumber: 4, rawText: '2024-01-01 INFO Sending request https://matrix.org/keys' }),
-        createParsedLogLine({ lineNumber: 5, rawText: '2024-01-01 INFO Received 200 OK' }),
+        createParsedLogLine({ lineNumber: 10, rawText: '2024-01-01 INFO Sending request https://matrix.org/sync' }),
+        createParsedLogLine({ lineNumber: 11, rawText: '2024-01-01 INFO Received 200 OK' }),
+        createParsedLogLine({ lineNumber: 20, rawText: '2024-01-01 INFO Sending request https://matrix.org/sync' }),
+        createParsedLogLine({ lineNumber: 21, rawText: '2024-01-01 INFO Received 500 Internal Server Error' }),
+        createParsedLogLine({ lineNumber: 30, rawText: '2024-01-01 INFO Sending request https://matrix.org/keys' }),
+        createParsedLogLine({ lineNumber: 31, rawText: '2024-01-01 INFO Received 200 OK' }),
       ];
       const requests = [
-        createHttpRequest({ requestId: 'A', sendLineNumber: 0, responseLineNumber: 1, status: '200' }),
-        createHttpRequest({ requestId: 'B', sendLineNumber: 2, responseLineNumber: 3, status: '500' }),
-        createHttpRequest({ requestId: 'C', sendLineNumber: 4, responseLineNumber: 5, status: '200' }),
+        createHttpRequest({ requestId: 'A', sendLineNumber: 10, responseLineNumber: 11, status: '200' }),
+        createHttpRequest({ requestId: 'B', sendLineNumber: 20, responseLineNumber: 21, status: '500' }),
+        createHttpRequest({ requestId: 'C', sendLineNumber: 30, responseLineNumber: 31, status: '200' }),
       ];
       useLogStore.getState().setHttpRequests(requests, rawLines);
 

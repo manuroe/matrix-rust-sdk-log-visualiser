@@ -205,7 +205,7 @@ describe('App.tsx - URL Parameter Synchronization', () => {
 
       await waitFor(() => {
         const state = useLogStore.getState();
-        // Both should be applied: uriFilter from App.tsx, and log viewer from useUrlRequestAutoScroll
+        // Both should be applied: logFilter from App.tsx, and log viewer from useUrlRequestAutoScroll
         expect(state.logFilter).toBe('sync');
         // REQ-5 → sendLineNumber = 5*2 = 10, so rowKey = 10
         expect(state.openLogViewerIds.has(10)).toBe(true);

@@ -154,9 +154,11 @@ export function filterHttpRequests(
       const query = logFilter.toLowerCase();
       const getLine = (lineNum: number): ParsedLogLine | undefined =>
         lineNumberIndex ? lineNumberIndex.get(lineNum) : rawLogLines.find((l) => l.lineNumber === lineNum);
-      const sendRaw = getLine(r.sendLineNumber)?.rawText.toLowerCase() ?? '';
-      // responseLineNumber === 0 is a sentinel meaning "no response yet" (incomplete request).
-      // Skip the lookup to avoid accidentally matching an unrelated line 0.
+      // sendLineNumber and responseLineNumber are both normalised to 0 as a sentinel meaning
+      // "not present" (e.g. incomplete request = no response, response-only record = no send).
+      // Skip the lookup when the sentinel is set to avoid accidentally matching line 0.
+      const sendRaw =
+        r.sendLineNumber !== 0 ? (getLine(r.sendLineNumber)?.rawText.toLowerCase() ?? '') : '';
       const responseRaw =
         r.responseLineNumber !== 0 ? (getLine(r.responseLineNumber)?.rawText.toLowerCase() ?? '') : '';
       if (!sendRaw.includes(query) && !responseRaw.includes(query)) return false;
