@@ -22,7 +22,8 @@ export interface SyncRequestFilters {
 export interface HttpRequestFilters {
   showIncompleteHttp: boolean;
   statusCodeFilter: Set<string> | null;
-  uriFilter: string | null;
+  /** Case-insensitive substring matched against the rawText of the request's send and response log lines. */
+  logFilter: string | null;
   startTime: TimeFilterValue | null;
   endTime: TimeFilterValue | null;
 }
@@ -113,15 +114,28 @@ export function filterSyncRequests(
 
 /**
  * Filter general HTTP requests according to current filter state.
+ *
+ * @param lineNumberIndex - Optional prebuilt line-number index for O(1) lookups.
+ *   When omitted, falls back to a linear scan of rawLogLines (used by tests).
  */
 export function filterHttpRequests(
   requests: HttpRequest[],
   rawLogLines: ParsedLogLine[],
-  filters: HttpRequestFilters
+  filters: HttpRequestFilters,
+  lineNumberIndex?: Map<number, ParsedLogLine>
 ): HttpRequest[] {
-  const { showIncompleteHttp, statusCodeFilter, uriFilter, startTime, endTime } = filters;
+  const { showIncompleteHttp, statusCodeFilter, logFilter, startTime, endTime } = filters;
 
   const timeRangeUs = getTimeRangeUs(rawLogLines, startTime, endTime);
+
+  // Hoist log-filter helpers outside the per-request callback to avoid
+  // repeated allocations when filtering large request sets.
+  const logQuery = logFilter && logFilter.length > 0 ? logFilter.toLowerCase() : null;
+  // sendLineNumber and responseLineNumber are both normalised to 0 as a sentinel meaning
+  // "not present" (e.g. incomplete request = no response, response-only record = no send).
+  // Skip the lookup when the sentinel is set to avoid accidentally matching line 0.
+  const getLine = (lineNum: number): ParsedLogLine | undefined =>
+    lineNumberIndex ? lineNumberIndex.get(lineNum) : rawLogLines.find((l) => l.lineNumber === lineNum);
 
   return requests.filter((r) => {
     // Incomplete filter — client errors always show (they are resolved, not truly incomplete)
@@ -143,9 +157,14 @@ export function filterHttpRequests(
       if (!matchesFinal && !matchesAttempt) return false;
     }
 
-    // URI filter (case-insensitive substring match)
-    if (uriFilter && uriFilter.length > 0) {
-      if (!r.uri.toLowerCase().includes(uriFilter.toLowerCase())) return false;
+    // Log filter: case-insensitive substring match against the raw text of the
+    // request's send line and response line (the two lines the SDK emits per request).
+    if (logQuery !== null) {
+      const sendRaw =
+        r.sendLineNumber !== 0 ? (getLine(r.sendLineNumber)?.rawText.toLowerCase() ?? '') : '';
+      const responseRaw =
+        r.responseLineNumber !== 0 ? (getLine(r.responseLineNumber)?.rawText.toLowerCase() ?? '') : '';
+      if (!sendRaw.includes(logQuery) && !responseRaw.includes(logQuery)) return false;
     }
 
     // Time filter
