@@ -46,8 +46,10 @@
  *
  * @example
  * LOG_PREFIX_RE.test("2026-01-28T13:24:43.950890Z INFO foo") // => true
+ * LOG_PREFIX_RE.test("2026-01-28T13:24:43Z INFO foo")       // => true (no fractions)
+ * LOG_PREFIX_RE.test("2026-01-28T13:24:43.123456 INFO foo")  // => true (no Z)
  */
-export const LOG_PREFIX_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+\w+\s+/;
+export const LOG_PREFIX_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\s+\w+\s+/;
 
 /**
  * Strip the ISO timestamp + log-level prefix from a raw log line, keeping only

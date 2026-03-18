@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractCoreMessage } from '../logMessageUtils';
+import { extractCoreMessage, stripLogPrefix } from '../logMessageUtils';
 
 describe('extractCoreMessage', () => {
   it('strips ISO timestamp and level prefix from a WARN line', () => {
@@ -49,5 +49,26 @@ describe('extractCoreMessage', () => {
     // Some log lines omit the trailing Z (local-time format).
     const raw = '2026-01-28T13:24:43.123456 INFO Payload without Z';
     expect(extractCoreMessage(raw)).toBe('Payload without Z');
+  });
+});
+
+describe('stripLogPrefix', () => {
+  it('strips a standard timestamp + level prefix', () => {
+    expect(stripLogPrefix('2026-01-28T13:24:43.950890Z INFO Something happened'))
+      .toBe('Something happened');
+  });
+
+  it('strips a prefix without fractional seconds', () => {
+    expect(stripLogPrefix('2026-01-28T13:24:43Z WARN No fractions here'))
+      .toBe('No fractions here');
+  });
+
+  it('strips a prefix without trailing Z', () => {
+    expect(stripLogPrefix('2026-01-28T13:24:43.123456 INFO Payload without Z'))
+      .toBe('Payload without Z');
+  });
+
+  it('returns the original string unchanged when there is no prefix', () => {
+    expect(stripLogPrefix('No timestamp here')).toBe('No timestamp here');
   });
 });
