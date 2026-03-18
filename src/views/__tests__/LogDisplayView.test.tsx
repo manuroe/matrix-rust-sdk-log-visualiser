@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { screen, fireEvent, createEvent } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
@@ -930,6 +930,7 @@ function makeShortcutCtx(
     pendingChord: null,
     registerFocusSearch: vi.fn(() => vi.fn()),
     registerFocusFilter: vi.fn(() => vi.fn()),
+    registerDismiss: vi.fn(() => vi.fn()),
     ...overrides,
   };
 }
@@ -1344,3 +1345,59 @@ describe('LogDisplayView sentry and HTTP error text coloring', () => {
     expect(textSpan.style.color).toBe('');
   });
 });
+
+describe('LogDisplayView export button', () => {
+  // Capture originals before the suite so afterEach can restore them exactly,
+  // preventing mock leakage into other test files.
+  const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock');
+    global.URL.revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    if (originalClipboard) {
+      Object.defineProperty(navigator, 'clipboard', originalClipboard);
+    } else {
+      // clipboard didn't exist before — remove the mock so it doesn't leak
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deleting a non-standard JSDOM property
+      delete (navigator as any).clipboard;
+    }
+    global.URL.createObjectURL = (originalCreateObjectURL ?? vi.fn()) as typeof URL.createObjectURL;
+    global.URL.revokeObjectURL = originalRevokeObjectURL ?? vi.fn();
+    vi.restoreAllMocks();
+    useLogStore.setState({ rawLogLines: [] });
+  });
+
+  it('shows an export button in the toolbar', () => {
+    useLogStore.setState({ rawLogLines: [createParsedLogLine({ lineNumber: 1 })] });
+    render(<LogDisplayView />);
+    expect(screen.getByRole('button', { name: /export logs/i })).toBeInTheDocument();
+  });
+
+  it('opens the export dialog when the export button is clicked', async () => {
+    const user = userEvent.setup();
+    useLogStore.setState({ rawLogLines: [createParsedLogLine({ lineNumber: 1 })] });
+    render(<LogDisplayView />);
+    await user.click(screen.getByRole('button', { name: /export logs/i }));
+    expect(screen.getByRole('dialog', { name: /export logs/i })).toBeInTheDocument();
+  });
+
+  it('closes the export dialog when the dialog close button is clicked', async () => {
+    const user = userEvent.setup();
+    useLogStore.setState({ rawLogLines: [createParsedLogLine({ lineNumber: 1 })] });
+    render(<LogDisplayView />);
+    await user.click(screen.getByRole('button', { name: /export logs/i }));
+    expect(screen.getByRole('dialog', { name: /export logs/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /close export dialog/i }));
+    expect(screen.queryByRole('dialog', { name: /export logs/i })).not.toBeInTheDocument();
+  });
+});
+
