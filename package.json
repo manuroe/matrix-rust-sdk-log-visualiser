@@ -7,7 +7,7 @@
     "start": "vite",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:extension": "tsc -b && vite build --config vite.config.extension.ts",
+    "build:extension": "tsc -b && vite build --config vite.config.extension.ts && vite build --config vite.config.extension.content.ts",
     "build:extension:firefox": "npm run build:extension && tsx scripts/prepareFirefoxExtension.ts",
     "webext:run": "npm run build:extension:firefox && npx web-ext run --source-dir extension-dist-firefox",
     "test": "vitest",

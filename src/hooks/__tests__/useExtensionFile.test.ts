@@ -51,11 +51,12 @@ import { useExtensionFile } from '../useExtensionFile';
 
 // Helper: build a minimal fake chrome.storage.session
 function makeChromeSession(
-  getImpl: (key: string) => Promise<Record<string, unknown>>
+  getImpl: (key: string) => Promise<Record<string, unknown>>,
+  removeImpl: (key: string) => Promise<void> = () => Promise.resolve()
 ): typeof chrome {
   return {
     storage: {
-      session: { get: (key: string) => getImpl(key) },
+      session: { get: (key: string) => getImpl(key), remove: removeImpl },
     },
   } as unknown as typeof chrome;
 }

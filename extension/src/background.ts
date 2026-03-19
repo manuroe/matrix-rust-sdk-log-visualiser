@@ -17,9 +17,10 @@
  * rageshakes session cookies are forwarded — allowing authenticated access to
  * private listing pages without requiring the user to re-authenticate.
  *
- * Note: This service worker runs with broad host_permissions so it can fetch
- * log files from any rageshake server deployment, which is what allows the
- * credentialed cross-origin fetch to succeed.
+ * URL validation: every incoming URL is validated with `validateAndNormalizeUrl`
+ * before it is fetched. Only same-origin `.log.gz` URLs are permitted, which
+ * prevents a malicious page from coercing the service-worker into making
+ * credentialed requests to arbitrary third-party origins.
  */
 
 import { summarizeLog } from './summarize';
@@ -115,26 +116,86 @@ async function decodeLogTextFromBuffer(buffer: ArrayBuffer): Promise<string> {
 
 /**
  * Encode an `ArrayBuffer` as a base64 string.
- * Works in service worker contexts (no `btoa` length limit issue since we
- * use chunked conversion).
+ * Uses `TextDecoder('latin1')` which maps byte values 0–255 to the same
+ * Unicode code points, giving a string that `btoa` can encode without
+ * iterating over individual bytes — and without the `String.fromCharCode`
+ * spread that can hit the ~65\u00a0535 max-arguments limit on large files.
  */
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  // Process in 64 KB chunks to avoid call-stack overflow on large files.
-  const CHUNK = 65536;
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  return btoa(new TextDecoder('latin1').decode(new Uint8Array(buffer)));
+}
+
+// ── URL validation ─────────────────────────────────────────────────────────
+
+/**
+ * Derive the origin of the sender tab so we can validate that the requested
+ * URL is same-origin.  `sender.origin` is preferred (always set for content
+ * scripts in MV3); we fall back to parsing `sender.tab.url` for older hosts.
+ */
+function getSenderOrigin(sender: chrome.runtime.MessageSender): string | null {
+  if (sender.origin) return sender.origin;
+  const tabUrl = sender.tab?.url;
+  if (!tabUrl) return null;
+  try {
+    return new URL(tabUrl).origin;
+  } catch {
+    return null;
   }
-  return btoa(binary);
+}
+
+/**
+ * Validate that `rawUrl` is a same-origin `.log.gz` URL relative to the
+ * sender tab, and return a normalised absolute URL string.
+ *
+ * Rejects non-http(s) protocols, cross-origin requests, and paths that do not
+ * end with `.log.gz`. This prevents a compromised listing page from coercing
+ * the service worker into making credentialled requests to arbitrary origins.
+ *
+ * @example
+ * validateAndNormalizeUrl('logs/console.log.gz', sender)
+ * // => 'https://rageshakes.example.com/api/listing/2024/abc/logs/console.log.gz'
+ */
+function validateAndNormalizeUrl(
+  rawUrl: string,
+  sender: chrome.runtime.MessageSender,
+): string {
+  const senderOrigin = getSenderOrigin(sender);
+  if (!senderOrigin) throw new Error('Unable to determine sender origin');
+
+  let url: URL;
+  try {
+    // Allow relative URLs by resolving against the sender origin.
+    url = new URL(rawUrl, senderOrigin);
+  } catch {
+    throw new Error('Invalid URL');
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Unsupported URL protocol');
+  }
+  if (url.origin !== senderOrigin) {
+    throw new Error('Cross-origin URL is not allowed');
+  }
+  if (!url.pathname.endsWith('.log.gz')) {
+    throw new Error('Only .log.gz log URLs are allowed');
+  }
+
+  return url.toString();
 }
 
 // ── Message handler ────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener(
-  (message: BackgroundMessage, _sender, sendResponse: (r: BackgroundResponse) => void) => {
+  (message: BackgroundMessage, sender, sendResponse: (r: BackgroundResponse) => void) => {
     if (message.type === 'fetchAndSummarize') {
-      handleFetchAndSummarize(message.url).then(sendResponse).catch((err: unknown) => {
+      let validatedUrl: string;
+      try {
+        validatedUrl = validateAndNormalizeUrl(message.url, sender);
+      } catch (err) {
+        sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
+        return false;
+      }
+      handleFetchAndSummarize(validatedUrl).then(sendResponse).catch((err: unknown) => {
         sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
       });
       // Return true to keep the message channel open for the async response.
@@ -142,7 +203,14 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'fetchAndStore') {
-      handleFetchAndStore(message.url, message.key).then(sendResponse).catch((err: unknown) => {
+      let validatedUrl: string;
+      try {
+        validatedUrl = validateAndNormalizeUrl(message.url, sender);
+      } catch (err) {
+        sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
+        return false;
+      }
+      handleFetchAndStore(validatedUrl, message.key).then(sendResponse).catch((err: unknown) => {
         sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
       });
       return true;

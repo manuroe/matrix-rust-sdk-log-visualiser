@@ -3,11 +3,14 @@
  *
  * Produces three artefacts in `extension-dist/`:
  *
- * 1. `content.js`   — IIFE content script (injected into rageshakes listing pages)
- * 2. `content.css`  — Styles injected alongside the content script (copied as-is)
- * 3. `background.js` — ES module service worker
- * 4. `viewer.html` + `assets/` — Full React app served as an extension page;
+ * 1. `content.css`  — Styles injected alongside the content script (copied as-is)
+ * 2. `background.js` — ES module service worker
+ * 3. `viewer.html` + `assets/` — Full React app served as an extension page;
  *    the `useExtensionFile` hook auto-loads the log on open.
+ *
+ * The content script (`content.js`) is built separately by
+ * `vite.config.extension.content.ts` as an IIFE so it can be injected
+ * as a classic script.  Both configs must run to produce a usable build.
  *
  * The `extension/manifest.json` is copied verbatim into `extension-dist/`, so
  * loading `extension-dist/` as an unpacked extension in Chrome/Firefox is all
@@ -64,22 +67,20 @@ export default defineConfig({
         viewer: resolve(root, 'extension/viewer.html'),
         // Background service worker.
         background: resolve(root, 'extension/src/background.ts'),
-        // Content script — must be IIFE so it runs immediately without a module loader.
-        content: resolve(root, 'extension/src/content.ts'),
+        // NOTE: content.ts is built separately by vite.config.extension.content.ts
+        // as an IIFE. It is intentionally omitted here so that the ESM output
+        // does not overwrite the IIFE content.js produced by the second build.
       },
       output: {
-        // Flat filenames for background and content scripts so manifest.json
-        // references stay simple (no hashed filenames needed for these).
+        // Flat filename for background so manifest.json reference is stable.
         entryFileNames: (chunk) => {
-          if (chunk.name === 'background' || chunk.name === 'content') {
-            return '[name].js';
+          if (chunk.name === 'background') {
+            return 'background.js';
           }
           return 'assets/[name]-[hash].js';
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
-        // IIFE format for content script so it executes in the page context
-        // without needing a module loader. background and viewer keep ESM.
         format: 'es',
       },
     },

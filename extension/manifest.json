@@ -7,7 +7,7 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*/*"
+    "*://*/api/listing/*"
   ],
   "background": {
     "service_worker": "background.js",

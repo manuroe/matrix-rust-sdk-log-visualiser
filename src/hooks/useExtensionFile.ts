@@ -69,6 +69,11 @@ export function useExtensionFile(): void {
         const decoded = isValidGzipHeader(rawBytes) ? gunzipSync(rawBytes) : rawBytes;
         const text = decodeTextBytes(decoded);
 
+        // Remove the session entry immediately after decoding — the base64 gz
+        // payload can be several MB and chrome.storage.session has a limited
+        // quota. Self-cleaning here ensures subsequent opens don't fail.
+        await session.remove(key);
+
         if (cancelled) return;
 
         const result = parseLogFile(text);
