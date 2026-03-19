@@ -36,7 +36,7 @@ jobs:
         run: npm run build:extension
 
       - name: Build extension (Firefox)
-        run: tsx scripts/prepareFirefoxExtension.ts
+        run: npm run build:extension:firefox
 
       - name: Upload coverage to Codecov
         if: ${{ github.event_name == 'push' || env.CODECOV_TOKEN != '' }}
