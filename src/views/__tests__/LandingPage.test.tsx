@@ -128,4 +128,29 @@ describe('LandingPage', () => {
 
     vi.unstubAllEnvs();
   });
+
+  it('renders the extension loading screen when extensionFileUrl param is present', () => {
+    render(
+      <MemoryRouter initialEntries={['/?extensionFileUrl=https%3A%2F%2Fexample.com%2Fapi%2Flisting%2Ffoo.log.gz&extensionFileName=foo.log.gz']}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/Loading foo\.log\.gz/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('file-upload')).not.toBeInTheDocument();
+  });
+
+  it('derives the filename from extensionFileUrl pathname when extensionFileName param is absent', () => {
+    render(
+      <MemoryRouter initialEntries={['/?extensionFileUrl=https%3A%2F%2Fexample.com%2Fapi%2Flisting%2Fderived.log.gz']}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/Loading derived\.log\.gz/i)).toBeInTheDocument();
+  });
 });
