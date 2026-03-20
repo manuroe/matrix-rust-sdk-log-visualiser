@@ -48,6 +48,8 @@ This document is a lightweight guide for contributors and automated agents. It f
 
 A git-ignored sandbox at `agent-workspace/` exists for all transient AI-generated files. Nothing in this folder is ever committed or reviewed.
 
+**Always use `agent-workspace/` for any temporary or scratch files.** Never use `/tmp/`, the system temp directory, or any path outside the workspace. The agent has full read/write access to `agent-workspace/` and must use it exclusively for all transient output.
+
 **Use it for:**
 - Planning notes (e.g. `agent-workspace/plan.md`)
 - All PR script outputs (see below)
@@ -59,24 +61,29 @@ A git-ignored sandbox at `agent-workspace/` exists for all transient AI-generate
 - `agent-workspace/pr-replies-template.json` — batch reply template to fill in
 - `agent-workspace/pr-reply-results.json` — results after sending replies
 
-**Commit messages** — never pass long or multi-line messages inline. Write to a file and use `-F`:
+**Writing files** — always use your native file-writing tool (e.g. `create_file` or `str_replace`) to create or update files in `agent-workspace/`. Never use shell workarounds such as `echo "…" >> file`, `python3 -c "open(…).write(…)"`, or heredoc `cat > file << 'EOF'` to write file content — those exist only as a last resort when no file tool is available, which is never the case here.
+
+**Commit messages** — never pass long or multi-line messages inline. Write to a file with your file tool and use `-F`:
 ```sh
-# Write message to file (title on first line, blank line, then body)
-cat > agent-workspace/commit-msg.txt << 'EOF'
+git commit -F agent-workspace/commit-msg.txt
+```
+
+Example content for `agent-workspace/commit-msg.txt` (written with your file tool, not via the shell):
+```
 feat: short title here
 
 Longer body explaining what changed and why.
-EOF
-git commit -F agent-workspace/commit-msg.txt
 ```
 
 **PR descriptions** — use `--body-file` instead of `--body`:
 ```sh
-cat > agent-workspace/pr-body.md << 'EOF'
+gh pr create --title "feat: short title" --body-file agent-workspace/pr-body.md
+```
+
+Example content for `agent-workspace/pr-body.md` (written with your file tool):
+```
 ## Summary
 Describe the PR here.
-EOF
-gh pr create --title "feat: short title" --body-file agent-workspace/pr-body.md
 ```
 
 **Never store source code or files meant to be reviewed in this folder.**
