@@ -158,16 +158,17 @@ function getSenderOrigin(sender: chrome.runtime.MessageSender): string | null {
 }
 
 /**
- * Validate that `rawUrl` is a same-origin `.log.gz` URL relative to the
- * sender tab, and return a normalised absolute URL string.
+ * Validate that `rawUrl` is a same-origin HTTPS `.log.gz` URL relative to the
+ * sender origin, and return a normalised absolute URL string.
  *
- * Rejects non-http(s) protocols, cross-origin requests, and paths that do not
+ * Rejects non-https protocols, cross-origin requests, and paths that do not
  * end with `.log.gz`. This prevents a compromised listing page from coercing
  * the service worker into making credentialled requests to arbitrary origins.
  *
  * @example
- * validateAndNormalizeUrl('logs/console.log.gz', sender)
- * // => 'https://rageshakes.example.com/api/listing/2024/abc/logs/console.log.gz'
+ * // Given: sender.tab.url === 'https://rageshakes.example.com/api/listing/2024/abc'
+ * validateAndNormalizeUrl('logs/console.log.gz', sender);
+ * // => 'https://rageshakes.example.com/logs/console.log.gz'
  */
 function validateAndNormalizeUrl(
   rawUrl: string,

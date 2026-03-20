@@ -7,7 +7,7 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*/api/listing/*"
+    "https://*/api/listing/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -15,7 +15,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*/api/listing/*"],
+      "matches": ["https://*/api/listing/*"],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
@@ -24,7 +24,7 @@
   "web_accessible_resources": [
     {
       "resources": ["viewer.html", "assets/*"],
-      "matches": ["*://*/api/listing/*"]
+      "matches": ["https://*/api/listing/*"]
     }
   ],
   "browser_specific_settings": {

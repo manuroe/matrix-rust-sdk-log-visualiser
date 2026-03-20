@@ -32,10 +32,7 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
-      - name: Build extension (Chrome/Edge)
-        run: npm run build:extension
-
-      - name: Build extension (Firefox)
+      - name: Build extension (Chrome/Edge and Firefox)
         run: npm run build:extension:firefox
 
       - name: Upload coverage to Codecov
