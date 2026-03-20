@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileUpload } from '../components/FileUpload';
 import { parseLogFile } from '../utils/logParser';
 import { useLogStore } from '../stores/logStore';
@@ -8,11 +8,34 @@ import type { AppError } from '../utils/errorHandling';
 import ErrorDisplay from '../components/ErrorDisplay';
 import uploadStyles from '../components/FileUpload.module.css';
 
+/** @see useExtensionFile — must match the param name used there. */
+const EXTENSION_FILE_URL_PARAM = 'extensionFileUrl';
+const EXTENSION_FILE_NAME_PARAM = 'extensionFileName';
+
 export function LandingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const loadLogParserResult = useLogStore((state) => state.loadLogParserResult);
   const [demoError, setDemoError] = useState<AppError | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
+
+  // When opened by the extension, show a loading screen immediately so the
+  // user never sees the upload UI while useExtensionFile fetches the log.
+  const extensionFileUrl = searchParams.get(EXTENSION_FILE_URL_PARAM);
+  const extensionFileName =
+    searchParams.get(EXTENSION_FILE_NAME_PARAM) ??
+    extensionFileUrl?.split('/').pop() ??
+    'log file';
+
+  if (extensionFileUrl) {
+    return (
+      <div className={uploadStyles.dropZone}>
+        <div className={uploadStyles.dropZoneContent}>
+          <p>Loading {extensionFileName}…</p>
+        </div>
+      </div>
+    );
+  }
 
   const prNumber = import.meta.env.VITE_PR_NUMBER;
   const githubUrl = prNumber

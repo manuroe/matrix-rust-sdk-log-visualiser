@@ -49,15 +49,20 @@ let mockSearchParams: URLSearchParams;
 
 import { useExtensionFile } from '../useExtensionFile';
 
-// Helper: build a minimal fake chrome.storage.session
-function makeChromeSession(
-  getImpl: (key: string) => Promise<Record<string, unknown>>,
-  removeImpl: (key: string) => Promise<void> = () => Promise.resolve()
+/** Representative rageshake log URL used across tests. */
+const TEST_FILE_URL = 'https://rageshakes.example.com/api/listing/2024/abc/console.log.gz';
+const TEST_FILE_NAME = 'console.log.gz';
+
+/**
+ * Build a minimal fake `chrome` global with a stubbed `runtime.sendMessage`.
+ *
+ * @param sendMessageImpl - Resolves to the background response for each call.
+ */
+function makeChrome(
+  sendMessageImpl: (...args: unknown[]) => Promise<unknown>
 ): typeof chrome {
   return {
-    storage: {
-      session: { get: (key: string) => getImpl(key), remove: removeImpl },
-    },
+    runtime: { sendMessage: sendMessageImpl },
   } as unknown as typeof chrome;
 }
 
@@ -80,8 +85,8 @@ describe('useExtensionFile', () => {
     }
   });
 
-  it('is a no-op when the extensionFile param is absent', async () => {
-    // No ?extensionFile in URL, chrome not defined
+  it('is a no-op when the extensionFileUrl param is absent', async () => {
+    // No ?extensionFileUrl in URL, chrome not defined
     renderHook(() => useExtensionFile());
     await Promise.resolve(); // flush microtasks
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
@@ -89,40 +94,41 @@ describe('useExtensionFile', () => {
   });
 
   it('is a no-op when chrome is not defined', async () => {
-    mockSearchParams = new URLSearchParams('extensionFile=mykey');
+    mockSearchParams = new URLSearchParams(`extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}`);
     // chrome is deliberately absent from globalThis (cleared in afterEach)
     renderHook(() => useExtensionFile());
     await Promise.resolve();
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
   });
 
-  it('is a no-op when chrome.storage.session is undefined', async () => {
-    mockSearchParams = new URLSearchParams('extensionFile=mykey');
-    // @ts-expect-error — injecting partial chrome without storage.session
+  it('is a no-op when chrome.runtime.sendMessage is undefined', async () => {
+    mockSearchParams = new URLSearchParams(`extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}`);
+    // @ts-expect-error — injecting partial chrome without runtime.sendMessage
     globalThis.chrome = {};
     renderHook(() => useExtensionFile());
     await Promise.resolve();
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
   });
 
-  it('is a no-op when the storage entry is missing', async () => {
-    mockSearchParams = new URLSearchParams('extensionFile=missingkey');
-    // session.get returns an empty object (key not found)
-    globalThis.chrome = makeChromeSession(() => Promise.resolve({}));
+  it('is a no-op when fetchForViewer returns ok: false', async () => {
+    mockSearchParams = new URLSearchParams(`extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`);
+    globalThis.chrome = makeChrome(() =>
+      Promise.resolve({ ok: false, error: 'fetch failed' })
+    );
     renderHook(() => useExtensionFile());
-    // Flush the async effect
     await new Promise((r) => setTimeout(r, 0));
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
   });
 
   it('decompresses gzip bytes, parses, and navigates on the happy path', async () => {
-    const key = 'ext-key-001';
-    mockSearchParams = new URLSearchParams(`extensionFile=${key}`);
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
+    );
 
     // Encode a tiny valid base64 payload ("AB" → 2 bytes)
     const base64 = btoa('\x00\x01');
-    globalThis.chrome = makeChromeSession(() =>
-      Promise.resolve({ [key]: { base64, fileName: 'test.log.gz' } })
+    globalThis.chrome = makeChrome(() =>
+      Promise.resolve({ ok: true, base64, fileName: TEST_FILE_NAME })
     );
 
     renderHook(() => useExtensionFile());
@@ -136,33 +142,51 @@ describe('useExtensionFile', () => {
     expect(mockLoadLogParserResult).toHaveBeenCalledTimes(1);
 
     // gunzipSync was called with the decoded bytes
-    expect(mockGunzipSync).toHaveBeenCalledWith(
-      expect.any(Uint8Array)
-    );
+    expect(mockGunzipSync).toHaveBeenCalledWith(expect.any(Uint8Array));
     // decodeTextBytes was called with the decompressed result
     expect(mockDecodeTextBytes).toHaveBeenCalledWith(expect.any(Uint8Array));
     // parseLogFile was called with the decoded text
     expect(mockParseLogFile).toHaveBeenCalledWith('log text');
     // loadLogParserResult was called with the parsed result
     expect(mockLoadLogParserResult).toHaveBeenCalledWith({ logs: [], requests: [] });
-    // navigate was called to remove the param and go to /summary
+    // navigate was called to remove the params and go to /summary
     expect(mockNavigate).toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/summary' }),
       { replace: true }
     );
-    // The extensionFile param should be removed from the search string
+    // The extensionFile params should be removed from the search string
     const navArg = mockNavigate.mock.calls[0][0] as { search: string };
-    expect(navArg.search).not.toContain('extensionFile');
+    expect(navArg.search).not.toContain('extensionFileUrl');
+    expect(navArg.search).not.toContain('extensionFileName');
+  });
+
+  it('derives fileName from URL when extensionFileName param is absent', async () => {
+    // Only extensionFileUrl is set; hook derives fileName from URL
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}`
+    );
+    const base64 = btoa('\x00\x01');
+    const mockSendMessage = vi.fn().mockResolvedValue({ ok: true, base64, fileName: TEST_FILE_NAME });
+    globalThis.chrome = makeChrome(mockSendMessage);
+
+    renderHook(() => useExtensionFile());
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'fetchForViewer', fileName: TEST_FILE_NAME })
+    );
+    expect(mockLoadLogParserResult).toHaveBeenCalledTimes(1);
   });
 
   it('skips gunzip and decodes directly when bytes are plain text (server already decompressed)', async () => {
-    const key = 'plain-key-001';
-    mockSearchParams = new URLSearchParams(`extensionFile=${key}`);
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
+    );
     mockIsValidGzipHeader.mockReturnValue(false); // fetch transparently decompressed
 
     const base64 = btoa('plain log text here');
-    globalThis.chrome = makeChromeSession(() =>
-      Promise.resolve({ [key]: { base64, fileName: 'console.log.gz' } })
+    globalThis.chrome = makeChrome(() =>
+      Promise.resolve({ ok: true, base64, fileName: TEST_FILE_NAME })
     );
 
     renderHook(() => useExtensionFile());
@@ -180,9 +204,11 @@ describe('useExtensionFile', () => {
     );
   });
 
-  it('silently swallows errors from session.get', async () => {
-    mockSearchParams = new URLSearchParams('extensionFile=badkey');
-    globalThis.chrome = makeChromeSession(() => Promise.reject(new Error('quota exceeded')));
+  it('silently swallows errors from sendMessage rejection', async () => {
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
+    );
+    globalThis.chrome = makeChrome(() => Promise.reject(new Error('service worker terminated')));
 
     // Should not throw
     renderHook(() => useExtensionFile());
@@ -190,35 +216,14 @@ describe('useExtensionFile', () => {
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
   });
 
-  it('continues to parse and navigate even when session.remove rejects', async () => {
-    // session.remove is best-effort — a rejection must not abort parsing.
-    const key = 'remove-err-key';
-    mockSearchParams = new URLSearchParams(`extensionFile=${key}`);
-    const base64 = btoa('a');
-    globalThis.chrome = makeChromeSession(
-      () => Promise.resolve({ [key]: { base64, fileName: 'test.log.gz' } }),
-      () => Promise.reject(new Error('quota exceeded'))
-    );
-
-    renderHook(() => useExtensionFile());
-    await new Promise((r) => setTimeout(r, 10));
-
-    // Parse and navigate must still have been called
-    expect(mockParseLogFile).toHaveBeenCalledTimes(1);
-    expect(mockLoadLogParserResult).toHaveBeenCalledTimes(1);
-    expect(mockNavigate).toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/summary' }),
-      { replace: true }
-    );
-  });
-
   it('silently swallows errors from gunzipSync', async () => {
-    const key = 'decomp-err-key';
-    mockSearchParams = new URLSearchParams(`extensionFile=${key}`);
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
+    );
     // isValidGzipHeader returns true so we reach gunzipSync
     mockIsValidGzipHeader.mockReturnValue(true);
-    globalThis.chrome = makeChromeSession(() =>
-      Promise.resolve({ [key]: { base64: btoa('\x00'), fileName: 'bad.log.gz' } })
+    globalThis.chrome = makeChrome(() =>
+      Promise.resolve({ ok: true, base64: btoa('\x00'), fileName: 'bad.log.gz' })
     );
     mockGunzipSync.mockImplementation(() => { throw new Error('invalid gzip'); });
 
@@ -228,22 +233,23 @@ describe('useExtensionFile', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('cleanup sets cancelled flag so a slow async path is ignored', async () => {
-    // A hanging session.get promise whose resolution arrives after unmount.
-    let resolveGet!: (v: Record<string, unknown>) => void;
-    const hangingPromise = new Promise<Record<string, unknown>>((res) => { resolveGet = res; });
+  it('cleanup sets cancelled flag so a slow sendMessage response is ignored', async () => {
+    // A hanging sendMessage promise whose resolution arrives after unmount.
+    let resolveSend!: (v: unknown) => void;
+    const hangingPromise = new Promise((res) => { resolveSend = res; });
 
-    const key = 'slow-key';
-    mockSearchParams = new URLSearchParams(`extensionFile=${key}`);
-    globalThis.chrome = makeChromeSession(() => hangingPromise);
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
+    );
+    globalThis.chrome = makeChrome(() => hangingPromise);
 
     const { unmount } = renderHook(() => useExtensionFile());
 
     // Unmount before the promise resolves → effect cleanup runs
     unmount();
 
-    // Now resolve the promise with a valid entry
-    resolveGet({ [key]: { base64: btoa('\x00'), fileName: 'slow.log.gz' } });
+    // Now resolve the promise with a valid response
+    resolveSend({ ok: true, base64: btoa('\x00\x01'), fileName: TEST_FILE_NAME });
     await new Promise((r) => setTimeout(r, 0));
 
     // cancelled was true, so nothing should have been called
