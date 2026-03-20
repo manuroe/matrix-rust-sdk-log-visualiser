@@ -231,7 +231,7 @@ function validateViewerFileUrl(rawUrl: string): string {
   if (!url.pathname.endsWith('.log.gz')) {
     throw new Error('Only .log.gz log URLs are allowed');
   }
-  if (!url.pathname.includes('/api/listing/')) {
+  if (!url.pathname.startsWith('/api/listing/')) {
     throw new Error('URL must be under /api/listing/');
   }
   return url.toString();

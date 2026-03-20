@@ -7,10 +7,7 @@ import { wrapError } from '../utils/errorHandling';
 import type { AppError } from '../utils/errorHandling';
 import ErrorDisplay from '../components/ErrorDisplay';
 import uploadStyles from '../components/FileUpload.module.css';
-
-/** @see useExtensionFile — must match the param name used there. */
-const EXTENSION_FILE_URL_PARAM = 'extensionFileUrl';
-const EXTENSION_FILE_NAME_PARAM = 'extensionFileName';
+import { EXTENSION_FILE_URL_PARAM, EXTENSION_FILE_NAME_PARAM } from '../hooks/useExtensionFile';
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -22,9 +19,20 @@ export function LandingPage() {
   // When opened by the extension, show a loading screen immediately so the
   // user never sees the upload UI while useExtensionFile fetches the log.
   const extensionFileUrl = searchParams.get(EXTENSION_FILE_URL_PARAM);
+  let extensionFileNameFromUrl: string | undefined;
+  if (extensionFileUrl) {
+    try {
+      const parsedUrl = new URL(extensionFileUrl);
+      const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+      extensionFileNameFromUrl = pathSegments[pathSegments.length - 1];
+    } catch {
+      // Fall back to simple split if URL parsing fails.
+      extensionFileNameFromUrl = extensionFileUrl.split('/').pop() ?? undefined;
+    }
+  }
   const extensionFileName =
     searchParams.get(EXTENSION_FILE_NAME_PARAM) ??
-    extensionFileUrl?.split('/').pop() ??
+    extensionFileNameFromUrl ??
     'log file';
 
   if (extensionFileUrl) {

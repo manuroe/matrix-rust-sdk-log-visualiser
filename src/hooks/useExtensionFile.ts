@@ -6,9 +6,9 @@ import { decodeTextBytes, isValidGzipHeader } from '../utils/fileValidator';
 import { useLogStore } from '../stores/logStore';
 
 /** URL search-param key carrying the `.log.gz` file URL set by the extension content script. */
-const EXTENSION_FILE_URL_PARAM = 'extensionFileUrl';
+export const EXTENSION_FILE_URL_PARAM = 'extensionFileUrl';
 /** URL search-param key carrying the plain filename set by the extension content script. */
-const EXTENSION_FILE_NAME_PARAM = 'extensionFileName';
+export const EXTENSION_FILE_NAME_PARAM = 'extensionFileName';
 
 /**
  * Detects when the viewer page is opened by the browser extension's
@@ -35,7 +35,18 @@ export function useExtensionFile(): void {
   const loadLogParserResult = useLogStore((state) => state.loadLogParserResult);
 
   const fileUrl = searchParams.get(EXTENSION_FILE_URL_PARAM);
-  const fileName = searchParams.get(EXTENSION_FILE_NAME_PARAM) ?? fileUrl?.split('/').pop() ?? 'log.gz';
+  let fileNameFromUrl: string | undefined;
+  if (fileUrl) {
+    try {
+      const parsedFileUrl = new URL(fileUrl, window.location.href);
+      const lastSegment = parsedFileUrl.pathname.split('/').filter(Boolean).pop();
+      fileNameFromUrl = lastSegment ?? undefined;
+    } catch {
+      // Fallback to the original split-based behaviour if URL parsing fails.
+      fileNameFromUrl = fileUrl.split('/').pop() ?? undefined;
+    }
+  }
+  const fileName = searchParams.get(EXTENSION_FILE_NAME_PARAM) ?? fileNameFromUrl ?? 'log.gz';
 
   useEffect(() => {
     if (!fileUrl) return;
@@ -64,7 +75,11 @@ export function useExtensionFile(): void {
           return;
         }
 
-        const base64 = fetchResponse.base64 ?? '';
+        const base64 = fetchResponse.base64;
+        if (!base64) {
+          console.error('[useExtensionFile] fetchForViewer returned ok but without base64 content — bailing out');
+          return;
+        }
 
         // Decode base64 → raw bytes. If gzip-compressed, decompress with gunzipSync.
         const binaryStr = atob(base64);

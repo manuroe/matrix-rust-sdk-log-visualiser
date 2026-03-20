@@ -253,7 +253,16 @@ function statusChipClass(code: string): string {
  * the 10 MB session quota.
  */
 function handleOpenInVisualizer(url: string, nameBtn: HTMLButtonElement): void {
-  const fileName = url.split('/').pop() ?? 'log.gz';
+  let fileName = 'log.gz';
+  try {
+    const parsedUrl = new URL(url, window.location.href);
+    const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+    if (pathSegments.length > 0) {
+      fileName = pathSegments[pathSegments.length - 1];
+    }
+  } catch {
+    // Fallback to default fileName if URL parsing fails
+  }
   const viewerUrl = chrome.runtime.getURL(
     `viewer.html#/?extensionFileUrl=${encodeURIComponent(url)}&extensionFileName=${encodeURIComponent(fileName)}`
   );
