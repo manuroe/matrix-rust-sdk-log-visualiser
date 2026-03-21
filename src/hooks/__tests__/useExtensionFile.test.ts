@@ -110,6 +110,26 @@ describe('useExtensionFile', () => {
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
   });
 
+  it('derives fileName using split fallback when URL constructor throws', async () => {
+    // A URL string containing a null byte causes new URL() to throw, exercising
+    // the catch fallback that uses split('/').pop() instead.
+    const invalidUrl = 'https://example.com/logs/\x00bad.log.gz';
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(invalidUrl)}`
+    );
+    const base64 = btoa('\x00\x01');
+    const mockSendMessage = vi.fn().mockResolvedValue({ ok: true, base64, fileName: TEST_FILE_NAME });
+    globalThis.chrome = makeChrome(mockSendMessage);
+
+    renderHook(() => useExtensionFile());
+    await new Promise((r) => setTimeout(r, 10));
+    // The split fallback produces 'bad.log.gz' so sendMessage is called with that name
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'fetchForViewer' })
+    );
+    expect(mockLoadLogParserResult).toHaveBeenCalledTimes(1);
+  });
+
   it('is a no-op when fetchForViewer returns ok: false', async () => {
     mockSearchParams = new URLSearchParams(`extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`);
     globalThis.chrome = makeChrome(() =>
@@ -118,6 +138,22 @@ describe('useExtensionFile', () => {
     renderHook(() => useExtensionFile());
     await new Promise((r) => setTimeout(r, 0));
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
+  });
+
+  it('navigates back to "/" when fetchForViewer returns ok: true but no base64', async () => {
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
+    );
+    globalThis.chrome = makeChrome(() =>
+      Promise.resolve({ ok: true, base64: undefined, fileName: TEST_FILE_NAME })
+    );
+    renderHook(() => useExtensionFile());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockLoadLogParserResult).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/' }),
+      { replace: true }
+    );
   });
 
   it('decompresses gzip bytes, parses, and navigates on the happy path', async () => {
@@ -204,7 +240,7 @@ describe('useExtensionFile', () => {
     );
   });
 
-  it('silently swallows errors from sendMessage rejection', async () => {
+  it('navigates back to "/" on sendMessage rejection', async () => {
     mockSearchParams = new URLSearchParams(
       `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
     );
@@ -214,9 +250,13 @@ describe('useExtensionFile', () => {
     renderHook(() => useExtensionFile());
     await new Promise((r) => setTimeout(r, 0));
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/' }),
+      { replace: true }
+    );
   });
 
-  it('silently swallows errors from gunzipSync', async () => {
+  it('navigates back to "/" on errors from gunzipSync', async () => {
     mockSearchParams = new URLSearchParams(
       `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
     );
@@ -230,7 +270,10 @@ describe('useExtensionFile', () => {
     renderHook(() => useExtensionFile());
     await new Promise((r) => setTimeout(r, 0));
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/' }),
+      { replace: true }
+    );
   });
 
   it('cleanup sets cancelled flag so a slow sendMessage response is ignored', async () => {
@@ -253,6 +296,31 @@ describe('useExtensionFile', () => {
     await new Promise((r) => setTimeout(r, 0));
 
     // cancelled was true, so nothing should have been called
+    expect(mockLoadLogParserResult).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('does not navigate on fetch error if cancelled before sendMessage rejects', async () => {
+    // A hanging sendMessage promise that rejects after unmount — covers the
+    // if (!cancelled) guard in the catch block.
+    let rejectSend!: (err: Error) => void;
+    const hangingPromise = new Promise<never>((_, rej) => { rejectSend = rej; });
+
+    mockSearchParams = new URLSearchParams(
+      `extensionFileUrl=${encodeURIComponent(TEST_FILE_URL)}&extensionFileName=${TEST_FILE_NAME}`
+    );
+    globalThis.chrome = makeChrome(() => hangingPromise);
+
+    const { unmount } = renderHook(() => useExtensionFile());
+
+    // Unmount before the rejection → cancelled = true
+    unmount();
+
+    // Now reject the sendMessage promise
+    rejectSend(new Error('service worker terminated'));
+    await new Promise((r) => setTimeout(r, 0));
+
+    // cancelled was true when catch fired, so navigate should NOT have been called
     expect(mockLoadLogParserResult).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });

@@ -86,6 +86,15 @@ export function useExtensionFile(): void {
         const base64 = fetchResponse.base64;
         if (!base64) {
           console.error('[useExtensionFile] fetchForViewer returned ok but without base64 content — bailing out');
+          // Mirror the !fetchResponse?.ok path: clear extension params so the
+          // landing page falls back to the normal upload UI instead of
+          // remaining stuck on "Loading…".
+          // Note: no cancelled check needed — we already returned at the
+          // `if (cancelled) return;` guard above, so cancelled is false here.
+          const fallbackParams = new URLSearchParams(searchParams);
+          fallbackParams.delete(EXTENSION_FILE_URL_PARAM);
+          fallbackParams.delete(EXTENSION_FILE_NAME_PARAM);
+          void navigate({ pathname: '/', search: fallbackParams.toString() }, { replace: true });
           return;
         }
 
@@ -113,6 +122,17 @@ export function useExtensionFile(): void {
         );
       } catch (err) {
         console.error('[useExtensionFile] error loading log from extension:', err);
+        // Mirror the fetchForViewer failure behavior: clear extension params and
+        // navigate back to the landing page so the user sees the normal upload UI.
+        if (!cancelled) {
+          const fallbackParams = new URLSearchParams(searchParams);
+          fallbackParams.delete(EXTENSION_FILE_URL_PARAM);
+          fallbackParams.delete(EXTENSION_FILE_NAME_PARAM);
+          void navigate(
+            { pathname: '/', search: fallbackParams.toString() },
+            { replace: true }
+          );
+        }
       }
     })();
 
