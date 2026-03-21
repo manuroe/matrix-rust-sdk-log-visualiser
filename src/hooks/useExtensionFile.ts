@@ -62,16 +62,24 @@ export function useExtensionFile(): void {
 
     void (async () => {
       try {
-        const fetchResponse = await chrome.runtime.sendMessage({
+        const fetchResponse = (await chrome.runtime.sendMessage({
           type: 'fetchForViewer',
           url: fileUrl,
           fileName,
-        }) as { ok: boolean; base64?: string; fileName?: string; error?: string } | undefined;
+        })) as { ok: boolean; base64?: string; fileName?: string; error?: string } | undefined;
 
         if (cancelled) return;
 
         if (!fetchResponse?.ok) {
           console.error('[useExtensionFile] fetchForViewer failed:', fetchResponse?.error ?? 'no response');
+          // Clear the extension params so the landing page falls back to the
+          // normal upload UI rather than staying stuck on "Loading…".
+          if (!cancelled) {
+            const fallbackParams = new URLSearchParams(searchParams);
+            fallbackParams.delete(EXTENSION_FILE_URL_PARAM);
+            fallbackParams.delete(EXTENSION_FILE_NAME_PARAM);
+            void navigate({ pathname: '/', search: fallbackParams.toString() }, { replace: true });
+          }
           return;
         }
 

@@ -130,6 +130,10 @@ describe('LandingPage', () => {
   });
 
   it('renders the extension loading screen when extensionFileUrl param is present', () => {
+    // Simulate extension context: chrome.runtime.sendMessage must be available
+    // for the loading-screen guard to activate.
+    (globalThis as Record<string, unknown>).chrome = { runtime: { sendMessage: vi.fn() } };
+
     render(
       <MemoryRouter initialEntries={['/?extensionFileUrl=https%3A%2F%2Fexample.com%2Fapi%2Flisting%2Ffoo.log.gz&extensionFileName=foo.log.gz']}>
         <Routes>
@@ -140,9 +144,13 @@ describe('LandingPage', () => {
 
     expect(screen.getByText(/Loading foo\.log\.gz/i)).toBeInTheDocument();
     expect(screen.queryByTestId('file-upload')).not.toBeInTheDocument();
+
+    delete (globalThis as Record<string, unknown>).chrome;
   });
 
   it('derives the filename from extensionFileUrl pathname when extensionFileName param is absent', () => {
+    (globalThis as Record<string, unknown>).chrome = { runtime: { sendMessage: vi.fn() } };
+
     render(
       <MemoryRouter initialEntries={['/?extensionFileUrl=https%3A%2F%2Fexample.com%2Fapi%2Flisting%2Fderived.log.gz']}>
         <Routes>
@@ -152,5 +160,24 @@ describe('LandingPage', () => {
     );
 
     expect(screen.getByText(/Loading derived\.log\.gz/i)).toBeInTheDocument();
+
+    delete (globalThis as Record<string, unknown>).chrome;
+  });
+
+  it('falls back to the upload UI when extensionFileUrl is present but chrome APIs are unavailable', () => {
+    // Ensure chrome is NOT in globalThis (non-extension context)
+    if ('chrome' in globalThis) delete (globalThis as Record<string, unknown>).chrome;
+
+    render(
+      <MemoryRouter initialEntries={['/?extensionFileUrl=https%3A%2F%2Fexample.com%2Fapi%2Flisting%2Ffoo.log.gz']}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // Should show the normal upload UI, not the loading screen
+    expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('file-upload')).toBeInTheDocument();
   });
 });

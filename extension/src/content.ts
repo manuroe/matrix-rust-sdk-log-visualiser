@@ -8,10 +8,12 @@
  * all rows. Summaries are fetched in reverse order (newest files first) with a
  * concurrency limit of 3 to avoid overloading the server.
  *
- * An "Open in Visualizer" button in the File column (`rs-name-btn`) triggers
- * `fetchAndStore` in the background worker, then opens the bundled viewer page
- * with the file key as a query parameter so `useExtensionFile` can load it
- * automatically.
+ * An "Open in Visualizer" button in the File column (`rs-name-btn`) opens the
+ * bundled viewer page with `extensionFileUrl` and `extensionFileName` query
+ * params. The viewer's `useExtensionFile` hook reads those params and sends a
+ * `fetchForViewer` message to the background service worker, which fetches the
+ * file and returns the base64 payload directly in the message response —
+ * no `chrome.storage.session` is used.
  */
 
 import type { LogSummary } from './summarize';

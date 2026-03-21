@@ -35,7 +35,14 @@ export function LandingPage() {
     extensionFileNameFromUrl ??
     'log file';
 
-  if (extensionFileUrl) {
+  // Only show the loading screen when we are actually inside the extension
+  // context and the sendMessage API is available. Without that guard, a stale
+  // or manually crafted extensionFileUrl param would leave the user stuck on
+  // the loading screen with no way to upload a file.
+  const isExtensionContext =
+    typeof chrome !== 'undefined' && !!chrome.runtime?.sendMessage;
+
+  if (extensionFileUrl && isExtensionContext) {
     return (
       <div className={uploadStyles.dropZone}>
         <div className={uploadStyles.dropZoneContent}>
