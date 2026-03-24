@@ -191,6 +191,15 @@ async function main(): Promise<void> {
   const demoSummary = summarizeLogResult(parseLogFile(demoLogText));
 
   await page.goto(`${BASE_URL}/demo/api/listing/demo/`, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(300);
+
+  // Before extension enhancement
+  await page.evaluate(() => { document.documentElement.removeAttribute('data-rs-theme'); });
+  await shot('extension-before-light');
+  await page.evaluate(() => { document.documentElement.setAttribute('data-rs-theme', 'dark'); });
+  await page.waitForTimeout(300);
+  await shot('extension-before-dark');
 
   // Set up chrome global before the content script runs so chrome.storage and
   // chrome.runtime.sendMessage resolve with the real demo summary instead of
