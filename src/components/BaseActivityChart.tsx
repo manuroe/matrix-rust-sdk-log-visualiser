@@ -40,6 +40,11 @@ interface BaseActivityChartProps<TBucket extends ActivityBucket, TCategory exten
   emptyMessage?: string;
   /** Chart height in pixels */
   height?: number;
+  /** Optional formatter for y-axis tick labels. Defaults to visx's built-in number format.
+   * Use this to display KB/MB/GB labels for byte-valued charts. */
+  yAxisTickFormat?: (value: { valueOf(): number }) => string;
+  /** Left margin in pixels. Increase when y-axis labels are wider than default (e.g. byte labels). Defaults to 50. */
+  marginLeft?: number;
 }
 
 /**
@@ -59,6 +64,8 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
   onResetZoom,
   emptyMessage = 'No data to display',
   height = 120,
+  yAxisTickFormat,
+  marginLeft = 50,
 }: BaseActivityChartProps<TBucket, TCategory>) {
   const { tooltipData, tooltipLeft, tooltipTop, showTooltip, hideTooltip } = useTooltip<TBucket>();
 
@@ -69,7 +76,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
   }, []);
 
   const width = 800;
-  const margin = useMemo(() => ({ top: 10, right: 10, bottom: 30, left: 50 }), []);
+  const margin = useMemo(() => ({ top: 10, right: 10, bottom: 30, left: marginLeft }), [marginLeft]);
   const xMax = width - margin.left - margin.right;
   const yMax = height - margin.top - margin.bottom;
 
@@ -223,6 +230,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
               stroke="#666"
               tickStroke="#666"
               numTicks={4}
+              tickFormat={yAxisTickFormat}
               tickLabelProps={() => ({
                 fill: '#666',
                 fontSize: 10,
