@@ -48,11 +48,27 @@ export interface SyncRequest extends HttpRequest {
  * `HttpActivityChart` to plot request density over time.
  */
 export interface HttpRequestWithTimestamp {
+
   readonly requestId: string;
   readonly status: string;
   readonly timestampUs: TimestampMicros;
   /** Timeout in ms when this is a /sync request; 0 = catch-up, ≥30000 = long-poll. */
   readonly timeout?: number;
+}
+
+/**
+ * An HTTP request entry annotated with the bytes transferred, used by
+ * `BandwidthChart` to plot upload and download volumes over time.
+ *
+ * Each entry corresponds to a single HTTP request. Incomplete requests
+ * (no response received yet) contribute upload bytes only.
+ */
+export interface BandwidthRequestEntry {
+  readonly timestampUs: TimestampMicros;
+  readonly uploadBytes: number;
+  readonly downloadBytes: number;
+  /** Full request URI — used by consumers to filter by path (e.g. hide /media/ uploads). */
+  readonly uri: string;
 }
 
 export interface SentryEvent {
