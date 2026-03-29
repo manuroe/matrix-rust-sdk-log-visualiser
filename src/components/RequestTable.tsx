@@ -268,7 +268,7 @@ export function RequestTable({
     return () => {
       observer.disconnect();
     };
-  }, [timeline.totalWidthPx]);
+  }, []);
 
   /** Handle click on request ID - toggle expansion or open log viewer */
   const handleRequestClick = useCallback((rowKey: number, requestId: string, req?: HttpRequest) => {
