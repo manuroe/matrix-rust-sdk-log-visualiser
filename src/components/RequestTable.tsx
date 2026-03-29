@@ -13,7 +13,8 @@ import type { SearchInputHandle } from './SearchInput';
 import { useKeyboardShortcutContextOptional } from './KeyboardShortcutContext';
 import { metaKey, optionKey } from '../utils/shortcuts';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { getWaterfallPosition, getWaterfallBarWidth, calculateTimelineWidth } from '../utils/timelineUtils';
+import { calculateTimelineWidth } from '../utils/timelineUtils';
+import { buildCompressedTimeline, buildLinearTimeline, formatGapDuration } from '../utils/waterfallGapUtils';
 import { LogDisplayView } from '../views/LogDisplayView';
 import { useScrollSync } from '../hooks/useScrollSync';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
@@ -143,6 +144,8 @@ export function RequestTable({
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [showSyncRequests, setShowSyncRequests] = useState(true);
+  /** When true (default), idle gaps longer than the threshold are collapsed to narrow stripe bands. */
+  const [collapseIdlePeriods, setCollapseIdlePeriods] = useState(true);
 
   const isSyncRequest = (req: HttpRequest): boolean => /\/sync(?:[/?]|$)/i.test(req.uri);
   const displayedRequests = showSyncRequests
@@ -196,27 +199,27 @@ export function RequestTable({
 
   // Calculate timeline scale
   // Find the maximum extent: the latest point where any request bar ends
-  const timeData = displayedRequests
+  const timeData = useMemo(() => displayedRequests
     .map((r) => {
       const sendLine = lineNumberIndex.get(r.sendLineNumber);
       const startTime = microsToMs(sendLine?.timestampUs ?? 0);
       const endTime = startTime + (r.requestDurationMs || 0);
       return { startTime, endTime };
     })
-    .filter((t) => t.startTime > 0);
-  
+    .filter((t) => t.startTime > 0), [displayedRequests, lineNumberIndex]);
+
   const minTime = timeData.length > 0 ? Math.min(...timeData.map(t => t.startTime)) : 0;
   // Use maxExtent to ensure the timeline is wide enough for all bars including their widths
   // Add extra time (in ms) to account for the duration label displayed after the last bar (e.g., "12888ms")
   // 80px worth of label space at the current scale
   const labelPaddingMs = 80 * msPerPixel;
-  const maxExtent = timeData.length > 0 
-    ? Math.max(...timeData.map(t => t.endTime)) + labelPaddingMs 
+  const maxExtent = timeData.length > 0
+    ? Math.max(...timeData.map(t => t.endTime)) + labelPaddingMs
     : 0;
   // totalDuration uses maxExtent so bar positions are correctly proportioned to timeline width
   const totalDuration = Math.max(1, maxExtent - minTime);
 
-  // Calculate timeline width using shared logic
+  // Calculate timeline width using shared logic (used by the linear path below)
   const visibleTimes = displayedRequests
     .slice(0, 20)
     .map((r) => {
@@ -232,6 +235,19 @@ export function RequestTable({
     maxExtent,
     msPerPixel
   );
+
+  /**
+   * Piecewise timeline mapping: compressed when `collapseIdlePeriods` is on
+   * (idle gaps > 5 s are collapsed to 28 px bands), linear otherwise.
+   * All bar position and width calculations read from this single object so
+   * that both modes stay in sync automatically.
+   */
+  const timeline = useMemo(() => {
+    if (collapseIdlePeriods && timeData.length > 1) {
+      return buildCompressedTimeline(timeData, minTime, maxExtent, msPerPixel);
+    }
+    return buildLinearTimeline(minTime, totalDuration, timelineWidth, msPerPixel);
+  }, [collapseIdlePeriods, timeData, minTime, maxExtent, msPerPixel, totalDuration, timelineWidth]);
 
   // Handle resize for layout measurements
   useEffect(() => {
@@ -249,7 +265,7 @@ export function RequestTable({
     return () => {
       observer.disconnect();
     };
-  }, [timelineWidth]);
+  }, [timeline.totalWidthPx]);
 
   /** Handle click on request ID - toggle expansion or open log viewer */
   const handleRequestClick = useCallback((rowKey: number, requestId: string, req?: HttpRequest) => {
@@ -282,7 +298,7 @@ export function RequestTable({
       setTimeout(() => {
         const sendLine = lineNumberIndex.get(req.sendLineNumber);
         const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
-        const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
+        const barLeft = timeline.timeToPixel(reqTime);
         const container = waterfallContainerRef.current;
         if (container) {
           const containerClientWidth = container.clientWidth;
@@ -291,7 +307,7 @@ export function RequestTable({
         }
       }, 0);
     }
-  }, [openLogViewerIds, expandedRows, closeLogViewer, toggleRowExpansion, setActiveRequest, lineNumberIndex, minTime, totalDuration, timelineWidth, msPerPixel]);
+  }, [openLogViewerIds, expandedRows, closeLogViewer, toggleRowExpansion, setActiveRequest, lineNumberIndex, timeline]);
 
   /** Handle mouse enter on a row - highlight both panels */
   const handleRowMouseEnter = (rowKey: number) => {
@@ -316,7 +332,7 @@ export function RequestTable({
     const container = waterfallContainerRef.current;
     const sendLine = lineNumberIndex.get(req.sendLineNumber);
     const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
-    const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
+    const barLeft = timeline.timeToPixel(reqTime);
 
     // Scroll to show the start of the request bar, with some padding (20% of container width)
     const containerClientWidth = container.clientWidth;
@@ -324,7 +340,7 @@ export function RequestTable({
 
     // Use direct scrollLeft assignment (scrollTo with smooth behavior doesn't work reliably)
     container.scrollLeft = Math.max(0, targetScroll);
-  }, [lineNumberIndex, minTime, totalDuration, timelineWidth, msPerPixel]);
+  }, [lineNumberIndex, timeline]);
 
   // Sum upload/download bytes for displayed requests
   const { totalUploadBytes, totalDownloadBytes } = useMemo(() => {
@@ -423,6 +439,15 @@ export function RequestTable({
             Incomplete
           </label>
 
+          <label className="checkbox-compact">
+            <input
+              type="checkbox"
+              checked={collapseIdlePeriods}
+              onChange={(e) => setCollapseIdlePeriods(e.target.checked)}
+            />
+            Collapse idle
+          </label>
+
           <div className="stats-compact">
             <span id="shown-count">{displayedRequests.length}</span> / <span id="total-count">{totalCount}</span>
             {(totalUploadBytes > 0 || totalDownloadBytes > 0) && (
@@ -465,7 +490,7 @@ export function RequestTable({
           </div>
           <div className={styles.timelineHeaderWaterfall}>
             <WaterfallTimeline
-              width={timelineWidth}
+              width={timeline.totalWidthPx}
               cursorContainerRef={waterfallContainerRef}
               cursorOffsetLeft={0}
             />
@@ -528,17 +553,12 @@ export function RequestTable({
 
                 {/* Right panel - waterfall */}
                 <div className={styles.timelineRowsRight} ref={waterfallContainerRef}>
-                  <div style={{ display: 'flex', flexDirection: 'column', width: `${timelineWidth}px` }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', width: `${timeline.totalWidthPx}px`, position: 'relative' }}>
                     {displayedRequests.map((req) => {
                       const sendLine = lineNumberIndex.get(req.sendLineNumber);
                       const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
-                      const barLeft = getWaterfallPosition(reqTime, minTime, totalDuration, timelineWidth, msPerPixel);
-                      const barWidth = getWaterfallBarWidth(
-                        req.requestDurationMs,
-                        totalDuration,
-                        timelineWidth,
-                        msPerPixel
-                      );
+                      const barLeft = timeline.timeToPixel(reqTime);
+                      const barWidth = timeline.durationToPixels(reqTime, reqTime + req.requestDurationMs);
                       const isClientError = !req.status && !!req.clientError;
                       const resolvedIsIncomplete = !req.status && !req.clientError;
                       const resolvedStatus = req.status ? req.status : (req.clientError ?? INCOMPLETE_STATUS_KEY);
@@ -571,7 +591,7 @@ export function RequestTable({
                           onMouseLeave={() => handleRowMouseLeave(rowKey)}
                           onClick={() => handleWaterfallRowClick(req)}
                         >
-                          <div style={{ position: 'relative', overflow: 'visible' }}>
+                          <div style={{ position: 'relative', overflow: 'visible', zIndex: 3 }}>
                             <div
                               className={styles.waterfallItem}
                               style={{
@@ -628,7 +648,7 @@ export function RequestTable({
                                   }
                                   return [segment];
                                 })}
-                                {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timelineWidth)}
+                                {!resolvedIsIncomplete && renderBarOverlay && renderBarOverlay(req, barWidth, msPerPixel, totalDuration, timeline.totalWidthPx)}
                               </div>
                               <span className={styles.waterfallDuration} title={resolvedIsIncomplete ? INCOMPLETE_STATUS_KEY : (retryTooltip ?? resolvedStatus)}>
                                 {resolvedIsIncomplete
@@ -645,6 +665,24 @@ export function RequestTable({
                         </div>
                       );
                     })}
+
+                    {/* Idle gap overlay bands — absolutely positioned full-height stripes */}
+                    {collapseIdlePeriods && timeline.segments
+                      .filter(s => s.type === 'gap')
+                      .map(seg => (
+                        <div
+                          key={seg.startMs}
+                          className={styles.gapOverlay}
+                          style={{ left: `${seg.startPx}px`, width: `${seg.widthPx}px` }}
+                          title={`No HTTP activity for ${formatGapDuration(seg.durationMs)}`}
+                          aria-label={`Idle gap: no HTTP activity for ${formatGapDuration(seg.durationMs)}`}
+                        >
+                          <span className={styles.gapLabel} aria-hidden="true">
+                            {formatGapDuration(seg.durationMs)}
+                          </span>
+                        </div>
+                      ))
+                    }
                   </div>
                 </div>
               </div>
