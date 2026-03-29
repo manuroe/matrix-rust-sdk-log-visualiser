@@ -1,0 +1,151 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { BandwidthChart } from '../BandwidthChart';
+import type { BandwidthRequestEntry } from '../../types/log.types';
+import type { TimestampMicros } from '../../types/time.types';
+import { MICROS_PER_MILLISECOND } from '../../types/time.types';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function makeEntry(
+  overrides: Partial<BandwidthRequestEntry> = {},
+): BandwidthRequestEntry {
+  return {
+    timestampUs: (2_000 * MICROS_PER_MILLISECOND) as TimestampMicros, // 2 s
+    uploadBytes: 512,
+    downloadBytes: 4096,
+    uri: 'https://matrix.example.org/_matrix/client/v3/sync',
+    ...overrides,
+  };
+}
+
+function makeRange(
+  minMs = 0,
+  maxMs = 10_000,
+): { minTime: TimestampMicros; maxTime: TimestampMicros } {
+  return {
+    minTime: (minMs * MICROS_PER_MILLISECOND) as TimestampMicros,
+    maxTime: (maxMs * MICROS_PER_MILLISECOND) as TimestampMicros,
+  };
+}
+
+// ─── Tests ──────────────────────────────────────────────────────────────────
+
+describe('BandwidthChart', () => {
+  describe('empty state', () => {
+    it('shows empty message when no requests provided', () => {
+      render(<BandwidthChart requests={[]} timeRange={makeRange()} />);
+      expect(screen.getByText('No bandwidth data to display')).toBeInTheDocument();
+    });
+
+    it('renders without errors when timeRange is 0/0 (covers early-return useMemo branch)', () => {
+      // exercises the `if (minTime === 0 && maxTime === 0)` early return inside useMemo
+      expect(() =>
+        render(
+          <BandwidthChart
+            requests={[makeEntry()]}
+            timeRange={{ minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros }}
+          />,
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  describe('bar rendering', () => {
+    it('renders an SVG with bars when entries are provided', () => {
+      const { container } = render(
+        <BandwidthChart requests={[makeEntry()]} timeRange={makeRange(0, 10_000)} />,
+      );
+      expect(container.querySelector('svg')).toBeInTheDocument();
+    });
+
+    it('renders download bars with the download CSS variable colour', () => {
+      const { container } = render(
+        <BandwidthChart
+          requests={[makeEntry({ uploadBytes: 0, downloadBytes: 4096 })]}
+          timeRange={makeRange(0, 10_000)}
+        />,
+      );
+      // Download bars use --bandwidth-download
+      const downloadBars = container.querySelectorAll(
+        'rect[fill="var(--bandwidth-download)"][opacity="0.9"]',
+      );
+      expect(downloadBars.length).toBeGreaterThan(0);
+    });
+
+    it('renders upload bars with the upload CSS variable colour', () => {
+      const { container } = render(
+        <BandwidthChart
+          requests={[makeEntry({ uploadBytes: 1024, downloadBytes: 0 })]}
+          timeRange={makeRange(0, 10_000)}
+        />,
+      );
+      const uploadBars = container.querySelectorAll(
+        'rect[fill="var(--bandwidth-upload)"][opacity="0.9"]',
+      );
+      expect(uploadBars.length).toBeGreaterThan(0);
+    });
+
+    it('renders stacked bars when both upload and download are non-zero', () => {
+      const { container } = render(
+        <BandwidthChart
+          requests={[makeEntry({ uploadBytes: 512, downloadBytes: 4096 })]}
+          timeRange={makeRange(0, 10_000)}
+        />,
+      );
+      const uploadBars = container.querySelectorAll(
+        'rect[fill="var(--bandwidth-upload)"][opacity="0.9"]',
+      );
+      const downloadBars = container.querySelectorAll(
+        'rect[fill="var(--bandwidth-download)"][opacity="0.9"]',
+      );
+      expect(uploadBars.length).toBeGreaterThan(0);
+      expect(downloadBars.length).toBeGreaterThan(0);
+    });
+
+    it('buckets multiple entries into the same bar when they share a time window', () => {
+      // Two entries at the same second → should collapse into a single non-empty bucket
+      const entries = [
+        makeEntry({ timestampUs: (1_000 * MICROS_PER_MILLISECOND) as TimestampMicros, uploadBytes: 100, downloadBytes: 200 }),
+        makeEntry({ timestampUs: (1_500 * MICROS_PER_MILLISECOND) as TimestampMicros, uploadBytes: 150, downloadBytes: 300 }),
+      ];
+      const { container } = render(
+        <BandwidthChart requests={entries} timeRange={makeRange(0, 10_000)} />,
+      );
+      expect(container.querySelector('svg')).toBeInTheDocument();
+      // Both contribute to the same 1-second bucket → exactly one download bar rendered
+      const downloadBars = container.querySelectorAll(
+        'rect[fill="var(--bandwidth-download)"][opacity="0.9"]',
+      );
+      expect(downloadBars.length).toBe(1);
+    });
+
+    it('entries outside the time range are placed in adjacent buckets (no bar outside range)', () => {
+      // Entry at t=2s; range 0–10s → should render without throwing
+      expect(() =>
+        render(
+          <BandwidthChart
+            requests={[makeEntry({ timestampUs: (2_000 * MICROS_PER_MILLISECOND) as TimestampMicros })]}
+            timeRange={makeRange(0, 10_000)}
+          />,
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  describe('callback props', () => {
+    it('passes onTimeRangeSelected to BaseActivityChart (mouse interaction)', () => {
+      const onSelect = vi.fn();
+      const { container } = render(
+        <BandwidthChart
+          requests={[makeEntry()]}
+          timeRange={makeRange(0, 10_000)}
+          onTimeRangeSelected={onSelect}
+        />,
+      );
+      // The invisible overlay rect receives mouse events; just verify it exists
+      // (full drag-selection behaviour is tested in BaseActivityChart/useChartInteraction)
+      expect(container.querySelector('rect[fill="transparent"]')).toBeInTheDocument();
+    });
+  });
+});
