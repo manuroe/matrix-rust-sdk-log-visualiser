@@ -156,6 +156,16 @@
   --waterfall-timeout-exceeded: #e65100;
 
   /* -------------------------------------------------------------------------
+     Idle Gap Band Colors
+     Diagonal stripe overlay rendered in place of long periods with no HTTP
+     activity ("Collapse idle" feature in the waterfall views).
+     ------------------------------------------------------------------------- */
+  --gap-stripe-a: rgba(0, 0, 0, 0.025);
+  --gap-stripe-b: rgba(0, 0, 0, 0.055);
+  --gap-border: rgba(0, 0, 0, 0.12);
+  --gap-label-color: #666;
+
+  /* -------------------------------------------------------------------------
      Sync Request Colors
      Distinct colors for /sync request types in the waterfall view.
      ------------------------------------------------------------------------- */
@@ -292,6 +302,12 @@
   --sync-catchup-success: #a3e635;     /* Brighter lime for dark mode visibility */
   --sync-longpoll-success: #94a3b8;    /* Brighter slate for dark mode visibility */
 
+  /* Idle Gap Band Colors */
+  --gap-stripe-a: rgba(255, 255, 255, 0.03);
+  --gap-stripe-b: rgba(255, 255, 255, 0.08);
+  --gap-border: rgba(255, 255, 255, 0.15);
+  --gap-label-color: #707070;
+
   /* HTTP Status Code Colors (dark theme - brighter for visibility) */
   --http-200: #4caf50;
   --http-201: #66bb6a;
@@ -399,6 +415,12 @@
     /* Sync Request Colors */
     --sync-catchup-success: #a3e635;
     --sync-longpoll-success: #94a3b8;
+
+    /* Idle Gap Band Colors */
+    --gap-stripe-a: rgba(255, 255, 255, 0.03);
+    --gap-stripe-b: rgba(255, 255, 255, 0.08);
+    --gap-border: rgba(255, 255, 255, 0.15);
+    --gap-label-color: #707070;
 
     /* HTTP Status Code Colors (dark theme - brighter for visibility) */
     --http-200: #4caf50;

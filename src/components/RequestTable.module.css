@@ -326,3 +326,50 @@
     border-top: 1px solid var(--border-default);
     flex-shrink: 0;
 }
+
+/* -------------------------------------------------------------------------
+   Idle gap overlay band
+   Rendered as an absolutely-positioned full-height stripe column inside the
+   waterfall right panel when "Collapse idle" is enabled.
+   ------------------------------------------------------------------------- */
+.gapOverlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 2;
+    border-left: 1px solid var(--gap-border);
+    border-right: 1px solid var(--gap-border);
+    background: repeating-linear-gradient(
+        45deg,
+        var(--gap-stripe-a),
+        var(--gap-stripe-a) 4px,
+        var(--gap-stripe-b) 4px,
+        var(--gap-stripe-b) 8px
+    );
+    /* overflow: visible so the sticky label can extend beyond the 28px band width */
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.gapLabel {
+    /* sticky keeps the pill in the viewport as the user scrolls down through rows */
+    position: sticky;
+    top: 8px;
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--gap-label-color);
+    white-space: nowrap;
+    background: var(--bg-secondary);
+    padding: 1px 4px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gap-border);
+    line-height: 1.3;
+    user-select: none;
+    z-index: 3;
+    /* override the inherited pointer-events: none from .gapOverlay so
+       hovering the pill triggers the browser title tooltip */
+    pointer-events: auto;
+}

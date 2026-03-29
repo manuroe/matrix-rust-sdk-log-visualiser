@@ -768,6 +768,113 @@ describe('RequestTable', () => {
       expect(filterInput.value).toBe('sync');
     });
   });
+
+  describe('collapse idle periods', () => {
+    it('is checked by default', () => {
+      renderWithRouter(<RequestTable {...createProps()} />);
+      const checkbox = screen.getByRole('checkbox', { name: /collapse idle/i });
+      expect(checkbox).toBeChecked();
+    });
+
+    it('unchecks when clicked (exercises setCollapseIdlePeriods onChange)', () => {
+      renderWithRouter(<RequestTable {...createProps()} />);
+      const checkbox = screen.getByRole('checkbox', { name: /collapse idle/i });
+      fireEvent.click(checkbox);
+      expect(checkbox).not.toBeChecked();
+    });
+
+    it('renders gap overlay label when idle gap exceeds collapse threshold', () => {
+      const BASE_TS = 1_700_000_000_000_000;
+      const req1 = createHttpRequest({ requestId: 'GAP-A', sendLineNumber: 0, responseLineNumber: 1, requestDurationMs: 500 });
+      const req2 = createHttpRequest({ requestId: 'GAP-B', sendLineNumber: 2, responseLineNumber: 3, requestDurationMs: 500 });
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: BASE_TS }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: BASE_TS + 500_000 }),
+        createParsedLogLine({ lineNumber: 2, timestampUs: BASE_TS + 10_000_000 }),
+        createParsedLogLine({ lineNumber: 3, timestampUs: BASE_TS + 10_500_000 }),
+      ];
+      useLogStore.getState().setHttpRequests([req1, req2], rawLines);
+
+      renderWithRouter(<RequestTable {...createProps({ filteredRequests: [req1, req2], totalCount: 2, msPerPixel: 10 })} />);
+
+      // The gap overlay span has a title starting with "No HTTP activity"
+      const gapLabel = document.querySelector('[title^="No HTTP activity"]');
+      expect(gapLabel).toBeInTheDocument();
+    });
+  });
+
+  describe('row click handlers', () => {
+    it('clicking a sticky row fires handleWaterfallRowClick without throwing', () => {
+      const requests = createRequests(1);
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: 1700000000000000 }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: 1700000001000000 }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, rawLines);
+
+      const { container } = renderWithRouter(<RequestTable {...createProps({ filteredRequests: requests, totalCount: 1 })} />);
+
+      const row = container.querySelector('[data-row-id="sticky-1"]');
+      expect(row).toBeInTheDocument();
+      // handleWaterfallRowClick early-returns (no ref) but onClick arrow fn is exercised
+      fireEvent.click(row!);
+    });
+
+    it('clicking a waterfall row fires handleWaterfallRowClick without throwing', () => {
+      const requests = createRequests(1);
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: 1700000000000000 }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: 1700000001000000 }),
+      ];
+      useLogStore.getState().setHttpRequests(requests, rawLines);
+
+      const { container } = renderWithRouter(<RequestTable {...createProps({ filteredRequests: requests, totalCount: 1 })} />);
+
+      const row = container.querySelector('[data-row-id="waterfall-1"]');
+      expect(row).toBeInTheDocument();
+      fireEvent.click(row!);
+    });
+  });
+
+  describe('renderBarOverlay integration', () => {
+    it('invokes renderBarOverlay for complete (non-incomplete) requests', () => {
+      const req = createHttpRequest({ requestId: 'OVERLAY-REQ', status: '200', sendLineNumber: 0, responseLineNumber: 1 });
+      const rawLines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: 1700000000000000 }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: 1700000001000000 }),
+      ];
+      useLogStore.getState().setHttpRequests([req], rawLines);
+
+      const renderBarOverlay = vi.fn().mockReturnValue(<div data-testid="bar-overlay" />);
+      renderWithRouter(<RequestTable {...createProps({ filteredRequests: [req], totalCount: 1, renderBarOverlay })} />);
+
+      expect(renderBarOverlay).toHaveBeenCalled();
+      expect(screen.getByTestId('bar-overlay')).toBeInTheDocument();
+    });
+  });
+
+  describe('log viewer close', () => {
+    it('closes log viewer when onClose is called', async () => {
+      const req = createHttpRequest({ requestId: 'REQ-CLOSE-TEST', sendLineNumber: 10, responseLineNumber: 20 });
+      const rawLines = Array.from({ length: 25 }, (_, i) =>
+        createParsedLogLine({ lineNumber: i, timestampUs: 1700000000000000 + i * 1000000 })
+      );
+      useLogStore.getState().setHttpRequests([req], rawLines);
+
+      renderWithRouter(<RequestTable {...createProps({ filteredRequests: [req], totalCount: 1 })} />);
+
+      act(() => {
+        useLogStore.setState({
+          openLogViewerIds: new Set<number>([10]),
+          expandedRows: new Set<number>([10]),
+        });
+      });
+
+      expect(await screen.findByTestId('log-display-view')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Close'));
+      expect(screen.queryByTestId('log-display-view')).not.toBeInTheDocument();
+    });
+  });
 });
 
 // Helper to create requests for tests
