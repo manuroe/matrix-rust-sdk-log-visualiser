@@ -1264,7 +1264,8 @@ describe('SummaryView', () => {
       expect(screen.getByText('1')).toBeInTheDocument();
     });
 
-    it('displays the correct line count after a global time filter is applied', () => {      // 10 lines at 1 s each; filter to the middle 4 (lines 3–6)
+    it('displays the correct line count after a global time filter is applied', () => {
+      // 10 lines at 1 s each; filter to the middle 4 (lines 3–6)
       const BASE_TF = 1_712_000_000_000_000 as TimestampMicros;
       const lines = Array.from({ length: 10 }, (_, i) =>
         createParsedLogLine({ lineNumber: i, timestampUs: (BASE_TF + i * 1_000_000) as TimestampMicros })

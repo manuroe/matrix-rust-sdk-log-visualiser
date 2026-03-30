@@ -207,10 +207,16 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
     }
 
     const svg = svgRef.current;
-    if (!svg) return;
+    if (!svg) {
+      hideTooltip();
+      return;
+    }
 
     const bucket = getBucketAtExternalTime(externalCursorTime);
-    if (!bucket) return;
+    if (!bucket) {
+      hideTooltip();
+      return;
+    }
 
     // Convert the chart-space coordinate to viewport coordinates using the
     // SVG's actual screen transform. This matches the browser's rendering even
