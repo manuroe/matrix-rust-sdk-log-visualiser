@@ -336,22 +336,33 @@ export function computeSummaryStats(
   const buildChartEntries = (req: HttpRequest): HttpRequestWithTimestamp[] => {
     const timeout = timeoutByRequestId.get(req.requestId);
     const sendTimestampUs = getLineTimestampUs(req.sendLineNumber);
-    const attemptStartTimestampsUs = (req.attemptTimestampsUs ?? []).filter(
-      (timestampUs): timestampUs is TimestampMicros => timestampUs > 0,
-    );
+    const attemptStartTimestampsUs = req.attemptTimestampsUs ?? [];
     const finalStatus = req.clientError ? CLIENT_ERROR_CHART_STATUS : (req.status ?? '');
 
     if ((req.numAttempts ?? 1) > 1 && attemptStartTimestampsUs.length > 1) {
-      return attemptStartTimestampsUs
-        .map((timestampUs, index) => ({
-          requestId: req.requestId,
-          status: mapAttemptOutcomeToChartStatus(
-            req.attemptOutcomes?.[index] ?? (index === attemptStartTimestampsUs.length - 1 ? finalStatus : undefined),
-          ),
-          timestampUs,
-          ...(timeout !== undefined && { timeout }),
-        }))
-        .filter((entry) => isTimestampInRange(entry.timestampUs));
+      // Preserve alignment between attempt timestamps and outcomes by operating on
+      // original indices and skipping invalid timestamps without reindexing.
+      const validAttemptIndices = attemptStartTimestampsUs
+        .map((timestampUs, index) => (timestampUs > 0 ? index : -1))
+        .filter((index) => index >= 0);
+
+      if (validAttemptIndices.length > 1) {
+        const lastValidIndex = validAttemptIndices[validAttemptIndices.length - 1];
+        return validAttemptIndices
+          .map((attemptIndex) => {
+            const timestampUs = attemptStartTimestampsUs[attemptIndex] as TimestampMicros;
+            return {
+              requestId: req.requestId,
+              status: mapAttemptOutcomeToChartStatus(
+                req.attemptOutcomes?.[attemptIndex] ??
+                  (attemptIndex === lastValidIndex ? finalStatus : undefined),
+              ),
+              timestampUs,
+              ...(timeout !== undefined && { timeout }),
+            };
+          })
+          .filter((entry) => isTimestampInRange(entry.timestampUs));
+      }
     }
 
     if (!sendTimestampUs || !isTimestampInRange(sendTimestampUs)) {
@@ -393,8 +404,11 @@ export function computeSummaryStats(
   }
 
   // ── HTTP requests with bandwidth data (for BandwidthChart) ───────────────
-  // Mirrors the same timestamp logic used for httpRequestsWithTimestamps but
-  // captures requestSize / responseSize instead of status.
+  // Uses completion-based timestamps (responseLineNumber) for finished
+  // requests, falling back to sendLineNumber for in‑flight ones, and captures
+  // requestSize / responseSize instead of status. Note this differs from the
+  // start‑based HTTP activity chart, so cross‑chart alignment uses different
+  // reference points (start vs. end of the transfer).
   const httpRequestsWithBandwidth: BandwidthRequestEntry[] = [];
 
   for (const req of allHttpRequests) {
