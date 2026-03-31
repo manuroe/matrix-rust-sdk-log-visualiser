@@ -24,6 +24,7 @@ import { getHttpStatusColor } from '../utils/httpStatusColors';
 import { buildAttemptSegments, buildRetryTooltip, computeHasSegments } from '../utils/requestBarUtils';
 import { INCOMPLETE_STATUS_KEY } from '../utils/statusCodeUtils';
 import type { HttpRequest } from '../types/log.types';
+import { RowTimeAction } from './RowTimeAction';
 import styles from './RequestTable.module.css';
 
 
@@ -521,6 +522,10 @@ export function RequestTable({
                       onClick={() => handleWaterfallRowClick(req)}
                     >
                       <div className={styles.requestRowSticky}>
+                        {/* Leading actions column */}
+                        <RowTimeAction
+                          timestampUs={lineNumberIndex.get(req.sendLineNumber)?.timestampUs ?? 0}
+                        />
                         {columns.map((col, i) => {
                           // First column is clickable request ID
                           if (i === 0) {
@@ -548,6 +553,7 @@ export function RequestTable({
                             </div>
                           );
                         })}
+
                       </div>
                     </div>
                     );
