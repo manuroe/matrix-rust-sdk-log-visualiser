@@ -152,7 +152,10 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     const line = lines[i];
 
     // Empty lines terminate a multi-line block; nothing to display or accumulate.
+    // Reset lastEntry so that a non-timestamped line after a blank line is not
+    // folded into the previous entry across the blank-line boundary.
     if (!line.trim()) {
+      lastEntry = null;
       continue;
     }
 

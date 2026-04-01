@@ -241,13 +241,15 @@
     /* Align continuation text with .logLineText: sum of the three
        fixed columns (number 60px + timestamp 140px + level 60px = 260px). */
     padding-left: 260px;
-    /* Preserve leading whitespace / indentation in continuation lines */
-    white-space: pre;
+    /* In wrap mode use pre-wrap so indentation is preserved and long lines still
+       wrap. The nowrap override below switches to pre so content scrolls instead. */
+    white-space: pre-wrap;
     overflow: hidden;
 }
 
-/* In nowrap mode let the continuation line scroll horizontally with the row */
+/* In nowrap mode: keep continuation text on one line and let it scroll. */
 .nowrap .logLineContinuation {
+    white-space: pre;
     overflow: visible;
 }
 

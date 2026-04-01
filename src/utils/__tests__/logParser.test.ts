@@ -305,6 +305,33 @@ describe('logParser', () => {
         // The real INFO entry is parsed correctly.
         expect(result.rawLogLines[1].level).toBe('INFO');
       });
+
+      it('does not fold continuation lines across a blank-line boundary', () => {
+        // A blank line between the ERROR and a non-timestamped line must prevent
+        // the latter from being folded into the ERROR entry.
+        const content = [
+          '2026-04-01T09:00:00.000000Z ERROR first entry first line',
+          '    continuation of first entry',
+          '',
+          '    this line is after a blank line and must NOT be a continuation',
+          '2026-04-01T09:00:01.000000Z INFO second entry',
+        ].join('\n');
+
+        const result = parseAllHttpRequests(content);
+
+        // The ERROR entry should only have 1 continuation line (not 2)
+        const errorEntry = result.rawLogLines[0];
+        expect(errorEntry.level).toBe('ERROR');
+        expect(errorEntry.continuationLines).toHaveLength(1);
+        expect(errorEntry.continuationLines[0]).toContain('continuation of first entry');
+
+        // The post-blank non-timestamped line becomes a standalone UNKNOWN entry
+        expect(result.rawLogLines[1].level).toBe('UNKNOWN');
+        expect(result.rawLogLines[1].rawText).toContain('this line is after a blank line');
+
+        // The INFO line is a normal third entry
+        expect(result.rawLogLines[2].level).toBe('INFO');
+      });
     });
 
     describe('duration parsing', () => {
