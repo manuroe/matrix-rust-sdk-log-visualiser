@@ -1466,5 +1466,41 @@ describe('SummaryView', () => {
       expect(checkbox).toBeChecked();
     });
   });
+
+  describe('Media toggle', () => {
+    const BASE_MEDIA = 1_722_000_000_000_000 as TimestampMicros;
+
+    beforeEach(() => {
+      const lines = [
+        createParsedLogLine({ lineNumber: 0, timestampUs: BASE_MEDIA }),
+        createParsedLogLine({ lineNumber: 1, timestampUs: (BASE_MEDIA + 1_000_000) as TimestampMicros }),
+      ];
+      const req = createHttpRequest({
+        requestId: 'MEDIA-1',
+        uri: 'https://example.org/_matrix/media/v3/upload',
+        status: '200',
+        sendLineNumber: 0,
+        responseLineNumber: 1,
+        attemptTimestampsUs: [BASE_MEDIA],
+      });
+      useLogStore.getState().setHttpRequests([req], lines);
+    });
+
+    it('renders the "Media" checkbox checked by default', () => {
+      renderSummaryView();
+      const checkbox = screen.getByRole('checkbox', { name: /media/i });
+      expect(checkbox).toBeInTheDocument();
+      expect(checkbox).toBeChecked();
+    });
+
+    it('toggles "Media" checkbox on and off', () => {
+      renderSummaryView();
+      const checkbox = screen.getByRole('checkbox', { name: /media/i });
+      act(() => { fireEvent.click(checkbox); });
+      expect(checkbox).not.toBeChecked();
+      act(() => { fireEvent.click(checkbox); });
+      expect(checkbox).toBeChecked();
+    });
+  });
 });
 
