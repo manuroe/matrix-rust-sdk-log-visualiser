@@ -235,6 +235,22 @@
     overflow: hidden;
 }
 
+.logLineContinuation {
+    /* Forces a new row within the flex row, spanning the full width */
+    flex: 0 0 100%;
+    /* Align continuation text with .logLineText: sum of the three
+       fixed columns (number 60px + timestamp 140px + level 60px = 260px). */
+    padding-left: 260px;
+    /* Preserve leading whitespace / indentation in continuation lines */
+    white-space: pre;
+    overflow: hidden;
+}
+
+/* In nowrap mode let the continuation line scroll horizontally with the row */
+.nowrap .logLineContinuation {
+    overflow: visible;
+}
+
 .sourceLink {
     color: var(--color-primary);
     text-decoration: underline;

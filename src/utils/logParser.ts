@@ -13,6 +13,13 @@ import { INCOMPLETE_STATUS_KEY } from './statusCodeUtils';
  */
 type HttpRequestRecord = { -readonly [K in keyof HttpRequest]?: HttpRequest[K] };
 
+/**
+ * Mutable view of a `ParsedLogLine` used only during the parsing phase to
+ * accumulate continuation lines and update `rawText` in place. Cast to the
+ * sealed `ParsedLogLine` when pushed to the output array.
+ */
+type MutableParsedLogLine = { -readonly [K in keyof ParsedLogLine]: K extends 'continuationLines' ? string[] : ParsedLogLine[K] };
+
 // Regex patterns for parsing HTTP requests - generic (all URIs)
 // request_size= is optional: some SDK log lines (e.g. API error responses) omit it from the span.
 const HTTP_RESP_RE = /send\{request_id="(?<id>[^"]+)"\s+method=(?<method>\S+)\s+uri="(?<uri>[^"]+)"(?:\s+request_size="(?<req_size>[^"]+)")?\s+status=(?<status>\S+)\s+response_size="(?<resp_size>[^"]+)"\s+request_duration=(?<duration_val>[0-9.]+)(?<duration_unit>ms|s)/;
@@ -65,6 +72,20 @@ function extractSourceLocation(line: string): { filePath?: string; sourceLineNum
     };
   }
   return {};
+}
+
+/**
+ * Returns true when the line begins with an ISO 8601 timestamp
+ * (`YYYY-MM-DDTHH:MM:SS`), meaning it is the start of a new log entry.
+ * Lines that lack this prefix are continuation lines that belong to the
+ * previous log entry (e.g. multi-line Rust error values).
+ *
+ * @example
+ * lineStartsWithISOTimestamp('2026-04-01T09:18:52.057456Z ERROR foo: bar'); // true
+ * lineStartsWithISOTimestamp('    SomeError { status: 404 }');               // false
+ */
+function lineStartsWithISOTimestamp(line: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(line);
 }
 
 /**
@@ -123,51 +144,93 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
   const rawLogLines: ParsedLogLine[] = [];
   const sentryEvents: SentryEvent[] = [];
   let linesWithTimestamps = 0;
+  // Counts all non-empty physical lines (including continuation lines without
+  // an ISO timestamp) so the timestamp-percentage validation below can detect
+  // files that are not rageshake logs even when they have no timestamp-bearing lines.
+  let totalNonEmptyLines = 0;
+  // Mutable reference to the last pushed entry, used to fold continuation
+  // lines (lines without a leading ISO timestamp) into the parent record.
+  let lastEntry: MutableParsedLogLine | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
-    // Parse every line for the raw log view
-    if (line.trim()) {
-      const isoTimestamp = extractISOTimestamp(line);
-      const level = extractLogLevel(line);
-      const timestampUs = parseTimestampMicros(isoTimestamp);
-      const displayTime = formatDisplayTime(isoTimestamp);
-      const strippedMessage = stripMessagePrefix(line);
-      const { filePath, sourceLineNumber } = extractSourceLocation(line);
-      
-      if (isoTimestamp) {
-        linesWithTimestamps++;
-      }
-      
-      rawLogLines.push({
-        lineNumber: i + 1,
-        rawText: line,
-        isoTimestamp,
-        timestampUs,
-        displayTime,
-        level,
-        message: line,
-        strippedMessage,
-        filePath,
-        sourceLineNumber,
-      });
 
-      // Detect Sentry events
-      if (line.includes(SENTRY_ANDROID_STR)) {
-        sentryEvents.push({ platform: 'android', lineNumber: i + 1, message: line });
+    // Empty lines terminate a multi-line block; nothing to display or accumulate.
+    if (!line.trim()) {
+      continue;
+    }
+
+    totalNonEmptyLines++;
+
+    // Continuation line: non-empty but no leading ISO timestamp → belongs to
+    // the previous log entry (e.g. the indented body of a multi-line Rust error).
+    if (!lineStartsWithISOTimestamp(line)) {
+      if (lastEntry !== null) {
+        lastEntry.continuationLines.push(line);
+        // Extend rawText so search queries can match content in continuation lines.
+        lastEntry.rawText = lastEntry.rawText + '\n' + line;
       } else {
-        const iosMatch = line.match(SENTRY_IOS_RE);
-        if (iosMatch) {
-          const sentryId = iosMatch[1];
-          sentryEvents.push({
-            platform: 'ios',
-            lineNumber: i + 1,
-            message: line,
-            sentryId,
-            sentryUrl: `${SENTRY_URL_BASE}${sentryId}`,
-          });
-        }
+        // Orphaned continuation line: appears before any timestamped entry (e.g.
+        // a malformed log that starts mid-message). Emit it as a standalone UNKNOWN
+        // entry so the content is visible in the log view rather than silently lost.
+        const orphan: MutableParsedLogLine = {
+          lineNumber: i + 1,
+          rawText: line,
+          isoTimestamp: '' as ISODateTimeString,
+          timestampUs: 0 as TimestampMicros,
+          displayTime: '',
+          level: 'UNKNOWN',
+          message: line,
+          strippedMessage: line,
+          continuationLines: [],
+        };
+        rawLogLines.push(orphan as ParsedLogLine);
+        lastEntry = orphan;
+      }
+      // Continuation lines never contain HTTP span patterns; skip HTTP parsing.
+      continue;
+    }
+
+    // === New log entry (line has a leading ISO timestamp) ===
+    const isoTimestamp = extractISOTimestamp(line);
+    const level = extractLogLevel(line);
+    const timestampUs = parseTimestampMicros(isoTimestamp);
+    const displayTime = formatDisplayTime(isoTimestamp);
+    const strippedMessage = stripMessagePrefix(line);
+    const { filePath, sourceLineNumber } = extractSourceLocation(line);
+
+    linesWithTimestamps++;
+
+    const entry: MutableParsedLogLine = {
+      lineNumber: i + 1,
+      rawText: line,
+      isoTimestamp,
+      timestampUs,
+      displayTime,
+      level,
+      message: line,
+      strippedMessage,
+      filePath,
+      sourceLineNumber,
+      continuationLines: [],
+    };
+    rawLogLines.push(entry as ParsedLogLine);
+    lastEntry = entry;
+
+    // Detect Sentry events
+    if (line.includes(SENTRY_ANDROID_STR)) {
+      sentryEvents.push({ platform: 'android', lineNumber: i + 1, message: line });
+    } else {
+      const iosMatch = line.match(SENTRY_IOS_RE);
+      if (iosMatch) {
+        const sentryId = iosMatch[1];
+        sentryEvents.push({
+          platform: 'ios',
+          lineNumber: i + 1,
+          message: line,
+          sentryId,
+          sentryUrl: `${SENTRY_URL_BASE}${sentryId}`,
+        });
       }
     }
 
@@ -431,8 +494,8 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
   }
 
   // Validate that we found at least some timestamps
-  const timestampPercentage = rawLogLines.length > 0 ? (linesWithTimestamps / rawLogLines.length) * 100 : 0;
-  if (rawLogLines.length > 100 && timestampPercentage < 10) {
+  const timestampPercentage = totalNonEmptyLines > 0 ? (linesWithTimestamps / totalNonEmptyLines) * 100 : 0;
+  if (totalNonEmptyLines > 100 && timestampPercentage < 10) {
     throw new ParsingError(
       'Log file appears to be invalid. Please ensure this is a valid rageshake log file.',
       'error'
