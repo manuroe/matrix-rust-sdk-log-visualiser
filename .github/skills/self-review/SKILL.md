@@ -10,7 +10,7 @@ Run this skill before creating any PR. It walks the diff against the known Copil
 comment patterns in [PATTERNS.md](./PATTERNS.md) to catch issues before review.
 
 ## When to Use
-- Before calling the `create-pr` skill (it's the Step 0 gate)
+- As required by the `create-pr` skill's Step 0 gate
 - When asked to "self-review", "run pre-PR review", or "check for review issues"
 
 ## Procedure
