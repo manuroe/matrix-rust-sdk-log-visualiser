@@ -3,9 +3,10 @@ import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_SECOND, MICROS_PER_MILLISECOND } from '../types/time.types';
 import { BaseActivityChart } from './BaseActivityChart';
 import { formatBytes } from '../utils/sizeUtils';
-import type { BandwidthRequestEntry } from '../types/log.types';
+import type { BandwidthRequestEntry, BandwidthRequestSpan } from '../types/log.types';
 import { renderBandwidthTooltip, type BandwidthBucket } from './BandwidthChartTooltip';
 import type { SelectionRange } from '../hooks/useChartInteraction';
+import { BandwidthConcurrencyChart } from './BandwidthConcurrencyChart';
 
 /**
  * Upload category key for the bandwidth stacked bar chart.
@@ -38,6 +39,10 @@ const CATEGORIES: BandwidthCategory[] = [DOWNLOAD_KEY, UPLOAD_KEY];
 interface BandwidthChartProps {
   /** Bandwidth data points to chart, one per HTTP request. */
   requests: readonly BandwidthRequestEntry[];
+  /** Request spans used by in-flight mode to build step-function stacked areas. */
+  bandwidthRequestSpans?: readonly BandwidthRequestSpan[];
+  /** Completed = start-based bars, concurrent = in-flight stacked areas. */
+  displayMode?: 'completed' | 'concurrent';
   /**
    * Time range for the chart — should match the sibling activity charts
    * (LogActivityChart, HttpActivityChart) so that all three are aligned.
@@ -78,6 +83,8 @@ interface BandwidthChartProps {
  */
 export function BandwidthChart({
   requests,
+  bandwidthRequestSpans,
+  displayMode = 'completed',
   timeRange,
   onTimeRangeSelected,
   onResetZoom,
@@ -92,6 +99,16 @@ export function BandwidthChart({
   }, []);
 
   const chartData = useMemo(() => {
+    // In concurrent mode the bandwidth histogram is not rendered; skip expensive bucketing.
+    if (displayMode === 'concurrent') {
+      return {
+        buckets: [] as BandwidthBucket[],
+        maxCount: 0,
+        minTime: timeRange.minTime,
+        maxTime: timeRange.maxTime,
+      };
+    }
+
     const { minTime, maxTime } = timeRange;
 
     if (minTime === 0 && maxTime === 0) {
@@ -140,7 +157,7 @@ export function BandwidthChart({
     const dataBuckets = Array.from(bucketMap.values()).sort((a, b) => a.timestamp - b.timestamp);
     const maxCount = Math.max(...dataBuckets.map((b) => b.total), 1);
     return { buckets: dataBuckets, maxCount, minTime, maxTime };
-  }, [requests, timeRange, formatTime]);
+  }, [displayMode, requests, timeRange, formatTime]);
 
   const getCategoryColor = useCallback(
     (category: BandwidthCategory): string =>
@@ -164,6 +181,21 @@ export function BandwidthChart({
     (value: { valueOf(): number }): string => formatBytes(value.valueOf()),
     [],
   );
+
+  if (displayMode === 'concurrent') {
+    return (
+      <BandwidthConcurrencyChart
+        bandwidthRequestSpans={bandwidthRequestSpans ?? []}
+        timeRange={timeRange}
+        onTimeRangeSelected={onTimeRangeSelected}
+        onResetZoom={onResetZoom}
+        externalCursorTime={externalCursorTime}
+        externalSelection={externalSelection}
+        onCursorMove={onCursorMove}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+  }
 
   if (requests.length === 0) {
     return (
