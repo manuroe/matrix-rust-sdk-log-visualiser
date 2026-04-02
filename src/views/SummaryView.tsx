@@ -500,8 +500,8 @@ export function SummaryView() {
             {stats.httpRequestsWithTimestamps.length > 0 && (
               <>
                 <h3>
-                  Requests: {stats.httpRequestCount}
-                  {stats.incompleteRequestCount > 0 ? ` (Incomplete: ${stats.incompleteRequestCount})` : ''}
+                  Requests (total): {stats.httpRequestCount}
+                  {stats.incompleteRequestCount > 0 ? ` (Incomplete, total: ${stats.incompleteRequestCount})` : ''}
                 </h3>
                 <div className={styles.activityChartContainer}>
                   <HttpActivityChart
@@ -522,7 +522,7 @@ export function SummaryView() {
             {stats.httpRequestsWithBandwidth.length > 0 && (
               <>
                 <h3>
-                  Bandwidth: ↑ {formatBytes(stats.totalUploadBytes)} / ↓ {formatBytes(stats.totalDownloadBytes)}
+                  Overall bandwidth: ↑ {formatBytes(stats.totalUploadBytes)} / ↓ {formatBytes(stats.totalDownloadBytes)}
                 </h3>
                 <div className={styles.activityChartContainer}>
                   <BandwidthChart

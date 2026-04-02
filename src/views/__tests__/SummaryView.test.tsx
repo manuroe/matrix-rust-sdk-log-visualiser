@@ -898,8 +898,8 @@ describe('SummaryView', () => {
       useLogStore.getState().setHttpRequests([incompleteReq], lines);
       renderSummaryView();
 
-      // The Requests sub-header should show "Incomplete: 1"
-      expect(screen.getByText(/Incomplete: 1/)).toBeInTheDocument();
+      // The Requests sub-header should show "Incomplete, total: 1"
+      expect(screen.getByText(/Incomplete, total: 1/)).toBeInTheDocument();
     });
 
     it('aggregates upload/download bytes across duplicate request IDs and skips requests with missing timestamps', () => {
@@ -960,8 +960,8 @@ describe('SummaryView', () => {
 
       // Phase 1 is start-based, so requests with a valid send timestamp still count
       // even when their response timestamp is missing.
-      expect(screen.getByText(/Requests: 4.*Incomplete: 1/)).toBeInTheDocument();
-      expect(screen.getByText(/Bandwidth: ↑ 1.4 KB \/ ↓ 1.6 KB/)).toBeInTheDocument();
+      expect(screen.getByText(/Requests \(total\): 4.*Incomplete, total: 1/)).toBeInTheDocument();
+      expect(screen.getByText(/Overall bandwidth: ↑ 1.4 KB \/ ↓ 1.6 KB/)).toBeInTheDocument();
     });
   });
 
