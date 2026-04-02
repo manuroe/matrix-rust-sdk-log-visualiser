@@ -140,9 +140,8 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
   const rawLogLines: ParsedLogLine[] = [];
   const sentryEvents: SentryEvent[] = [];
   let linesWithTimestamps = 0;
-  // Counts all non-empty physical lines (including continuation lines without
-  // an ISO timestamp) so the timestamp-percentage validation below can detect
-  // files that are not rageshake logs even when they have no timestamp-bearing lines.
+  // Counts non-empty physical lines so the file-size gate below can fire even
+  // when all physical lines are continuation lines folded into one UNKNOWN entry.
   let totalNonEmptyLines = 0;
   // Mutable reference to the last pushed entry, used to fold continuation
   // lines (lines without a leading ISO timestamp) into the parent record.
@@ -494,8 +493,14 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
     }
   }
 
-  // Validate that we found at least some timestamps
-  const timestampPercentage = totalNonEmptyLines > 0 ? (linesWithTimestamps / totalNonEmptyLines) * 100 : 0;
+  // Validate that we found at least some timestamps.
+  // Gate on physical file size (totalNonEmptyLines) so short test snippets aren't
+  // rejected. Use logical entry count (rawLogLines.length) as the ratio denominator
+  // instead of physical lines — this prevents a valid log dominated by large
+  // multi-line entries from being wrongly rejected because continuation lines inflate
+  // the denominator and dilute the apparent timestamp density.
+  const logicalEntryCount = rawLogLines.length;
+  const timestampPercentage = logicalEntryCount > 0 ? (linesWithTimestamps / logicalEntryCount) * 100 : 0;
   if (totalNonEmptyLines > 100 && timestampPercentage < 10) {
     throw new ParsingError(
       'Log file appears to be invalid. Please ensure this is a valid rageshake log file.',

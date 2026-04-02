@@ -1491,7 +1491,8 @@ describe('LogDisplayView multi-line (continuation) log entries', () => {
         createParsedLogLine({
           lineNumber: 1,
           rawText: '2024-01-01T10:00:00.000000Z ERROR first line\n  second line\n  third line',
-          message: 'ERROR first line',
+          isoTimestamp: '2024-01-01T10:00:00.000000Z',
+          message: '2024-01-01T10:00:00.000000Z ERROR first line',
           strippedMessage: 'first line',
           level: 'ERROR',
           continuationLines: ['  second line', '  third line'],
@@ -1536,7 +1537,8 @@ describe('LogDisplayView multi-line (continuation) log entries', () => {
         createParsedLogLine({
           lineNumber: 1,
           rawText: `2024-01-01T10:00:00.000000Z ERROR first line\n  ${continuationOnlyText}`,
-          message: 'ERROR first line',
+          isoTimestamp: '2024-01-01T10:00:00.000000Z',
+          message: `2024-01-01T10:00:00.000000Z ERROR first line`,
           strippedMessage: 'first line',
           level: 'ERROR',
           continuationLines: [`  ${continuationOnlyText}`],
@@ -1565,7 +1567,8 @@ describe('LogDisplayView multi-line (continuation) log entries', () => {
         createParsedLogLine({
           lineNumber: 1,
           rawText: `2024-01-01T10:00:00.000000Z ERROR first line\n  ${continuationOnlyTerm}`,
-          message: 'ERROR first line',
+          isoTimestamp: '2024-01-01T10:00:00.000000Z',
+          message: `2024-01-01T10:00:00.000000Z ERROR first line`,
           strippedMessage: 'first line',
           level: 'ERROR',
           continuationLines: [`  ${continuationOnlyTerm}`],
@@ -1573,7 +1576,8 @@ describe('LogDisplayView multi-line (continuation) log entries', () => {
         createParsedLogLine({
           lineNumber: 2,
           rawText: '2024-01-01T10:00:01.000000Z INFO unrelated',
-          message: 'unrelated',
+          isoTimestamp: '2024-01-01T10:00:01.000000Z',
+          message: '2024-01-01T10:00:01.000000Z INFO unrelated',
           strippedMessage: 'unrelated',
           continuationLines: [],
         }),

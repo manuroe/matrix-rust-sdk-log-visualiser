@@ -535,6 +535,24 @@ describe('logParser', () => {
         expect(() => parseAllHttpRequests(noTimestamps)).toThrow(ParsingError);
       });
 
+      it('accepts a valid log dominated by long multi-line stack traces', () => {
+        // A log with a few timestamped entries each followed by many continuation
+        // lines (e.g. a Rust error with a 300-line stack trace). The continuation
+        // lines must not inflate the denominator and cause a false rejection.
+        const header = '2026-01-01T00:00:00.000000Z ERROR matrix-rust-sdk error occurred';
+        const continuationLines = Array(300).fill('    at some::module::function (src/lib.rs:42)');
+        const block = [header, ...continuationLines].join('\n');
+
+        // Two such blocks = 602 physical lines, but only 2 logical entries.
+        const content = [block, block].join('\n');
+
+        const result = parseAllHttpRequests(content);
+        expect(result.rawLogLines).toHaveLength(2);
+        // Each entry must have its 300 continuation lines.
+        expect(result.rawLogLines[0].continuationLines).toHaveLength(300);
+        expect(result.rawLogLines[1].continuationLines).toHaveLength(300);
+      });
+
       it('accepts file with mostly valid timestamps', () => {
         const lines = [
           ...Array(50).fill('no timestamp line'),
