@@ -1,6 +1,6 @@
 # Self-Review Pattern Library
 
-Recurring Copilot review comment categories observed across PRs #24–57 in this repo.
+Recurring Copilot review comment categories observed across PRs #24–58 in this repo.
 Consult this file during the self-review pass before creating any PR.
 
 ---
@@ -298,7 +298,7 @@ Consult this file during the self-review pass before creating any PR.
 
 **What to look for**:
 - Sequential dependencies: if step N uses an artifact (e.g. `pr-body.md`, a built file, a config), confirm that artifact exists at the point step N runs — not only in a later step.
-- Command / tool names: every shell command (`grep_search`, `npx foo`, etc.) referenced in prose must be a real, executable command. Verify with `which <cmd>` or `git grep <cmd>` in the repo scripts if unsure.
+- Command / tool names: every shell command (for example, `grep` or `npx foo`) referenced in prose must be a real, executable command; avoid Copilot tool names like `grep_search` in shell-command examples. Verify with `which <cmd>` or `git grep <cmd>` in the repo scripts if unsure.
 - Repo-specific syntax: CSS selectors, naming conventions, or code patterns cited as examples must actually appear in the codebase. Use `git grep` to confirm before writing them into docs.
 - Cross-file claims: if doc A says "doc B describes X", read doc B and verify it actually does.
 - Count / list consistency: if prose says "N patterns" or "N steps", count them.

@@ -87,11 +87,11 @@ Do not commit if any of these steps fail. Fix the issue first, then re-run the f
 ## Creating PRs (for Agents)
 
 When asked to commit and create a PR, follow `.github/skills/create-pr/SKILL.md` (also available as `/create-pr` in Copilot). Core steps:
-1. **Self-review first** — load `.github/skills/self-review/SKILL.md` (`/self-review`) and resolve all findings.
-2. Pass the Pre-Commit Checklist above.
-3. Analyze `git diff` and group changes into logical commits.
-4. Create a branch (`feat/`, `fix/`, etc.) and commit each group with a conventional commit message: `type(scope): description`.
-5. Write PR description to `agent-workspace/pr-body.md`.
+1. Pass the Pre-Commit Checklist above before each commit.
+2. Analyze `git diff` and group changes into logical commits.
+3. Create a branch (`feat/`, `fix/`, etc.) and commit each group with a conventional commit message: `type(scope): description`.
+4. Write PR description to `agent-workspace/pr-body.md`.
+5. **Self-review** — load `.github/skills/self-review/SKILL.md` (`/self-review`) and resolve all findings before pushing.
 6. Push and run `gh pr create --body-file agent-workspace/pr-body.md`.
 
 ## PR Review Workflow (for Agents)

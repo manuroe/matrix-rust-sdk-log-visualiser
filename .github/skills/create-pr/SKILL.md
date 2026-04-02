@@ -12,15 +12,15 @@ argument-hint: 'Brief description of the feature or fix (used for branch name an
 
 ## Prerequisites
 
-### Step 0: Self-Review (required before pushing or creating the PR)
+### Step 0: Self-Review (required — run after Step 4, before Step 5)
 
-Load `.github/skills/self-review/SKILL.md` and run the full self-review procedure against the diff once all PR materials are prepared, including `agent-workspace/pr-body.md`. Resolve every finding before continuing. Only declare the self-review clean and proceed once no pattern matches remain.
+After writing `agent-workspace/pr-body.md` (Step 4) and before pushing (Step 5), load `.github/skills/self-review/SKILL.md` and run the full self-review procedure against the diff. Resolve every finding before continuing. Only declare the self-review clean and proceed once no pattern matches remain.
 
-This step catches the categories of issues that generate the most Copilot review comments (comment/implementation mismatches, CSS magic numbers, test fixture gaps, PR description staleness, floating promises, etc.). See [PATTERNS.md](../self-review/PATTERNS.md) for the full catalogue.
+This step catches the categories of issues that generate the most Copilot review comments (comment/implementation mismatches, CSS magic numbers, test fixture gaps, floating promises, docs coherence, etc.). See [PATTERNS.md](../self-review/PATTERNS.md) for the full catalogue.
 
 ### Step 1: Pre-Commit Checklist
 
-After the self-review is clean, pass the build/lint/test checklist:
+Before each commit (Step 3), pass the build/lint/test checklist:
 
 ```sh
 npm run build   # must produce no errors

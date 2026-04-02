@@ -1,7 +1,7 @@
 ---
 name: self-review
 description: 'Pre-PR self-review checklist to catch recurring Copilot review comment patterns before pushing. Use when asked to self-review, run pre-PR review, or before creating a PR to reduce review back-and-forth. Walks through the diff against PATTERNS.md.'
-argument-hint: 'Branch or commit range to review (optional, defaults to feature branch vs origin/main)'
+argument-hint: 'Reviews the current branch against origin/main using the merge base'
 ---
 
 # Self-Review
@@ -18,8 +18,8 @@ comment patterns in [PATTERNS.md](./PATTERNS.md) to catch issues before review.
 ### 1. Get the diff
 
 ```sh
-git diff $(git merge-base HEAD origin/main) HEAD -- ':!agent-workspace'
-git diff --stat $(git merge-base HEAD origin/main) HEAD -- ':!agent-workspace'
+git diff $(git merge-base HEAD origin/main) HEAD -- . ':(exclude)agent-workspace'
+git diff --stat $(git merge-base HEAD origin/main) HEAD -- . ':(exclude)agent-workspace'
 ```
 
 Read the stat output to understand which file types changed.
