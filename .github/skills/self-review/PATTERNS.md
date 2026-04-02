@@ -61,7 +61,7 @@ Consult this file during the self-review pass before creating any PR.
 - Does `overflow: hidden` clip content that should scroll in "nowrap" mode?
 - Is `white-space` mode-conditional? Does each mode variant explicitly set both `white-space` and `overflow`?
 
-**Canonical fix**: Use `pre-wrap` in the base case and add a `.nowrap &` (or `.nowrap .thisClass`) override that switches to `pre` + `overflow: auto` / `overflow: scroll`.
+**Canonical fix**: Use `pre-wrap` in the base case and add a plain `.nowrap .thisClass` override that switches to `pre` + `overflow: auto` / `overflow: scroll`.
 
 **Past examples**:
 - PR #57: `white-space: pre` on `.logLineContinuation` prevented wrapping even when the parent row was in wrap mode; fixed by default to `pre-wrap` and `.nowrap` override.
@@ -279,7 +279,7 @@ Consult this file during the self-review pass before creating any PR.
 **Where it appears**: Anywhere — most commonly when adapting logic from a React component into a util, or when adding a similar helper in a different module.
 
 **What to look for**:
-- Before writing a new regex or helper function, search the codebase for an existing one that does the same thing (`grep_search`).
+- Before writing a new regex or helper function, search the codebase for an existing one that does the same thing (for example with `git grep` or `rg`).
 - Does the new code duplicate a pattern already in `src/utils/sizeUtils.ts`, `src/utils/logMessageUtils.ts`, or `src/utils/textMatching.ts`?
 
 **Canonical fix**: Extract the shared implementation to `src/utils/`, import it from both call sites.

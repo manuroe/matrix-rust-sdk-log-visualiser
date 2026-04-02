@@ -30,7 +30,7 @@ Read the stat output to understand which file types changed.
 - Every block comment above a condition or calculation describes what the code actually does.
 - Every JSDoc `@param` / `@returns` / field description matches the current implementation.
 - Test `it(...)` / `describe(...)` descriptions accurately reflect what is being asserted.
-- After a rename, search for the old name in comments (`grep_search` the old identifier).
+- After a rename, search for the old name in comments (for example, `git grep -n '<old_identifier>'`).
 
 **P5 — Wrong Variable / Wrong Denominator**
 - In any percentage/ratio calculation: is the denominator the concept it claims to measure?
@@ -98,10 +98,10 @@ Read the stat output to understand which file types changed.
 - Zustand store state is reset between tests.
 - Interactive element tests use `userEvent.hover` before `userEvent.click` when a trigger is only visible on hover.
 
-### 5. For the PR description (`agent-workspace/pr-body.md`) — apply this pattern
+### 5. After writing the PR description (`agent-workspace/pr-body.md`) — apply this pattern
 
 **P8 — PR Description Staleness**
-- Read `git diff --stat $(git merge-base HEAD origin/main) HEAD` and `agent-workspace/pr-body.md` side-by-side.
+- If `agent-workspace/pr-body.md` exists, read `git diff --stat $(git merge-base HEAD origin/main) HEAD` and `agent-workspace/pr-body.md` side-by-side.
 - Every changed file/feature must be mentioned in the PR description.
 - Every paragraph in the PR description must map to a file or feature in the diff — delete any that don't.
 - Update the "Testing" section to include the exact test run commands and the test count / coverage output shown after running them locally.
