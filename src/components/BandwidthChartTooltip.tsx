@@ -47,9 +47,11 @@ export interface BandwidthBucket extends ActivityBucket {
  */
 export function renderBandwidthTooltip(bucket: BandwidthBucket): React.ReactElement {
   const downloadEntries = sortStatusCodes(Object.keys(bucket.downloadByStatus))
+    .reverse()
     .map((key): [string, number] => [key, bucket.downloadByStatus[key] ?? 0])
     .filter(([, v]) => v > 0);
   const uploadEntries = sortStatusCodes(Object.keys(bucket.uploadByStatus))
+    .reverse()
     .map((key): [string, number] => [key, bucket.uploadByStatus[key] ?? 0])
     .filter(([, v]) => v > 0);
 
