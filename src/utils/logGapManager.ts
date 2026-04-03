@@ -1,4 +1,5 @@
 import type { ParsedLogLine } from '../types/log.types';
+import { mergeNumberRanges, type NumberRange } from './rangeUtils';
 
 /**
  * # Gap Expansion Manager
@@ -86,7 +87,7 @@ export interface FilteredLine {
  * {@link mergeRanges} before being applied, so overlapping or adjacent ranges
  * always collapse into the minimum covering set.
  */
-export interface ForcedRange {
+export interface ForcedRange extends NumberRange {
   /** Inclusive start index into the raw log-line array. */
   readonly start: number;
   /** Exclusive end index into the raw log-line array. */
@@ -96,25 +97,11 @@ export interface ForcedRange {
 /**
  * Merges overlapping or adjacent forced ranges.
  * Forced ranges are inclusive-exclusive: [start, end).
+ * Delegates to the shared {@link mergeNumberRanges} utility; `ForcedRange`
+ * is structurally compatible with `NumberRange`.
  */
 function mergeRanges(ranges: ReadonlyArray<ForcedRange>): ForcedRange[] {
-  if (ranges.length === 0) return [];
-
-  const sorted = [...ranges].sort((a, b) => a.start - b.start || a.end - b.end);
-  const merged: { start: number; end: number }[] = [{ ...sorted[0] }];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const current = sorted[i];
-    const last = merged[merged.length - 1];
-
-    if (current.start <= last.end) {
-      last.end = Math.max(last.end, current.end);
-    } else {
-      merged.push({ ...current });
-    }
-  }
-
-  return merged;
+  return mergeNumberRanges(ranges);
 }
 
 function normalizeRange(range: ForcedRange, totalLines: number): ForcedRange | null {

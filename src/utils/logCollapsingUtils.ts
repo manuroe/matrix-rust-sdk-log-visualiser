@@ -1,5 +1,13 @@
 import type { ParsedLogLine } from '../types/log.types';
 import type { FilteredLine } from './logGapManager';
+import { ISO_TIMESTAMP_RE } from './logMessageUtils';
+
+/**
+ * Derived from {@link ISO_TIMESTAMP_RE}; strips the timestamp and any
+ * immediately following whitespace in a single regex pass.
+ * Lines that do not start with a timestamp are returned unchanged (no match).
+ */
+const STRIP_TIMESTAMP_RE = new RegExp(`${ISO_TIMESTAMP_RE.source}\\s*`);
 
 /**
  * Source file paths that should never participate in collapsing, even when
@@ -34,7 +42,10 @@ export interface CollapseResult {
  * Strip the ISO timestamp prefix from a raw log line for exact-duplicate comparison.
  */
 export function stripTimestamp(rawText: string): string {
-  return rawText.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\s*/, '');
+  // Single-pass: STRIP_TIMESTAMP_RE matches the timestamp + trailing whitespace
+  // only when the line starts with a timestamp, so continuation lines with
+  // intentional leading indentation are returned unchanged (no match = no-op).
+  return rawText.replace(STRIP_TIMESTAMP_RE, '');
 }
 
 /**
