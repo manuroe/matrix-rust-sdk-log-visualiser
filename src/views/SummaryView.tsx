@@ -60,10 +60,8 @@ export function SummaryView() {
   const [showIncomplete, setShowIncomplete] = useState(true);
   // Toggle to show/hide /sync requests (identified by a defined timeout field) in the HTTP chart
   const [showSync, setShowSync] = useState(true);
-  // Toggle to show/hide media requests (paths containing /media/) in the bandwidth chart.
-  // Defaults to false (hidden) because media transfers are typically multi-MB outliers
-  // that compress the y-axis scale and make smaller API traffic invisible.
-  const [showMedia, setShowMedia] = useState(false);
+  // Toggle to show/hide media requests (paths containing /media/) in both charts.
+  const [showMedia, setShowMedia] = useState(true);
 
   // Precompute min/max across ALL raw log lines (keyword anchor)
   const fullDataRange = useMemo(() => {
@@ -293,7 +291,7 @@ export function SummaryView() {
       <div className="content">
         {/* Log Overview */}
         <section className={styles.summarySection}>
-          <h2>Logs Over Time: {stats.totalLogLines} lines</h2>
+          <h2>Logs: {stats.totalLogLines} lines</h2>
           
           {/* Activity Chart */}
           <div className={styles.activityChartContainer}>
@@ -517,8 +515,8 @@ export function SummaryView() {
             {stats.httpRequestsWithTimestamps.length > 0 && (
               <>
                 <h3>
-                  Requests (total): {stats.httpRequestCount}
-                  {stats.incompleteRequestCount > 0 ? ` (Incomplete, total: ${stats.incompleteRequestCount})` : ''}
+                  Requests: {stats.httpRequestCount}
+                  {stats.incompleteRequestCount > 0 ? ` (Incomplete: ${stats.incompleteRequestCount})` : ''}
                 </h3>
                 <div className={styles.activityChartContainer}>
                   <HttpActivityChart
