@@ -98,6 +98,17 @@ Read the stat output to understand which file types changed.
 - Zustand store state is reset between tests.
 - Interactive element tests use `userEvent.hover` before `userEvent.click` when a trigger is only visible on hover.
 
+**P16 — Test Spec Coherence**
+- For UI tests that act as specification, the title describes a user-observable scenario. For integration tests, the title describes the public contract at that boundary.
+- For hook tests, the title describes the hook interface contract or side-effect, not listener bookkeeping or branch-coverage intent.
+- The fixture/setup actually creates the scenario the title claims (for example, matching URL params, filter text, or rendered labels).
+- The assertions verify that same scenario rather than drifting into unrelated helper internals or store plumbing.
+- A specific title needs a specific assertion: if the test says a formatted label, count, or state transition should appear, `expect(...).toBeInTheDocument()` on a generic container/button is not enough.
+- Querying by role, label, or `data-testid` is fine when those are part of the contract; drilling into CSS classes or container structure just to prove existence is usually too indirect.
+- Pure utility/algorithm tests may stay implementation-oriented, but their title, setup, and assertions still need to describe the same case.
+- Branch-coverage language (`covers ...`, `idx=1`, line numbers) is a smell in behavior tests; prefer naming the actual scenario.
+- P16 complements P1, P6, and P7: use it for title/setup/assertion drift, not wording-only mismatches, incomplete fixtures, or leaking mocks.
+
 ### 5. For each changed Markdown / docs / skill file — apply this pattern
 
 **P15 — Documentation / Skill Internal Consistency**

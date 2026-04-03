@@ -309,3 +309,32 @@ Consult this file during the self-review pass before creating any PR.
 - PR #58: `create-pr/SKILL.md` Step 0 said "before any commit" but `pr-body.md` (referenced in the same step) is only written in Step 4 — ordering contradiction.
 - PR #58: `PATTERNS.md` and `SKILL.md` both referenced `grep_search` as a shell command; it is a Copilot tool, not an executable — phantom name.
 - PR #58: `PATTERNS.md` P3 canonical fix cited `.nowrap &` (CSS nesting); the repo's `.module.css` files use plain selectors only — verified false by `git grep`.
+
+---
+
+## P16 — Test Spec Coherence
+
+**What it is**: A test that is meant to specify observable behavior drifts out of alignment: the title describes one scenario, the fixture/setup creates another, or the assertions verify something else.
+
+**Where it appears**: UI, integration, and hook tests in `src/**/__tests__/`, plus any lower-level test where the scenario name, setup, and assertions can silently drift apart.
+
+**What to look for**:
+- For UI tests, does the `it(...)` / `describe(...)` text describe a user-observable behavior? For integration tests, does it describe the public contract of the boundary under test (for example URL params synchronizing into app state)?
+- For hook tests, does the title describe the hook's interface contract or side-effect (`calls onClose`, `syncs scroll`, `returns debounced value`) rather than listener bookkeeping, branch coverage, or line coverage?
+- Does the fixture/setup actually contain the condition the title claims (for example, the URL params, filter text, or rendered label needed for the scenario)?
+- Do the assertions verify that same scenario, instead of only checking unrelated helper internals or store plumbing?
+- If the title promises a specific displayed outcome or state transition, do the assertions verify that outcome directly rather than only proving the component rendered or a generic button exists?
+- Are the selectors and assertions operating at the same abstraction level as the title? Querying by role, label, or `data-testid` is fine when those are part of the contract; drilling into CSS classes or container structure just to prove something exists is usually too indirect.
+- If the test is intentionally low-level (parser, regex, byte detection, pure filter logic), is it still internally coherent even if it does not use user-facing language?
+- Does the title drift into implementation-tracking language such as `covers branch`, `idx=1`, line numbers, or `attaches listener` when the real scenario could be named directly?
+- Does this finding belong here rather than in P1, P6, or P7? Use P16 when the problem is scenario drift between title, setup, and assertion; use the others for wording accuracy, missing fixture fields, or mock leakage.
+
+**Canonical fix**: Rewrite the test so the title, fixture/setup, and assertions all describe the same scenario. For UI coverage, prefer framing the scenario in terms of what the user can observe. For integration coverage, assert the public contract at that boundary directly. For hook tests, name the interface contract or side-effect. For lower-level tests, keep the algorithmic framing but make the setup and assertion match it exactly.
+
+**Past examples**:
+- Current suite: `TimeRangeSelector.test.tsx` uses visible labels and menu state (`"All time"`, expanded dropdown) to describe and verify what the user sees.
+- Current suite: `AppParameterSync.test.tsx` treats the URL as part of the public contract by asserting that `filter`, `status`, and time params restore the expected app state together.
+- Current suite: `useScrollSync.test.ts` is a good hook example because the title names the side-effect and the assertion verifies the exact synced `scrollTop` value.
+- Current suite: `ErrorDisplay.test.tsx` includes a warning block title with branch/line-coverage language; that is the kind of title P16 should push back toward the actual rendered warning behavior.
+- Current suite: `LogsView.test.tsx` verifies that changing the time range changes the rendered shown/total counts, which is the behavior the user experiences.
+- Boundary example: `fileValidator.test.ts` is intentionally low-level; it does not need UI language, but the title, byte fixture, and assertions still need to describe the same validation case.
