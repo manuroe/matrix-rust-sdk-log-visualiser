@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type { ParsedLogLine, LogLevel, SentryEvent } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_SECOND, MICROS_PER_MILLISECOND } from '../types/time.types';
+import { getMinMaxTimestamps } from '../utils/timeUtils';
 import { BaseActivityChart, type ActivityBucket } from './BaseActivityChart';
 import type { SelectionRange } from '../hooks/useChartInteraction';
 
@@ -53,19 +54,15 @@ export function LogActivityChart({ logLines, sentryEvents, onTimeRangeSelected, 
 
     const sentryLineNumbers = new Set((sentryEvents ?? []).map(e => e.lineNumber));
 
-    // Find time range (all in microseconds); exclude lines with no timestamp
-    // (timestampUs === 0 for orphaned continuation lines that appear before the
-    // first timestamped entry — including them would pull dataMinTime to Unix epoch).
-    const timestamps = logLines
-      .map((line) => line.timestampUs)
-      .filter((ts) => ts !== 0);
+    // Find time range (all in microseconds) via getMinMaxTimestamps, which
+    // skips lines with timestampUs <= 0 (orphaned continuation lines that appear
+    // before the first timestamped entry) and avoids Math.min/max spread that
+    // can throw on very large arrays.
+    const { min: dataMinTime, max: dataMaxTime } = getMinMaxTimestamps(logLines);
 
-    if (timestamps.length === 0) {
+    if (dataMinTime === 0) {
       return { buckets: [] as LogBucket[], maxCount: 0, minTime: 0 as TimestampMicros, maxTime: 0 as TimestampMicros };
     }
-
-    const dataMinTime = Math.min(...timestamps) as TimestampMicros;
-    const dataMaxTime = Math.max(...timestamps) as TimestampMicros;
     const timeRange = dataMaxTime - dataMinTime;
 
     // Calculate bucket size to display ~100 bars (in microseconds)
