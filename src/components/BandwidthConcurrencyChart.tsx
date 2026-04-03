@@ -279,15 +279,25 @@ export function BandwidthConcurrencyChart({
     });
   }, [orderedKeys, uploadSeriesByKey, minTime, maxTime]);
 
-  const maxDownload = useMemo(
-    () => Math.max(...downloadLayers.flatMap((l) => l.points.map((p) => p.y1)), 1),
-    [downloadLayers],
-  );
+  const maxDownload = useMemo(() => {
+    let max = 1;
+    for (const layer of downloadLayers) {
+      for (const point of layer.points) {
+        if (point.y1 > max) max = point.y1;
+      }
+    }
+    return max;
+  }, [downloadLayers]);
 
-  const maxUpload = useMemo(
-    () => Math.max(...uploadLayers.flatMap((l) => l.points.map((p) => p.y1)), 1),
-    [uploadLayers],
-  );
+  const maxUpload = useMemo(() => {
+    let max = 1;
+    for (const layer of uploadLayers) {
+      for (const point of layer.points) {
+        if (point.y1 > max) max = point.y1;
+      }
+    }
+    return max;
+  }, [uploadLayers]);
 
   const hasData = useMemo(
     () => bandwidthRequestSpans.some((s) => s.uploadBytes > 0 || s.downloadBytes > 0),
