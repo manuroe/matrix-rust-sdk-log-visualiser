@@ -38,7 +38,7 @@ interface BandwidthChartProps {
  * Bandwidth chart component.
  *
  * Plots HTTP bandwidth (upload and download bytes) as a **mirrored diverging bar chart**:
- * download bytes (received) stack **above** the zero line; upload bytes (sent) stack
+ * upload bytes (sent) stack **above** the zero line; download bytes (received) stack
  * **below** it.  Each direction is broken down by HTTP status bucket and coloured with
  * the same palette as `HttpActivityChart`, giving a coherent cross-chart colour language.
  *

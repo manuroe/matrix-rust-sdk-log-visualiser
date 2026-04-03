@@ -157,8 +157,8 @@ function renderConcurrencyTooltip(data: TooltipData, formatTime: (t: number) => 
  * from `BandwidthRequestSpan` to compute an exact in-flight waveform — no bucketing
  * approximation.
  *
- * The chart is **mirrored**: download bytes (received) stack **above** the zero line
- * using the HTTP status colour palette; upload bytes (sent) stack **below** the zero
+ * The chart is **mirrored**: upload bytes (sent) stack **above** the zero line
+ * using the HTTP status colour palette; download bytes (received) stack **below** the zero
  * line with the same colours.  This matches the `BandwidthHistogramChart` layout so
  * both chart modes are visually coherent.
  *
@@ -188,29 +188,35 @@ export function BandwidthConcurrencyChart({
   }, [bandwidthRequestSpans]);
 
   // ── Per-status step series (download + upload) ───────────────────────────
-  const downloadSeriesByKey = useMemo(() => {
+  /** Spans grouped by status key — built once and shared by both download and upload series. */
+  const spansByKey = useMemo(() => {
     const grouped = new Map<string, BandwidthRequestSpan[]>();
     for (const key of orderedKeys) grouped.set(key, []);
     for (const span of bandwidthRequestSpans) grouped.get(getBucketKey(span))?.push(span);
-    return new Map(
-      orderedKeys.map((key) => [
-        key,
-        computeStepSeries(grouped.get(key) ?? [], minTime, maxTime, (s) => s.downloadBytes),
-      ]),
-    );
-  }, [orderedKeys, bandwidthRequestSpans, minTime, maxTime]);
+    return grouped;
+  }, [orderedKeys, bandwidthRequestSpans]);
 
-  const uploadSeriesByKey = useMemo(() => {
-    const grouped = new Map<string, BandwidthRequestSpan[]>();
-    for (const key of orderedKeys) grouped.set(key, []);
-    for (const span of bandwidthRequestSpans) grouped.get(getBucketKey(span))?.push(span);
-    return new Map(
-      orderedKeys.map((key) => [
-        key,
-        computeStepSeries(grouped.get(key) ?? [], minTime, maxTime, (s) => s.uploadBytes),
-      ]),
-    );
-  }, [orderedKeys, bandwidthRequestSpans, minTime, maxTime]);
+  const downloadSeriesByKey = useMemo(
+    () =>
+      new Map(
+        orderedKeys.map((key) => [
+          key,
+          computeStepSeries(spansByKey.get(key) ?? [], minTime, maxTime, (s) => s.downloadBytes),
+        ]),
+      ),
+    [orderedKeys, spansByKey, minTime, maxTime],
+  );
+
+  const uploadSeriesByKey = useMemo(
+    () =>
+      new Map(
+        orderedKeys.map((key) => [
+          key,
+          computeStepSeries(spansByKey.get(key) ?? [], minTime, maxTime, (s) => s.uploadBytes),
+        ]),
+      ),
+    [orderedKeys, spansByKey, minTime, maxTime],
+  );
 
   /**
    * Unified timeline for download layers — positive domain (above zero).
@@ -243,8 +249,9 @@ export function BandwidthConcurrencyChart({
   }, [orderedKeys, downloadSeriesByKey, minTime, maxTime]);
 
   /**
-   * Unified timeline for upload layers — negative domain (below zero).
-   * y0/y1 values are stored as negative numbers so the same yScale maps them below the axis.
+   * Unified timeline for upload layers — positive domain (above zero).
+   * Each layer's y0/y1 values represent cumulative upload bytes in data units,
+   * mapped to pixel y via `uploadScale` which places them in the top 25% zone.
    */
   const uploadLayers = useMemo(() => {
     const allTimes = new Set([minTime, maxTime]);

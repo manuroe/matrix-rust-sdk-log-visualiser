@@ -27,7 +27,7 @@ export interface BandwidthBucket extends ActivityBucket {
 /**
  * Renders the tooltip content for a single bandwidth bar.
  *
- * Shows per-status rows under a Download section (above zero) and an Upload
+ * Shows per-status rows under an Upload section (above zero) and a Download
  * section (below zero), matching the mirrored bar layout of the chart.
  *
  * Extracted as a module-level function (rather than an inline useCallback) so

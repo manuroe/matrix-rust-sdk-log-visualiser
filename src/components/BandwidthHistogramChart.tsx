@@ -50,8 +50,8 @@ interface BandwidthHistogramChartProps {
 /**
  * Mirrored diverging stacked bar chart for bandwidth data.
  *
- * Download bytes (received) stack **above** the centre zero line; upload bytes
- * (sent) stack **below** it.  Each direction is broken down by HTTP status
+ * Upload bytes (sent) stack **above** the centre zero line; download bytes
+ * (received) stack **below** it.  Each direction is broken down by HTTP status
  * bucket and coloured with the same palette as `HttpActivityChart`, so the two
  * charts are visually coherent at a glance.
  *
