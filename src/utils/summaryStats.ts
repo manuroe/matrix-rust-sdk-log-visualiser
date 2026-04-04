@@ -433,7 +433,7 @@ export function computeSummaryStats(
             uploadBytes: req.requestSize,
             downloadBytes: req.responseSize,
             uri: req.uri,
-            status: req.status,
+            status: req.clientError ? CLIENT_ERROR_CHART_STATUS : req.status,
             isIncomplete: false,
             ...(timeoutByRequestId.has(req.requestId) && { timeout: timeoutByRequestId.get(req.requestId) }),
           });
