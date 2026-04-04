@@ -3,7 +3,7 @@
  * Tests rendering of statistics and user interactions.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SummaryView } from '../SummaryView';
 import { useLogStore } from '../../stores/logStore';
@@ -1258,9 +1258,11 @@ describe('SummaryView', () => {
       // Connection rows visible
       expect(screen.getByText('main')).toBeInTheDocument();
       expect(screen.getByText('encryption')).toBeInTheDocument();
-      // Count cells: 'main' has 2, 'encryption' has 1
-      expect(screen.getByText('2')).toBeInTheDocument();
-      expect(screen.getByText('1')).toBeInTheDocument();
+      // Scope count cells to each row to avoid matching unrelated numeric cells in other tables
+      const mainRow = screen.getByText('main').closest('tr')!;
+      expect(within(mainRow).getByRole('cell', { name: '2' })).toBeInTheDocument();
+      const encRow = screen.getByText('encryption').closest('tr')!;
+      expect(within(encRow).getByRole('cell', { name: '1' })).toBeInTheDocument();
     });
 
     it('displays the correct line count after a global time filter is applied', () => {
@@ -1372,20 +1374,21 @@ describe('SummaryView', () => {
       useLogStore.getState().setHttpRequests([req], lines);
     });
 
-    it('renders the chart-mode select in "completed" mode (displayed as "Starts") by default', () => {
+    it('renders the chart-mode select in "stepArea" mode (displayed as "In-flight") by default', () => {
       renderSummaryView();
       const select = screen.getByRole('combobox', { name: /chart display mode/i });
       expect(select).toBeInTheDocument();
-      expect(select).toHaveValue('completed');
+      expect(select).toHaveValue('stepArea');
     });
 
     it('switches chart-mode select to "In-flight" and back', () => {
       renderSummaryView();
       const select = screen.getByRole('combobox', { name: /chart display mode/i });
-      act(() => { fireEvent.change(select, { target: { value: 'concurrent' } }); });
-      expect(select).toHaveValue('concurrent');
-      act(() => { fireEvent.change(select, { target: { value: 'completed' } }); });
-      expect(select).toHaveValue('completed');
+      expect(select).toHaveValue('stepArea');
+      act(() => { fireEvent.change(select, { target: { value: 'histogram' } }); });
+      expect(select).toHaveValue('histogram');
+      act(() => { fireEvent.change(select, { target: { value: 'stepArea' } }); });
+      expect(select).toHaveValue('stepArea');
     });
 
     it('renders exactly one shared chart-mode select for both charts', () => {
