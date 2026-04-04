@@ -153,8 +153,8 @@ describe('SummaryView', () => {
     it('displays total log lines count', () => {
       renderSummaryView();
 
-      // The heading shows "Logs Over Time: X lines"
-      expect(screen.getByText(/Logs Over Time: 5 lines/)).toBeInTheDocument();
+      // The heading shows "Logs: X lines"
+      expect(screen.getByText(/Logs: 5 lines/)).toBeInTheDocument();
     });
 
     it('renders time range selector', () => {
@@ -898,8 +898,8 @@ describe('SummaryView', () => {
       useLogStore.getState().setHttpRequests([incompleteReq], lines);
       renderSummaryView();
 
-      // The Requests sub-header should show "Incomplete, total: 1"
-      expect(screen.getByText(/Incomplete, total: 1/)).toBeInTheDocument();
+      // The Requests sub-header should show "Incomplete: 1"
+      expect(screen.getByText(/Incomplete: 1/)).toBeInTheDocument();
     });
 
     it('aggregates upload/download bytes across duplicate request IDs and skips requests with missing timestamps', () => {
@@ -960,7 +960,7 @@ describe('SummaryView', () => {
 
       // Phase 1 is start-based, so requests with a valid send timestamp still count
       // even when their response timestamp is missing.
-      expect(screen.getByText(/Requests \(total\): 4.*Incomplete, total: 1/)).toBeInTheDocument();
+      expect(screen.getByText(/Requests: 4.*Incomplete: 1/)).toBeInTheDocument();
       expect(screen.getByText(/Overall bandwidth: ↑ 1.4 KB \/ ↓ 1.6 KB/)).toBeInTheDocument();
     });
   });
@@ -1273,8 +1273,8 @@ describe('SummaryView', () => {
       useLogStore.getState().setTimeFilter(lines[3].isoTimestamp, lines[6].isoTimestamp);
       renderSummaryView();
 
-      // 4 filtered lines should appear in the "Logs Over Time" heading
-      expect(screen.getByText(/Logs Over Time: 4 lines/)).toBeInTheDocument();
+      // 4 filtered lines should appear in the "Logs" heading
+      expect(screen.getByText(/Logs: 4 lines/)).toBeInTheDocument();
 
       // Restore
       useLogStore.getState().setTimeFilter(null, null);
@@ -1486,20 +1486,20 @@ describe('SummaryView', () => {
       useLogStore.getState().setHttpRequests([req], lines);
     });
 
-    it('renders the "Media" checkbox unchecked by default (media hidden to avoid scale compression)', () => {
+    it('renders the "Media" checkbox checked by default', () => {
       renderSummaryView();
       const checkbox = screen.getByRole('checkbox', { name: /media/i });
       expect(checkbox).toBeInTheDocument();
-      expect(checkbox).not.toBeChecked();
+      expect(checkbox).toBeChecked();
     });
 
     it('toggles "Media" checkbox on and off', () => {
       renderSummaryView();
       const checkbox = screen.getByRole('checkbox', { name: /media/i });
       act(() => { fireEvent.click(checkbox); });
-      expect(checkbox).toBeChecked();
-      act(() => { fireEvent.click(checkbox); });
       expect(checkbox).not.toBeChecked();
+      act(() => { fireEvent.click(checkbox); });
+      expect(checkbox).toBeChecked();
     });
   });
 });
