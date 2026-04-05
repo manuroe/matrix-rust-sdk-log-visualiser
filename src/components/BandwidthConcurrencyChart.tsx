@@ -3,7 +3,7 @@ import { Group } from '@visx/group';
 import { Area, Line } from '@visx/shape';
 import { scaleLinear } from '@visx/scale';
 import { AxisLeft } from '@visx/axis';
-import { useTooltip, TooltipWithBounds } from '@visx/tooltip';
+import { useTooltip } from '@visx/tooltip';
 import { curveStepAfter } from 'd3-shape';
 import type { BandwidthRequestSpan } from '../types/log.types';
 import type { TimestampMicros } from '../types/time.types';
@@ -372,7 +372,6 @@ export function BandwidthConcurrencyChart({
     handleMouseLeave,
     handleDoubleClick,
     hasExternalSelection,
-    isExternalTooltipActive,
   } = useStepChartInteraction({
     xMax,
     svgWidth: SVG_WIDTH,
@@ -609,28 +608,8 @@ export function BandwidthConcurrencyChart({
           </Group>
         </svg>
 
-        {/* Tooltip — local hover */}
-        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && !isExternalTooltipActive && (
-          <TooltipWithBounds
-            left={tooltipLeft}
-            top={tooltipTop}
-            offsetLeft={12}
-            offsetTop={12}
-            style={{
-              position: 'absolute',
-              backgroundColor: 'rgba(0,0,0,0.85)',
-              color: 'white',
-              padding: '4px 6px',
-              borderRadius: '3px',
-              fontSize: '10px',
-              pointerEvents: 'none',
-              lineHeight: '1.3',
-            }}
-          >
-            {renderConcurrencyTooltip(tooltipData, formatTime)}
-          </TooltipWithBounds>
-        )}
-        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && isExternalTooltipActive && (
+        {/* Tooltip — always pinned to the SVG top at the cursor x-position */}
+        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && (
           <div
             style={{
               position: 'fixed',

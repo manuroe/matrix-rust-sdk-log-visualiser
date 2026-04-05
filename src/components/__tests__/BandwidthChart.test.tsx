@@ -70,6 +70,23 @@ describe('BandwidthChart', () => {
         ),
       ).not.toThrow();
     });
+
+    it('renders without errors when minTime equals maxTime (single-instant time range)', () => {
+      // A single-instant time range (minTime === maxTime) is a valid edge case —
+      // the chart should render gracefully and treat all bars as zero-width (x=0).
+      const singlePointTime = 5_000 * MICROS_PER_MILLISECOND;
+      expect(() =>
+        render(
+          <BandwidthChart
+            requests={[makeEntry({ timestampUs: singlePointTime as TimestampMicros })]}
+            timeRange={{
+              minTime: singlePointTime as TimestampMicros,
+              maxTime: singlePointTime as TimestampMicros,
+            }}
+          />,
+        ),
+      ).not.toThrow();
+    });
   });
 
   describe('bar rendering', () => {

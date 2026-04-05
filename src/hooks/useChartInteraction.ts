@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, type MouseEvent } from 'react';
+import { useCallback, useState, useEffect, useRef, type RefObject, type MouseEvent } from 'react';
 import { localPoint } from '@visx/event';
 import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_MILLISECOND } from '../types/time.types';
@@ -61,6 +61,8 @@ interface UseChartInteractionOptions<TBucket> {
 }
 
 export interface ChartInteractionResult<TBucket> {
+  /** Ref to attach to the `<svg>` element; used internally for CTM-based tooltip positioning. */
+  svgRef: RefObject<SVGSVGElement | null>;
   state: ChartInteractionState;
   handlers: ChartInteractionHandlers<TBucket>;
 }
@@ -89,6 +91,7 @@ export function useChartInteraction<TBucket>({
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<SelectionPoint | undefined>();
   const [selectionEnd, setSelectionEnd] = useState<SelectionPoint | undefined>();
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const handleMouseDown = useCallback(
     (event: MouseEvent<SVGRectElement>) => {
@@ -214,10 +217,31 @@ export function useChartInteraction<TBucket>({
             setCursorX(point.x);
             setCursorTimeLabel(formatTime(cursorTime));
             onCursorMove?.(cursorTime);
+            // Compute tooltip position using the SVG's CTM so the bubble is
+            // anchored at the cursor x but always at the SVG top edge (y=0),
+            // matching the fixed-position behaviour used when sync is active.
+            let tooltipLeft = event.clientX;
+            let tooltipTop = event.clientY;
+            const svg = svgRef.current;
+            if (svg) {
+              const ctm = typeof svg.getScreenCTM === 'function' ? svg.getScreenCTM() : null;
+              if (ctm && typeof svg.createSVGPoint === 'function') {
+                const pt = svg.createSVGPoint();
+                pt.x = point.x;
+                pt.y = 0;
+                const tp = pt.matrixTransform(ctm);
+                tooltipLeft = tp.x;
+                tooltipTop = tp.y;
+              } else {
+                const rect = svg.getBoundingClientRect();
+                tooltipLeft = rect.left + point.x;
+                tooltipTop = rect.top;
+              }
+            }
             showTooltipFn({
               tooltipData: bucket,
-              tooltipLeft: event.clientX,
-              tooltipTop: event.clientY,
+              tooltipLeft,
+              tooltipTop,
             });
           }
         }
@@ -233,6 +257,7 @@ export function useChartInteraction<TBucket>({
   }, [hideTooltip, onCursorMove]);
 
   return {
+    svgRef,
     state: {
       cursorX,
       cursorTimeLabel,

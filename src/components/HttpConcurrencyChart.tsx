@@ -3,7 +3,7 @@ import { Group } from '@visx/group';
 import { Area, Line } from '@visx/shape';
 import { scaleLinear } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
-import { useTooltip, TooltipWithBounds } from '@visx/tooltip';
+import { useTooltip } from '@visx/tooltip';
 import { curveStepAfter } from 'd3-shape';
 import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_MILLISECOND } from '../types/time.types';
@@ -213,7 +213,6 @@ export function HttpConcurrencyChart({
     handleMouseLeave,
     handleDoubleClick,
     hasExternalSelection,
-    isExternalTooltipActive,
   } = useStepChartInteraction({
     xMax,
     svgWidth: SVG_WIDTH,
@@ -399,39 +398,8 @@ export function HttpConcurrencyChart({
           </Group>
         </svg>
 
-        {/* Tooltip — local hover */}
-        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && !isExternalTooltipActive && (
-          <TooltipWithBounds
-            left={tooltipLeft}
-            top={tooltipTop}
-            offsetLeft={12}
-            offsetTop={12}
-            style={{
-              position: 'absolute',
-              backgroundColor: 'rgba(0,0,0,0.85)',
-              color: 'white',
-              padding: '4px 6px',
-              borderRadius: '3px',
-              fontSize: '10px',
-              pointerEvents: 'none',
-              lineHeight: '1.3',
-            }}
-          >
-            <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '10px' }}>{formatTime(tooltipData.timeUs)}</div>
-            {tooltipData.statusCounts.map(({ key, count }) => (
-              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
-                <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: getBucketColor(key), borderRadius: '1px' }} />
-                <span style={{ fontSize: '9px' }}>{getBucketLabel(key)}: {count}</span>
-              </div>
-            ))}
-            <div style={{ marginTop: '2px', paddingTop: '2px', borderTop: '1px solid #555', fontSize: '9px' }}>
-              In-flight: {tooltipData.total}
-            </div>
-          </TooltipWithBounds>
-        )}
-
-        {/* Tooltip — external/mirrored cursor */}
-        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && isExternalTooltipActive && (
+        {/* Tooltip — always pinned to the SVG top at the cursor x-position */}
+        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && (
           <div
             style={{
               position: 'fixed',
