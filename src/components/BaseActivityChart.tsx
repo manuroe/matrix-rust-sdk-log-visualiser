@@ -1,9 +1,9 @@
-import { useMemo, useCallback, useRef, useEffect, type ReactNode } from 'react';
+import { useMemo, useCallback, useEffect, type ReactNode } from 'react';
 import { AxisBottom, AxisLeft } from '@visx/axis';
 import { Group } from '@visx/group';
 import { scaleBand, scaleLinear } from '@visx/scale';
 import { Bar, Line } from '@visx/shape';
-import { useTooltip, TooltipWithBounds } from '@visx/tooltip';
+import { useTooltip } from '@visx/tooltip';
 import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_MILLISECOND } from '../types/time.types';
 import { useChartInteraction } from '../hooks/useChartInteraction';
@@ -90,7 +90,6 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
 }: BaseActivityChartProps<TBucket, TCategory>) {
   const { tooltipData, tooltipLeft, tooltipTop, showTooltip, hideTooltip } = useTooltip<TBucket>();
   const tooltipOffsetLeft = 12;
-  const tooltipOffsetTop = 12;
 
   // Helper to format timestamp as HH:MM:SS in UTC (converts from microseconds)
   const formatTime = useCallback((timestampUs: number): string => {
@@ -129,7 +128,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
     [buckets]
   );
 
-  const { state, handlers } = useChartInteraction<TBucket>({
+  const { state, handlers, svgRef } = useChartInteraction<TBucket>({
     marginLeft: margin.left,
     xMax,
     minTime,
@@ -158,16 +157,8 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
     [minTime, maxTime, xMax],
   );
 
-  const svgRef = useRef<SVGSVGElement>(null);
-
   const { cursorX, cursorTimeLabel, isSelecting, selectionStart, selectionEnd } = state;
   const hasExternalSelection = externalSelection !== null && externalSelection !== undefined;
-  const isExternalTooltipActive =
-    !isSelecting &&
-    cursorX === undefined &&
-    !hasExternalSelection &&
-    externalCursorTime !== null &&
-    externalCursorTime !== undefined;
 
   /**
    * Returns the bucket whose time slot contains the given timestamp.
@@ -248,7 +239,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
       tooltipLeft: tooltipScreenX,
       tooltipTop: tooltipScreenY,
     });
-  }, [externalCursorTime, hasExternalSelection, isSelecting, cursorX, getBucketAtExternalTime, timeToX, margin, width, showTooltip, hideTooltip]);
+  }, [externalCursorTime, hasExternalSelection, isSelecting, cursorX, getBucketAtExternalTime, timeToX, margin, width, svgRef, showTooltip, hideTooltip]);
 
   if (buckets.length === 0) {
     return (
@@ -530,32 +521,12 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
           </Group>
         </svg>
 
-        {/* Tooltip - local hover uses bounds-aware positioning, mirrored tooltip is pinned to chart top */}
-        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && !isExternalTooltipActive && (
-          <TooltipWithBounds
-            left={tooltipLeft}
-            top={tooltipTop}
-            offsetLeft={tooltipOffsetLeft}
-            offsetTop={tooltipOffsetTop}
-            style={{
-              position: 'absolute',
-              backgroundColor: 'rgba(0, 0, 0, 0.85)',
-              color: 'white',
-              padding: '4px 6px',
-              borderRadius: '3px',
-              fontSize: '10px',
-              pointerEvents: 'none',
-              lineHeight: '1.3',
-            }}
-          >
-            {renderTooltipContent(tooltipData, categories)}
-          </TooltipWithBounds>
-        )}
-        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && isExternalTooltipActive && (
+        {/* Tooltip — always pinned to the SVG top at the cursor x-position */}
+        {!isSelecting && tooltipData && tooltipLeft !== undefined && tooltipTop !== undefined && (
           <div
             style={{
               position: 'fixed',
-              left: tooltipLeft + tooltipOffsetLeft,
+              left: Math.max(0, Math.min(tooltipLeft + tooltipOffsetLeft, Math.max(0, window.innerWidth - 200))),
               top: tooltipTop,
               backgroundColor: 'rgba(0, 0, 0, 0.85)',
               color: 'white',

@@ -1,9 +1,9 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { AxisLeft } from '@visx/axis';
 import { Group } from '@visx/group';
 import { scaleBand, scaleLinear } from '@visx/scale';
 import { Bar, Line } from '@visx/shape';
-import { useTooltip, TooltipWithBounds } from '@visx/tooltip';
+import { useTooltip } from '@visx/tooltip';
 import type { TimestampMicros } from '../types/time.types';
 import { MICROS_PER_MILLISECOND } from '../types/time.types';
 import { useChartInteraction } from '../hooks/useChartInteraction';
@@ -94,7 +94,6 @@ export function BandwidthHistogramChart({
     useTooltip<BandwidthBucket>();
 
   const tooltipOffsetLeft = 12;
-  const tooltipOffsetTop = 12;
 
   const margin = useMemo(
     () => ({ top: 10, right: 10, bottom: 30, left: marginLeft }),
@@ -144,7 +143,7 @@ export function BandwidthHistogramChart({
     [buckets],
   );
 
-  const { state, handlers } = useChartInteraction<BandwidthBucket>({
+  const { state, handlers, svgRef } = useChartInteraction<BandwidthBucket>({
     marginLeft: margin.left,
     xMax,
     minTime,
@@ -169,19 +168,10 @@ export function BandwidthHistogramChart({
     [minTime, maxTime, xMax],
   );
 
-  const svgRef = useRef<SVGSVGElement>(null);
-
   const { cursorX, cursorTimeLabel, isSelecting, selectionStart, selectionEnd } = state;
 
   const hasExternalSelection =
     externalSelection !== null && externalSelection !== undefined;
-
-  const isExternalTooltipActive =
-    !isSelecting &&
-    cursorX === undefined &&
-    !hasExternalSelection &&
-    externalCursorTime !== null &&
-    externalCursorTime !== undefined;
 
   const getBucketAtExternalTime = useCallback(
     (timeUs: number): BandwidthBucket | undefined => {
@@ -255,6 +245,7 @@ export function BandwidthHistogramChart({
     getBucketAtExternalTime,
     timeToX,
     margin,
+    svgRef,
     showTooltip,
     hideTooltip,
   ]);
@@ -595,42 +586,15 @@ export function BandwidthHistogramChart({
           </Group>
         </svg>
 
-        {/* ── Tooltip — local hover ───────────────────────────────────── */}
+        {/* ── Tooltip — always pinned to the SVG top at the cursor x-position ── */}
         {!isSelecting &&
           tooltipData &&
           tooltipLeft !== undefined &&
-          tooltipTop !== undefined &&
-          !isExternalTooltipActive && (
-            <TooltipWithBounds
-              left={tooltipLeft}
-              top={tooltipTop}
-              offsetLeft={tooltipOffsetLeft}
-              offsetTop={tooltipOffsetTop}
-              style={{
-                position: 'absolute',
-                backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                color: 'white',
-                padding: '4px 6px',
-                borderRadius: '3px',
-                fontSize: '10px',
-                pointerEvents: 'none',
-                lineHeight: '1.3',
-              }}
-            >
-              {renderTooltipContent(tooltipData)}
-            </TooltipWithBounds>
-          )}
-
-        {/* ── Tooltip — external-cursor driven ───────────────────────── */}
-        {!isSelecting &&
-          tooltipData &&
-          tooltipLeft !== undefined &&
-          tooltipTop !== undefined &&
-          isExternalTooltipActive && (
+          tooltipTop !== undefined && (
             <div
               style={{
                 position: 'fixed',
-                left: tooltipLeft + tooltipOffsetLeft,
+                left: Math.max(0, Math.min(tooltipLeft + tooltipOffsetLeft, Math.max(0, window.innerWidth - 200))),
                 top: tooltipTop,
                 backgroundColor: 'rgba(0, 0, 0, 0.85)',
                 color: 'white',

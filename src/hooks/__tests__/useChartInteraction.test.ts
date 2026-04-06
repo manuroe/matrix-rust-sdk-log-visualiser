@@ -648,3 +648,105 @@ describe('useChartInteraction — onSelectionChange callback', () => {
     });
   });
 });
+
+describe('useChartInteraction — CTM-based tooltip positioning', () => {
+  beforeEach(() => {
+    mockLocalPoint.mockReset();
+  });
+
+  it('uses CTM-derived screen coordinates when svgRef.current has a working getScreenCTM', () => {
+    // The hook now returns svgRef so the component can attach it to the <svg> element.
+    // When a real (or mock) SVG is attached, handleMouseMove computes the tooltip
+    // position via the SVG's CTM instead of falling back to raw event.clientX/Y —
+    // this keeps the bubble pinned to the SVG top edge regardless of scroll position.
+    const fakeBucket = { timestamp: 100_000, timeLabel: '00:00:00', total: 5 };
+    const options = {
+      ...makeOptions(),
+      getBucketAtIndex: vi.fn().mockReturnValue(fakeBucket),
+    };
+    const { result } = renderHook(() => useChartInteraction(options));
+
+    const showTooltipFn = vi.fn();
+
+    // Build a minimal mock SVG: getScreenCTM returns a matrix; createSVGPoint
+    // returns a mutable point whose matrixTransform produces the expected screen coords.
+    const mockTransformed = { x: 520, y: 80 };
+    const mockPoint = { x: 0, y: 0, matrixTransform: vi.fn().mockReturnValue(mockTransformed) };
+    const mockSvg = {
+      getScreenCTM: vi.fn().mockReturnValue({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+      createSVGPoint: vi.fn().mockReturnValue(mockPoint),
+    };
+
+    // Attach the mock SVG to the ref that the hook created.
+    Object.defineProperty(result.current.svgRef, 'current', {
+      value: mockSvg,
+      writable: true,
+      configurable: true,
+    });
+
+    mockLocalPoint.mockReturnValueOnce({ x: 400, y: 50 });
+    act(() => {
+      result.current.handlers.handleMouseMove(
+        { clientX: 999, clientY: 999 } as React.MouseEvent<SVGRectElement>,
+        showTooltipFn,
+      );
+    });
+
+    // Tooltip must use the CTM-derived position, not the raw event coordinates.
+    expect(showTooltipFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tooltipData: fakeBucket,
+        tooltipLeft: 520,
+        tooltipTop: 80,
+      }),
+    );
+    // CTM inputs: pt.x = point.x (400), pt.y = 0 (SVG top edge)
+    expect(mockPoint.x).toBe(400);
+    expect(mockPoint.y).toBe(0);
+  });
+
+  it('uses getBoundingClientRect fallback when svgRef.current.getScreenCTM returns null', () => {
+    // When getScreenCTM returns null (e.g. in certain jsdom configurations), the hook
+    // falls back to rect-based positioning with viewBox→CSS scaling applied so the
+    // horizontal position is correct even when the SVG is rendered responsively.
+    const fakeBucket = { timestamp: 100_000, timeLabel: '00:00:00', total: 5 };
+    const options = {
+      ...makeOptions(),
+      getBucketAtIndex: vi.fn().mockReturnValue(fakeBucket),
+    };
+    const { result } = renderHook(() => useChartInteraction(options));
+
+    const showTooltipFn = vi.fn();
+
+    // SVG rendered at 800 CSS px but has a viewBox of 1000 units → scaleX = 0.8
+    const mockSvg = {
+      getScreenCTM: vi.fn().mockReturnValue(null),
+      getBoundingClientRect: vi.fn().mockReturnValue({ left: 100, top: 200, width: 800 }),
+      viewBox: { baseVal: { width: 1000 } },
+    };
+
+    Object.defineProperty(result.current.svgRef, 'current', {
+      value: mockSvg,
+      writable: true,
+      configurable: true,
+    });
+
+    mockLocalPoint.mockReturnValueOnce({ x: 300, y: 50 });
+    act(() => {
+      result.current.handlers.handleMouseMove(
+        { clientX: 999, clientY: 999 } as React.MouseEvent<SVGRectElement>,
+        showTooltipFn,
+      );
+    });
+
+    // Fallback with viewBox scale: left = rect.left + point.x * (rect.width / viewBoxWidth)
+    //   = 100 + 300 * (800 / 1000) = 100 + 240 = 340; top = rect.top = 200
+    expect(showTooltipFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tooltipData: fakeBucket,
+        tooltipLeft: 340,
+        tooltipTop: 200,
+      }),
+    );
+  });
+});
