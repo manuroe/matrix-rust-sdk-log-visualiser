@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
@@ -16,7 +17,6 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { calculateTimelineWidth } from '../utils/timelineUtils';
 import { buildCompressedTimeline, buildLinearTimeline, formatGapDuration, LABEL_PADDING_PX } from '../utils/waterfallGapUtils';
 import { LogDisplayView } from '../views/LogDisplayView';
-import { useScrollSync } from '../hooks/useScrollSync';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
@@ -26,6 +26,9 @@ import { INCOMPLETE_STATUS_KEY } from '../utils/statusCodeUtils';
 import type { HttpRequest } from '../types/log.types';
 import { RowTimeAction } from './RowTimeAction';
 import styles from './RequestTable.module.css';
+
+/** All request rows are a fixed 28 px tall. Used by the virtualizer estimator. */
+const ROW_HEIGHT_PX = 28;
 
 
 
@@ -197,8 +200,8 @@ export function RequestTable({
     setLogFilter(null);
   }, [setLogFilter, setLogFilterInput]);
 
-  // Use shared scroll sync hook
-  useScrollSync(leftPanelRef, waterfallContainerRef);
+  // Vertical scroll is driven by a single .timelineContentWrapper container, so no
+  // JS scroll-sync hook is needed between the left and right panels.
 
   // Calculate timeline scale
   // Find the maximum extent: the latest point where any request bar ends
@@ -255,6 +258,21 @@ export function RequestTable({
     }
     return buildLinearTimeline(minTime, totalDuration, timelineWidth, msPerPixel);
   }, [collapseIdlePeriods, timeData, minTime, maxEndTime, msPerPixel, totalDuration, timelineWidth]);
+
+  /**
+   * Row virtualizer — only renders the rows visible in the scroll viewport plus
+   * an overscan buffer. `getScrollElement` points at the wrapper div (leftPanelRef)
+   * which is the single vertical scroll container shared by both panels.
+   */
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: displayedRequests.length,
+    getScrollElement: () => leftPanelRef.current,
+    estimateSize: () => ROW_HEIGHT_PX,
+    overscan: 10,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalVirtualHeight = rowVirtualizer.getTotalSize();
 
   // Handle resize for layout measurements
   useEffect(() => {
@@ -514,69 +532,92 @@ export function RequestTable({
                 conditional rendering prevents the refs from going null and breaking scroll sync. */}
             <div
               data-testid="request-table-scroll-wrapper"
+              ref={leftPanelRef}
               className={styles.timelineContentWrapper}
               style={isEmpty ? { display: 'none' } : undefined}
             >
                 {/* Left panel - sticky columns */}
-                <div data-testid="request-table-left-scroll" className={styles.timelineRowsLeft} ref={leftPanelRef}>
-                  {displayedRequests.map((req) => {
-                    const rowKey = getRowKey(req);
-                    return (
-                    <div
-                      key={`sticky-${rowKey}`}
-                      data-row-id={`sticky-${rowKey}`}
-                      className={`${styles.requestRow} ${openLogViewerIds.has(rowKey) ? styles.selected : ''} ${(expandedRows.has(rowKey) && openLogViewerIds.has(rowKey)) ? styles.expanded : ''} ${(!req.status && !req.clientError) ? styles.incomplete : ''}`}
-                      style={{ minHeight: '28px', cursor: 'pointer', zIndex: menuOpenForRowKey === rowKey ? 10 : undefined }}
-                      onMouseEnter={() => handleRowMouseEnter(rowKey)}
-                      onMouseLeave={() => handleRowMouseLeave(rowKey)}
-                      onClick={() => handleWaterfallRowClick(req)}
-                    >
-                      <div className={styles.requestRowSticky}>
-                        {/* Leading actions column */}
-                        <RowTimeAction
-                          timestampUs={lineNumberIndex.get(req.sendLineNumber)?.timestampUs}
-                          onOpenChange={(open) =>
-                            setMenuOpenForRowKey((prev) => (open ? rowKey : prev === rowKey ? null : prev))
-                          }
-                        />
-                        {columns.map((col, i) => {
-                          // First column is clickable request ID
-                          if (i === 0) {
+                <div data-testid="request-table-left-scroll" className={styles.timelineRowsLeft}>
+                  {/*
+                   * Padding approach: rows stay in normal flow so the grid content
+                   * establishes the container's width correctly. Padding-top/bottom
+                   * stand in for the rows that are scrolled out of view, making the
+                   * total height equal to totalVirtualHeight without needing a
+                   * position:relative spacer (which would collapse to width 0 because
+                   * all absolutely-positioned children are taken out of flow).
+                   */}
+                  <div
+                    style={{
+                      paddingTop: `${virtualRows[0]?.start ?? 0}px`,
+                      paddingBottom: `${Math.max(0, totalVirtualHeight - (virtualRows[virtualRows.length - 1]?.end ?? totalVirtualHeight))}px`,
+                    }}
+                  >
+                    {virtualRows.map((vRow) => {
+                      const req = displayedRequests[vRow.index];
+                      const rowKey = getRowKey(req);
+                      return (
+                      <div
+                        key={`sticky-${rowKey}`}
+                        data-row-id={`sticky-${rowKey}`}
+                        className={`${styles.requestRow} ${openLogViewerIds.has(rowKey) ? styles.selected : ''} ${(expandedRows.has(rowKey) && openLogViewerIds.has(rowKey)) ? styles.expanded : ''} ${(!req.status && !req.clientError) ? styles.incomplete : ''}`}
+                        style={{
+                          height: `${vRow.size}px`,
+                          cursor: 'pointer',
+                          zIndex: menuOpenForRowKey === rowKey ? 10 : undefined,
+                        }}
+                        onMouseEnter={() => handleRowMouseEnter(rowKey)}
+                        onMouseLeave={() => handleRowMouseLeave(rowKey)}
+                        onClick={() => handleWaterfallRowClick(req)}
+                      >
+                        <div className={styles.requestRowSticky}>
+                          {/* Leading actions column */}
+                          <RowTimeAction
+                            timestampUs={lineNumberIndex.get(req.sendLineNumber)?.timestampUs}
+                            onOpenChange={(open) =>
+                              setMenuOpenForRowKey((prev) => (open ? rowKey : prev === rowKey ? null : prev))
+                            }
+                          />
+                          {columns.map((col, i) => {
+                            // First column is clickable request ID
+                            if (i === 0) {
+                              return (
+                                <div
+                                  key={col.id}
+                                  className={`${styles.requestId} ${styles.clickable} ${styles.stickyCol} ${getColumnClass(col.className)}`}
+                                  data-testid={`request-id-${req.requestId}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRequestClick(rowKey, req.requestId, req);
+                                  }}
+                                >
+                                  {col.getValue(req)}
+                                </div>
+                              );
+                            }
                             return (
                               <div
                                 key={col.id}
-                                className={`${styles.requestId} ${styles.clickable} ${styles.stickyCol} ${getColumnClass(col.className)}`}
-                                data-testid={`request-id-${req.requestId}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRequestClick(rowKey, req.requestId, req);
-                                }}
+                                className={`${styles.stickyCol} ${getColumnClass(col.className)}`}
+                                title={col.getValue(req)}
                               >
                                 {col.getValue(req)}
                               </div>
                             );
-                          }
-                          return (
-                            <div
-                              key={col.id}
-                              className={`${styles.stickyCol} ${getColumnClass(col.className)}`}
-                              title={col.getValue(req)}
-                            >
-                              {col.getValue(req)}
-                            </div>
-                          );
-                        })}
+                          })}
 
+                        </div>
                       </div>
-                    </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Right panel - waterfall */}
                 <div data-testid="request-table-right-scroll" className={styles.timelineRowsRight} ref={waterfallContainerRef}>
-                  <div style={{ display: 'flex', flexDirection: 'column', width: `${timeline.totalWidthPx}px`, position: 'relative' }}>
-                    {displayedRequests.map((req) => {
+                  {/* Spacer div establishes the full scrollable height and contains absolutely-positioned rows + gap overlays. */}
+                  <div style={{ width: `${timeline.totalWidthPx}px`, height: `${totalVirtualHeight}px`, position: 'relative' }}>
+                    {virtualRows.map((vRow) => {
+                      const req = displayedRequests[vRow.index];
                       const sendLine = lineNumberIndex.get(req.sendLineNumber);
                       const reqTime = microsToMs(sendLine?.timestampUs ?? 0);
                       const barLeft = timeline.timeToPixel(reqTime);
@@ -608,12 +649,18 @@ export function RequestTable({
                           key={`waterfall-${rowKey}`}
                           data-row-id={`waterfall-${rowKey}`}
                           className={`${styles.requestRow} ${openLogViewerIds.has(rowKey) ? styles.selected : ''} ${(expandedRows.has(rowKey) && openLogViewerIds.has(rowKey)) ? styles.expanded : ''} ${resolvedIsIncomplete ? styles.incomplete : ''}`}
-                          style={{ minHeight: '28px', cursor: 'pointer' }}
+                          style={{
+                            position: 'absolute',
+                            top: `${vRow.start}px`,
+                            width: '100%',
+                            height: `${vRow.size}px`,
+                            cursor: 'pointer',
+                          }}
                           onMouseEnter={() => handleRowMouseEnter(rowKey)}
                           onMouseLeave={() => handleRowMouseLeave(rowKey)}
                           onClick={() => handleWaterfallRowClick(req)}
                         >
-                          <div style={{ position: 'relative', overflow: 'visible', zIndex: 3 }}>
+                          <div style={{ position: 'relative', overflow: 'visible' }}>
                             <div
                               className={styles.waterfallItem}
                               style={{
