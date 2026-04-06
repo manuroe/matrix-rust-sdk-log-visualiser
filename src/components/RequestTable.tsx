@@ -27,10 +27,11 @@ import type { HttpRequest } from '../types/log.types';
 import { RowTimeAction } from './RowTimeAction';
 import styles from './RequestTable.module.css';
 
-/** All request rows are a fixed 28 px tall. Used by the virtualizer estimator. */
+/**
+ * All request rows are a fixed 28 px tall. Used by the virtualizer estimator.
+ * Must match the `min-height: 28px` on `.requestRow` in RequestTable.module.css.
+ */
 const ROW_HEIGHT_PX = 28;
-
-
 
 /**
  * Column definition for the RequestTable component.

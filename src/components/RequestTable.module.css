@@ -63,8 +63,6 @@
     display: none;
 }
 
-
-
 /* Timeline container */
 .timelineContainer {
     /* Column widths shared between the sticky header and all row cells.
@@ -158,6 +156,9 @@
     font-size: var(--font-size-base);
     cursor: pointer;
     transition: background-color var(--transition-fast);
+    /* Row height must match ROW_HEIGHT_PX in RequestTable.tsx (used by the virtualizer
+       estimator). The virtualizer sets an explicit height inline, so this min-height
+       serves as a fallback for any non-virtualised rendering path. */
     min-height: 28px;
     --row-bg: var(--row-bg-even);
     background-color: var(--row-bg);
