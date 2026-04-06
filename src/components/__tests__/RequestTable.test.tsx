@@ -980,7 +980,7 @@ describe('RequestTable', () => {
       expect(screen.getByRole('button', { name: /collapse left panel/i })).toBeInTheDocument();
     });
 
-    it('surfaces hidden column values in URI cell tooltip when collapsed', () => {
+    it('surfaces hidden column values in last visible cell tooltip when collapsed', () => {
       const req = createHttpRequest({
         requestId: 'REQ-FOCUS',
         uri: '/example/path',
@@ -1011,12 +1011,47 @@ describe('RequestTable', () => {
         />
       );
 
-      // In collapsed mode, the URI cell's title should include the hidden method value
+      // In collapsed mode the last focus column (URI) title should include the hidden method value
       const uriCells = document.querySelectorAll('[title]');
       const uriCell = Array.from(uriCells).find((el) =>
         el.getAttribute('title')?.includes('/example/path')
       );
       expect(uriCell?.getAttribute('title')).toContain('POST');
+    });
+
+    it('surfaces hidden column values on requestId cell when it is the only visible column', () => {
+      const req = createHttpRequest({
+        requestId: 'REQ-SINGLE',
+        uri: '/sync',
+        method: 'GET',
+        sendLineNumber: 20,
+        responseLineNumber: 21,
+        status: '200',
+      });
+      useLogStore.getState().setHttpRequests([req], [
+        createParsedLogLine({ lineNumber: 20 }),
+        createParsedLogLine({ lineNumber: 21 }),
+      ]);
+
+      const singleFocusCols: ColumnDef[] = [
+        { id: 'requestId', label: 'Request', getValue: (r) => r.requestId },
+        { id: 'uri', label: 'URI', getValue: (r) => r.uri },
+      ];
+
+      renderWithRouter(
+        <RequestTable
+          {...createProps({
+            columns: singleFocusCols,
+            filteredRequests: [req],
+            totalCount: 1,
+            focusModeColumnIds: ['requestId'],
+          })}
+        />
+      );
+
+      // requestId is the only visible column — its title should include the hidden URI value
+      const idCell = document.querySelector(`[data-testid="request-id-REQ-SINGLE"]`);
+      expect(idCell?.getAttribute('title')).toContain('/sync');
     });
   });
 });

@@ -11,7 +11,8 @@ import { getSyncRequestBarColor } from '../utils/syncRequestColors';
 
 /**
  * Column IDs shown when waterfall-focus mode is active for sync requests.
- * Only the request ID column is kept; the rest collapse into the URI tooltip.
+ * Only the request ID column remains visible in this mode; hidden column values
+ * are surfaced in the request ID cell tooltip.
  */
 const SYNC_WATERFALL_FOCUS_COLUMNS: readonly string[] = ['requestId'];
 

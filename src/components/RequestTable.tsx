@@ -161,7 +161,7 @@ export function RequestTable({
   /** Row key of the request whose RowTimeAction menu is open, or null. */
   const [menuOpenForRowKey, setMenuOpenForRowKey] = useState<number | null>(null);
   /** When true, only focusModeColumnIds columns are shown to widen the waterfall timeline. */
-  const [waterfallFocus, setWaterfallFocus] = useState(true);
+  const [waterfallFocus, setWaterfallFocus] = useState(focusModeColumnIds !== undefined);
   /** Stable toggle callback — passed to both the header button and the content strip. */
   const handleCollapseToggle = useCallback(() => setWaterfallFocus((v) => !v), []);
 
@@ -545,7 +545,7 @@ export function RequestTable({
       </div>
 
       <div
-        className={`${styles.timelineContainer}${waterfallFocus ? ` ${styles.waterfallFocusMode}` : ''}`}
+        className={`${styles.timelineContainer}${(waterfallFocus && focusModeColumnIds) ? ` ${styles.waterfallFocusMode}` : ''}`}
         // eslint-disable-next-line @typescript-eslint/naming-convention -- CSS custom property name
         style={focusGridTemplate !== undefined ? { '--focus-grid-template': focusGridTemplate } as CSSProperties : undefined}
       >
@@ -636,13 +636,21 @@ export function RequestTable({
                             }
                           />
                           {displayedColumns.map((col, i) => {
+                            const isLastCol = i === displayedColumns.length - 1;
+                            const hiddenSuffix = (isLastCol && hiddenColumns.length > 0)
+                              ? hiddenColumns.map((hc) => hc.getValue(req)).filter(Boolean)
+                              : [];
                             // First column is clickable request ID
                             if (i === 0) {
+                              const titleValue = hiddenSuffix.length > 0
+                                ? [col.getValue(req), ...hiddenSuffix].join(' · ')
+                                : undefined;
                               return (
                                 <div
                                   key={col.id}
                                   className={`${styles.requestId} ${styles.clickable} ${styles.stickyCol} ${getColumnClass(col.className)}`}
                                   data-testid={`request-id-${req.requestId}`}
+                                  title={titleValue}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRequestClick(rowKey, req.requestId, req);
@@ -656,8 +664,8 @@ export function RequestTable({
                               <div
                                 key={col.id}
                                 className={`${styles.stickyCol} ${getColumnClass(col.className)}`}
-                                title={col.id === 'uri' && hiddenColumns.length > 0
-                                  ? [col.getValue(req), ...hiddenColumns.map((hc) => hc.getValue(req)).filter(Boolean)].join(' · ')
+                                title={hiddenSuffix.length > 0
+                                  ? [col.getValue(req), ...hiddenSuffix].join(' · ')
                                   : col.getValue(req)
                                 }
                               >

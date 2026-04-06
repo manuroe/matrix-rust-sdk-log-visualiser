@@ -209,11 +209,13 @@
 }
 
 /**
- * Collapse/expand handle — renders as a flex item at the boundary between the
- * sticky left panel and the waterfall timeline.  No absolute positioning or
- * z-index so it never interferes with the scroll containers.
+ * Collapse/expand handle — base rule renders as a flex item at the boundary
+ * between the sticky left panel and the waterfall timeline.  Context-specific
+ * overrides (e.g. `.timelineHeaderSticky .collapseToggle` below) may change
+ * positioning; this base rule has no z-index and does not interfere with the
+ * scroll containers.
  *
- * .collapseToggle  — header row version (contains the «/» chevron icon)
+ * .collapseToggle  — base/body-row version (contains the «/» chevron icon)
  */
 .collapseToggle {
     flex-shrink: 0;
