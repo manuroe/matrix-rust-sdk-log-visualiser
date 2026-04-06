@@ -53,8 +53,9 @@
     overflow-x: auto;
     overflow-y: hidden;
     position: relative;
-    /* Both scrollbars are hidden: vertical is managed by the wrapper container,
-       horizontal navigation uses trackpad gestures or mouse wheel. */
+    /* The horizontal scrollbar is hidden here; vertical scrolling is managed
+       by .timelineContentWrapper, and horizontal navigation uses trackpad
+       gestures or mouse wheel. */
     scrollbar-width: none;
 }
 
@@ -182,13 +183,11 @@
     padding: 3px 12px;
 }
 
-/* Zebra striping */
-.requestRow:nth-child(odd) {
+/* Zebra striping — applied via an explicit .rowOdd class based on vRow.index in
+   RequestTable.tsx. :nth-child selectors are unreliable with virtualization because
+   only a subset of rows is in the DOM at any time, causing parity to flip on scroll. */
+.requestRow.rowOdd {
     --row-bg: var(--row-bg-odd);
-}
-
-.requestRow:nth-child(even) {
-    --row-bg: var(--row-bg-even);
 }
 
 .requestRow:hover {

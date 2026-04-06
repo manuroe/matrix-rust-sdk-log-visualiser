@@ -541,9 +541,9 @@ export function RequestTable({
             {isEmpty && (
               <div className={styles.noData}>{emptyMessage}</div>
             )}
-            {/* Always keep both panels mounted so useScrollSync listeners stay attached even when the
-                list temporarily becomes empty (e.g. mid-filter). Hiding with display:none rather than
-                conditional rendering prevents the refs from going null and breaking scroll sync. */}
+            {/* Always keep both panels mounted so the scroll container ref (leftPanelRef) stays attached
+                even when the list temporarily becomes empty (e.g. mid-filter). Hiding with display:none
+                rather than conditional rendering prevents the ref from going null. */}
             <div
               data-testid="request-table-scroll-wrapper"
               ref={leftPanelRef}
@@ -573,7 +573,7 @@ export function RequestTable({
                       <div
                         key={`sticky-${rowKey}`}
                         data-row-id={`sticky-${rowKey}`}
-                        className={`${styles.requestRow} ${openLogViewerIds.has(rowKey) ? styles.selected : ''} ${(expandedRows.has(rowKey) && openLogViewerIds.has(rowKey)) ? styles.expanded : ''} ${(!req.status && !req.clientError) ? styles.incomplete : ''}`}
+                        className={`${styles.requestRow} ${vRow.index % 2 === 0 ? styles.rowOdd : ''} ${openLogViewerIds.has(rowKey) ? styles.selected : ''} ${(expandedRows.has(rowKey) && openLogViewerIds.has(rowKey)) ? styles.expanded : ''} ${(!req.status && !req.clientError) ? styles.incomplete : ''}`}
                         style={{
                           height: `${vRow.size}px`,
                           cursor: 'pointer',
@@ -662,7 +662,7 @@ export function RequestTable({
                         <div
                           key={`waterfall-${rowKey}`}
                           data-row-id={`waterfall-${rowKey}`}
-                          className={`${styles.requestRow} ${openLogViewerIds.has(rowKey) ? styles.selected : ''} ${(expandedRows.has(rowKey) && openLogViewerIds.has(rowKey)) ? styles.expanded : ''} ${resolvedIsIncomplete ? styles.incomplete : ''}`}
+                          className={`${styles.requestRow} ${vRow.index % 2 === 0 ? styles.rowOdd : ''} ${openLogViewerIds.has(rowKey) ? styles.selected : ''} ${(expandedRows.has(rowKey) && openLogViewerIds.has(rowKey)) ? styles.expanded : ''} ${resolvedIsIncomplete ? styles.incomplete : ''}`}
                           style={{
                             position: 'absolute',
                             top: `${vRow.start}px`,
