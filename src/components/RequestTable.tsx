@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -27,10 +28,7 @@ import type { HttpRequest } from '../types/log.types';
 import { RowTimeAction } from './RowTimeAction';
 import styles from './RequestTable.module.css';
 
-/**
- * All request rows are a fixed 28 px tall. Used by the virtualizer estimator.
- * Must match the `min-height: 28px` on `.requestRow` in RequestTable.module.css.
- */
+/** All request rows are a fixed 28 px tall. Used by the virtualizer estimator. */
 const ROW_HEIGHT_PX = 28;
 
 /**
@@ -96,6 +94,15 @@ export interface RequestTableProps {
     msPerPixel: number,
     durationToPixels: (durationMs: number) => number,
   ) => ReactNode;
+  /**
+   * Column IDs to show when waterfall-focus mode is active.
+   * When provided, a compact toggle appears in the header; activating it hides
+   * all other columns, freeing horizontal space for the waterfall timeline.
+   * Hidden column values are surfaced in the tooltip of the last visible focus column.
+   *
+   * @example ['requestId', 'uri']
+   */
+  focusModeColumnIds?: readonly string[];
 }
 
 /**
@@ -129,6 +136,7 @@ export function RequestTable({
   showSyncFilter = true,
   getBarColor,
   renderBarOverlay,
+  focusModeColumnIds,
 }: RequestTableProps) {
   const {
     expandedRows,
@@ -152,12 +160,52 @@ export function RequestTable({
   const [collapseIdlePeriods, setCollapseIdlePeriods] = useState(true);
   /** Row key of the request whose RowTimeAction menu is open, or null. */
   const [menuOpenForRowKey, setMenuOpenForRowKey] = useState<number | null>(null);
+  /** When true, only focusModeColumnIds columns are shown to widen the waterfall timeline. */
+  const [waterfallFocus, setWaterfallFocus] = useState(focusModeColumnIds !== undefined);
+  /** Stable toggle callback for the header button. */
+  const handleCollapseToggle = useCallback(() => setWaterfallFocus((v) => !v), []);
 
   const isSyncRequest = (req: HttpRequest): boolean => /\/sync(?:[/?]|$)/i.test(req.uri);
   const displayedRequests = showSyncRequests
     ? filteredRequests
     : filteredRequests.filter((req) => !isSyncRequest(req));
   const isEmpty = displayedRequests.length === 0;
+
+  /**
+   * Columns rendered in the current layout mode.
+   * In waterfall-focus mode only the columns whose id is in focusModeColumnIds
+   * are shown; all others are hidden to widen the waterfall timeline.
+   */
+  const displayedColumns = useMemo(
+    () => (waterfallFocus && focusModeColumnIds)
+      ? columns.filter((c) => focusModeColumnIds.includes(c.id))
+      : columns,
+    [waterfallFocus, focusModeColumnIds, columns],
+  );
+
+  /** Columns hidden in waterfall-focus mode; their values are appended to the tooltip of the last visible focus column. */
+  const hiddenColumns = useMemo(
+    () => (waterfallFocus && focusModeColumnIds)
+      ? columns.filter((c) => !focusModeColumnIds.includes(c.id))
+      : [],
+    [waterfallFocus, focusModeColumnIds, columns],
+  );
+
+  /**
+   * CSS grid template for the focus-mode left panel, derived from the columns
+   * actually displayed. Injected as --focus-grid-template on the container so
+   * the panel shrinks exactly to fit the visible focus columns.
+   * Each track resolves from a column-id CSS variable (e.g. --col-requestId,
+   * --col-url) with --col-url as a safe fallback for unknown ids.
+   * Falls back to a single --col-url track when no focus columns match.
+   */
+  const focusGridTemplate = (waterfallFocus && focusModeColumnIds)
+    ? (
+        displayedColumns.length > 0
+          ? displayedColumns.map((col) => `var(--col-${col.id}, var(--col-url))`).join(' ')
+          : 'var(--col-url)'
+      )
+    : undefined;
 
   // Log filter state with debouncing
   const [logFilterInput, setLogFilterInput] = useState(logFilter ?? '');
@@ -275,18 +323,20 @@ export function RequestTable({
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalVirtualHeight = rowVirtualizer.getTotalSize();
 
-  // Replicate sticky-top behavior for gap labels: CSS position:sticky is blocked
-  // by the overflow-x: auto on .timelineRowsRight.  Update --gap-label-offset on
-  // the scroll container so gap labels can translate themselves by scrollTop,
-  // keeping the pill visible in the viewport without any React re-renders.
+  // Keep idle-gap labels visually pinned while the shared vertical container scrolls.
+  // position:sticky is blocked by overflow-x:auto on .timelineRowsRight, so a JS listener
+  // on the wrapper writes --gap-label-offset = scrollTop; the label uses translateY to follow.
   useEffect(() => {
-    const container = leftPanelRef.current;
-    if (!container) return;
-    const handleGapLabelScroll = () => {
-      container.style.setProperty('--gap-label-offset', `${container.scrollTop}px`);
+    const scrollElement = leftPanelRef.current;
+    if (!scrollElement) return;
+    const updateGapLabelOffset = () => {
+      scrollElement.style.setProperty('--gap-label-offset', `${scrollElement.scrollTop}px`);
     };
-    container.addEventListener('scroll', handleGapLabelScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleGapLabelScroll);
+    updateGapLabelOffset();
+    scrollElement.addEventListener('scroll', updateGapLabelOffset, { passive: true });
+    return () => {
+      scrollElement.removeEventListener('scroll', updateGapLabelOffset);
+    };
   }, []);
 
   // Handle resize for layout measurements
@@ -516,10 +566,25 @@ export function RequestTable({
         </div>
       </div>
 
-      <div className={styles.timelineContainer}>
+      <div
+        className={`${styles.timelineContainer}${(waterfallFocus && focusModeColumnIds) ? ` ${styles.waterfallFocusMode}` : ''}`}
+        // eslint-disable-next-line @typescript-eslint/naming-convention -- CSS custom property name
+        style={focusGridTemplate !== undefined ? { '--focus-grid-template': focusGridTemplate } as CSSProperties : undefined}
+      >
         <div className={styles.timelineHeader}>
           <div className={styles.timelineHeaderSticky} ref={stickyHeaderRef}>
-            {columns.map((col) => (
+            {focusModeColumnIds && (
+              <button
+                className={`${styles.collapseToggle}${waterfallFocus ? ` ${styles.collapseToggleActive}` : ''}`}
+                onClick={handleCollapseToggle}
+                aria-label={waterfallFocus ? 'Expand left panel' : 'Collapse left panel'}
+                aria-pressed={waterfallFocus}
+                title={waterfallFocus ? 'Expand columns' : 'Collapse columns'}
+              >
+                {waterfallFocus ? '»' : '«'}
+              </button>
+            )}
+            {displayedColumns.map((col) => (
               <div
                 key={col.id}
                 className={`${styles.stickyCol} ${getColumnClass(col.className)}`}
@@ -542,9 +607,9 @@ export function RequestTable({
             {isEmpty && (
               <div className={styles.noData}>{emptyMessage}</div>
             )}
-            {/* Always keep both panels mounted so the scroll container ref (leftPanelRef) stays attached
-                even when the list temporarily becomes empty (e.g. mid-filter). Hiding with display:none
-                rather than conditional rendering prevents the ref from going null. */}
+            {/* Always keep both panels mounted so scroll container refs (leftPanelRef / rightPanelRef)
+                stay attached even when the list temporarily becomes empty (e.g. mid-filter). Using
+                display:none rather than conditional rendering prevents the refs from going null. */}
             <div
               data-testid="request-table-scroll-wrapper"
               ref={leftPanelRef}
@@ -592,14 +657,22 @@ export function RequestTable({
                               setMenuOpenForRowKey((prev) => (open ? rowKey : prev === rowKey ? null : prev))
                             }
                           />
-                          {columns.map((col, i) => {
+                          {displayedColumns.map((col, i) => {
+                            const isLastCol = i === displayedColumns.length - 1;
+                            const hiddenSuffix = (isLastCol && hiddenColumns.length > 0)
+                              ? hiddenColumns.map((hc) => hc.getValue(req)).filter(Boolean)
+                              : [];
                             // First column is clickable request ID
                             if (i === 0) {
+                              const titleValue = hiddenSuffix.length > 0
+                                ? [col.getValue(req), ...hiddenSuffix].join(' · ')
+                                : undefined;
                               return (
                                 <div
                                   key={col.id}
                                   className={`${styles.requestId} ${styles.clickable} ${styles.stickyCol} ${getColumnClass(col.className)}`}
                                   data-testid={`request-id-${req.requestId}`}
+                                  title={titleValue}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRequestClick(rowKey, req.requestId, req);
@@ -613,7 +686,10 @@ export function RequestTable({
                               <div
                                 key={col.id}
                                 className={`${styles.stickyCol} ${getColumnClass(col.className)}`}
-                                title={col.getValue(req)}
+                                title={hiddenSuffix.length > 0
+                                  ? [col.getValue(req), ...hiddenSuffix].join(' · ')
+                                  : col.getValue(req)
+                                }
                               >
                                 {col.getValue(req)}
                               </div>
