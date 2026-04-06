@@ -9,10 +9,30 @@ import { RequestTable } from '../RequestTable';
 import type { RequestTableProps, ColumnDef } from '../RequestTable';
 import { useLogStore } from '../../stores/logStore';
 import { createHttpRequest, createParsedLogLine } from '../../test/fixtures';
-import { mockVirtualizer } from '../../test/mocks';
-
-// Mock the virtualizer hook used by WaterfallTimeline
-vi.mock('@tanstack/react-virtual', () => mockVirtualizer());
+// Mock the virtualizer hook used by RequestTable.
+// Inlined here (not via a helper import) because vi.mock factories are hoisted
+// before import bindings are initialised, so imported helper functions are not
+// safe to call inside a vi.mock factory.
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: (opts: { count: number; estimateSize: () => number }) => ({
+    getTotalSize: () => opts.count * opts.estimateSize(),
+    getVirtualItems: () =>
+      Array.from({ length: opts.count }, (_, i) => {
+        const size = opts.estimateSize();
+        const start = i * size;
+        return {
+          index: i,
+          key: i,
+          start,
+          size,
+          end: start + size,
+        };
+      }),
+    measureElement: () => {},
+    measure: () => {},
+    measurementsCache: [],
+  }),
+}));
 
 // Spy on navigate to verify onExpand routing
 const mockNavigate = vi.fn();

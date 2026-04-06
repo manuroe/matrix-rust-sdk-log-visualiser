@@ -7,6 +7,29 @@ import type { SyncRequest } from '../../types/log.types';
 import { act } from '@testing-library/react';
 import * as URLParamsModule from '../../hooks/useURLParams';
 
+// Mock the virtualizer — inlined to avoid TDZ issues with hoisted vi.mock factories.
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: (opts: { count: number; estimateSize: () => number }) => ({
+    getTotalSize: () => opts.count * opts.estimateSize(),
+    getVirtualItems: () =>
+      Array.from({ length: opts.count }, (_, i) => {
+        const size = opts.estimateSize();
+        const start = i * size;
+
+        return {
+          index: i,
+          key: i,
+          start,
+          size,
+          end: start + size,
+        };
+      }),
+    measureElement: () => {},
+    measure: () => {},
+    measurementsCache: [],
+  }),
+}));
+
 // Mock dependencies
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ hash: window.location.hash }),
@@ -231,12 +254,14 @@ describe('SyncView - ID Parameter Deep Linking', () => {
     
     const { container } = render(<SyncView />);
 
-    const leftPanel = container.querySelector('.waterfall-timeline-left') as HTMLElement;
-    if (leftPanel) {
+    // The scroll container is the timelineContentWrapper (data-testid="request-table-scroll-wrapper").
+    // Set up dimension mocks so maxScroll > 0 and the retry logic activates.
+    const scrollWrapper = container.querySelector('[data-testid="request-table-scroll-wrapper"]') as HTMLElement;
+    if (scrollWrapper) {
       let scrollCount = 0;
-      Object.defineProperty(leftPanel, 'clientHeight', { value: 400, configurable: true });
-      Object.defineProperty(leftPanel, 'scrollHeight', { value: 1400, configurable: true });
-      Object.defineProperty(leftPanel, 'scrollTop', {
+      Object.defineProperty(scrollWrapper, 'clientHeight', { value: 400, configurable: true });
+      Object.defineProperty(scrollWrapper, 'scrollHeight', { value: 1400, configurable: true });
+      Object.defineProperty(scrollWrapper, 'scrollTop', {
         get: () => {
           // First few attempts return wrong value, then correct
           if (scrollCount < 3) return 0;

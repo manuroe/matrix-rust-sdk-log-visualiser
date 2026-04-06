@@ -18,12 +18,30 @@
 .timelineContentWrapper {
     display: flex;
     flex: 1;
-    overflow: hidden;
+    /*
+     * Single vertical scroll container for both the left and right panels.
+     * Both children use overflow-y: hidden so they don't scroll independently.
+     * Vertical scroll is driven here once, eliminating the JS-sync 1-frame lag
+     * that caused the two panels to desync when scrolling at speed.
+     *
+     * align-items: flex-start is critical: it lets both children take their
+     * natural (content) height rather than stretching to fill the wrapper.
+     * Without it, children fill the bounded wrapper height and nothing overflows
+     * — so overflow-y: scroll has nothing to scroll.
+     *
+     * will-change: scroll-position tells the browser to maintain a larger
+     * pre-rasterized tile buffer in the scroll direction, reducing blank tiles
+     * when scrolling fast through 2 000+ rows.
+     */
+    overflow-y: scroll;
+    overflow-x: hidden;
+    align-items: flex-start;
+    will-change: scroll-position;
 }
 
 .timelineRowsLeft {
     flex-shrink: 0;
-    overflow-y: auto;
+    overflow-y: hidden;
     overflow-x: hidden;
     border-right: 1px solid var(--border-default);
     display: flex;
@@ -33,8 +51,11 @@
 .timelineRowsRight {
     flex: 1;
     overflow-x: auto;
-    overflow-y: scroll;
+    overflow-y: hidden;
     position: relative;
+    /* The horizontal scrollbar is hidden here; vertical scrolling is managed
+       by .timelineContentWrapper, and horizontal navigation uses trackpad
+       gestures or mouse wheel. */
     scrollbar-width: none;
 }
 
@@ -135,6 +156,9 @@
     font-size: var(--font-size-base);
     cursor: pointer;
     transition: background-color var(--transition-fast);
+    /* Row height must match ROW_HEIGHT_PX in RequestTable.tsx (used by the virtualizer
+       estimator). The virtualizer sets an explicit height inline, so this min-height
+       serves as a fallback for any non-virtualised rendering path. */
     min-height: 28px;
     --row-bg: var(--row-bg-even);
     background-color: var(--row-bg);
@@ -160,13 +184,11 @@
     padding: 3px 12px;
 }
 
-/* Zebra striping */
-.requestRow:nth-child(odd) {
+/* Zebra striping — applied via an explicit .rowOdd class based on vRow.index in
+   RequestTable.tsx. :nth-child selectors are unreliable with virtualization because
+   only a subset of rows is in the DOM at any time, causing parity to flip on scroll. */
+.requestRow.rowOdd {
     --row-bg: var(--row-bg-odd);
-}
-
-.requestRow:nth-child(even) {
-    --row-bg: var(--row-bg-even);
 }
 
 .requestRow:hover {
@@ -351,6 +373,14 @@
     bottom: 0;
     pointer-events: none;
     z-index: 2;
+    /*
+     * Promote to a GPU compositor layer so the diagonal gradient is rasterised
+     * once into GPU tiles rather than being repainted on every scroll frame.
+     * The scroll-sync regression was primarily caused by zIndex: 3 on each
+     * waterfall row wrapper (since removed), but this keeps the gap overlay
+     * compositing cheap regardless of the number of rows.
+     */
+    will-change: transform;
     border-left: 1px solid var(--gap-border);
     border-right: 1px solid var(--gap-border);
     background: repeating-linear-gradient(
@@ -368,9 +398,17 @@
 }
 
 .gapLabel {
-    /* sticky keeps the pill in the viewport as the user scrolls down through rows */
-    position: sticky;
+    /*
+     * position: sticky cannot see through the overflow-x: auto on .timelineRowsRight
+     * because any non-visible overflow creates a new scroll container that blocks
+     * sticky from latching onto an ancestor scroll container.  Instead, a JS scroll
+     * listener on .timelineContentWrapper sets --gap-label-offset to scrollTop so
+     * the translateY replicates sticky-top: 8px without CSS sticky.
+     */
+    position: absolute;
     top: 8px;
+    left: 50%;
+    transform: translateX(-50%) translateY(var(--gap-label-offset, 0px));
     font-size: var(--font-size-xs);
     font-family: var(--font-mono);
     color: var(--gap-label-color);
