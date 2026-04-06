@@ -91,8 +91,6 @@
   --log-level-error: #f44336;
   --log-level-error-text: #f48771;
   --log-level-unknown: #858585;
-  --log-collapse-exact: #4caf50;
-  --log-collapse-similar: #64b5f6;
   --log-timestamp: #9cdcfe;
   --log-search-highlight: #ffeb3b;
   --log-search-highlight-text: #000;        /* High-contrast text on the yellow highlight */
@@ -179,7 +177,7 @@
      Distinct colors for /sync request types in the waterfall view.
      ------------------------------------------------------------------------- */
   --sync-catchup-success: #84cc16;     /* Yellow-green: catchup = app speed indicator */
-  --sync-longpoll-success: #64748b;    /* Slate blue-gray: long-poll = background request */
+  --sync-longpoll-success: #5f8f6f;    /* Muted sage: long-poll = background request */
 
   /* -------------------------------------------------------------------------
      HTTP Status Code Colors
@@ -301,7 +299,7 @@
 
   /* Sync Request Colors */
   --sync-catchup-success: #a3e635;     /* Brighter lime for dark mode visibility */
-  --sync-longpoll-success: #94a3b8;    /* Brighter slate for dark mode visibility */
+  --sync-longpoll-success: #7fb091;    /* Brighter sage for dark mode visibility */
 
   /* Idle Gap Band Colors */
   --gap-stripe-a: rgba(255, 255, 255, 0.03);
@@ -411,7 +409,7 @@
 
     /* Sync Request Colors */
     --sync-catchup-success: #a3e635;
-    --sync-longpoll-success: #94a3b8;
+    --sync-longpoll-success: #7fb091;
 
     /* Idle Gap Band Colors */
     --gap-stripe-a: rgba(255, 255, 255, 0.03);
