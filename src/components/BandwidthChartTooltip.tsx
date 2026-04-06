@@ -57,7 +57,6 @@ export function renderBandwidthTooltip(bucket: BandwidthBucket): React.ReactElem
 
   return (
     <>
-
       {uploadEntries.length > 0 && (
         <>
           <div style={{ fontSize: '9px', color: '#aaa', marginBottom: '1px' }}>↑ Upload</div>

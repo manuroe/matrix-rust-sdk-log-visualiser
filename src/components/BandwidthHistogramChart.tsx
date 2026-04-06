@@ -586,7 +586,6 @@ export function BandwidthHistogramChart({
           </Group>
         </svg>
 
-        {/* ── Tooltip — local hover ───────────────────────────────────── */}
         {/* ── Tooltip — always pinned to the SVG top at the cursor x-position ── */}
         {!isSelecting &&
           tooltipData &&
