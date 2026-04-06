@@ -403,7 +403,7 @@ export function HttpConcurrencyChart({
           <div
             style={{
               position: 'fixed',
-              left: Math.min(tooltipLeft + 12, window.innerWidth - 200),
+              left: Math.max(0, Math.min(tooltipLeft + 12, Math.max(0, window.innerWidth - 200))),
               top: tooltipTop,
               backgroundColor: 'rgba(0,0,0,0.85)',
               color: 'white',
