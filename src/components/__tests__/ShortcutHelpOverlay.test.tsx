@@ -112,14 +112,14 @@ describe('ShortcutHelpOverlay', () => {
     expect(screen.getByText('Go to Sync Requests')).toBeInTheDocument();
   });
 
-  it('shows theme and session shortcuts', () => {
+  it('shows theme, session, and help shortcuts', () => {
     renderWithCtx(makeCtx({ showHelp: true }), <ShortcutHelpOverlay />);
     expect(screen.getByText(/cycle theme/i)).toBeInTheDocument();
     expect(screen.getByText(/new session/i)).toBeInTheDocument();
     expect(screen.getByText('Open help')).toBeInTheDocument();
   });
 
-  it('shows log and HTTP color legends in the help overlay', () => {
+  it('shows log, HTTP, and sync color legends in the help overlay', () => {
     renderWithCtx(makeCtx({ showHelp: true }), <ShortcutHelpOverlay />);
     expect(screen.getByText('Log Colors')).toBeInTheDocument();
     expect(screen.getByText('HTTP Colors')).toBeInTheDocument();
