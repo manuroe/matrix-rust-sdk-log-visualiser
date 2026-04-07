@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { buildExportText, type ExportContext, type ExportOptions } from '../utils/logExportUtils';
 import type { DisplayItem } from '../utils/logGapManager';
 import { useKeyboardShortcutContextOptional } from './KeyboardShortcutContext';
+import { useLogStore } from '../stores/logStore';
 import styles from './LogExportDialog.module.css';
 
 interface LogExportDialogProps {
@@ -35,6 +36,8 @@ export function LogExportDialog({ displayItems, context, onClose }: LogExportDia
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
+  const { isAnonymized, anonymizationDictionary } = useLogStore();
+
   // Register onClose with the central shortcut system so the global Escape
   // handler can close this dialog. When the context is unavailable (e.g. in
   // standalone tests), the focus-trap below falls back to a local ESC handler.
@@ -54,7 +57,6 @@ export function LogExportDialog({ displayItems, context, onClose }: LogExportDia
   const [stripPrefix, setStripPrefix] = useState(false);
   const [maxWidthEnabled, setMaxWidthEnabled] = useState(false);
   const [maxWidth, setMaxWidth] = useState(120);
-
   /** `null` = no confirmation visible; `'copy'` or `'save'` = show label for that action. */
   const [confirmation, setConfirmation] = useState<'copy' | 'save' | null>(null);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +172,22 @@ export function LogExportDialog({ displayItems, context, onClose }: LogExportDia
     showConfirmation('save');
   };
 
+  const handleSaveDictionary = () => {
+    if (!anonymizationDictionary) return;
+    const blob = new Blob([JSON.stringify(anonymizationDictionary, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dictionary.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    showConfirmation('save');
+  };
+
   const handleMaxWidthChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
     if (!isNaN(val) && val >= 4) setMaxWidth(val);
@@ -279,6 +297,8 @@ export function LogExportDialog({ displayItems, context, onClose }: LogExportDia
             />
             <span className={styles.optionUnit}>chars</span>
           </label>
+
+
         </div>
 
         <hr className={styles.divider} />
@@ -307,6 +327,20 @@ export function LogExportDialog({ displayItems, context, onClose }: LogExportDia
             </svg>
             Save to file
           </button>
+          {isAnonymized && anonymizationDictionary && (
+            <button
+              className={styles.actionButton}
+              onClick={handleSaveDictionary}
+              title="Download the anonymization dictionary as a .json file (needed to unanonymise the exported log)"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h5L11 5.5V12a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 2 12V4.5Z" stroke="currentColor" strokeWidth="1.4" fill="none"/>
+                <path d="M8.5 3v3h3" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/>
+                <path d="M5 8.5h4M5 11h2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              Save anonymisation dictionary
+            </button>
+          )}
           {confirmation && (
             <span className={styles.confirmLabel} role="status" aria-live="polite">
               {confirmation === 'copy' ? 'Copied!' : 'Saved!'}

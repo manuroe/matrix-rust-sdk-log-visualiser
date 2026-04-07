@@ -1,5 +1,6 @@
 import type { DisplayItem } from './logGapManager';
 import { stripLogPrefix } from './logMessageUtils';
+import { ANONYMIZED_LOG_MARKER } from './anonymizeUtils';
 
 /**
  * Options that control how exported log text is formatted.
@@ -69,6 +70,11 @@ export interface ExportContext {
   readonly startTime: string | null;
   /** Global time filter end (ISO string or null). */
   readonly endTime: string | null;
+  /**
+   * When true, `buildExportText` prepends the anonymization marker line so the
+   * file is recognized as anonymized when re-loaded.
+   */
+  readonly isAnonymized?: boolean;
 }
 
 /**
@@ -161,6 +167,10 @@ export function buildExportText(
   context: ExportContext,
 ): string {
   const lines: string[] = [];
+
+  if (context.isAnonymized) {
+    lines.push(ANONYMIZED_LOG_MARKER);
+  }
 
   if (options.showIntro) {
     lines.push(...buildIntroLines(options, context));

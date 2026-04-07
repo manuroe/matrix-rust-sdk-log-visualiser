@@ -4,6 +4,7 @@ import { LogExportDialog } from '../LogExportDialog';
 import type { ExportContext } from '../../utils/logExportUtils';
 import type { DisplayItem } from '../../utils/logGapManager';
 import { createParsedLogLine } from '../../test/fixtures';
+import { useLogStore } from '../../stores/logStore';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -292,5 +293,49 @@ describe('LogExportDialog', () => {
     expect(capturedText).toMatch(/^\[00001\] /m);
     clickSpy.mockRestore();
     blobSpy.mockRestore();
+  });
+
+  // -------------------------------------------------------------------------
+  // Dictionary export (anonymized state)
+  // -------------------------------------------------------------------------
+
+  it('shows the Save dictionary button when isAnonymized=true in the store', () => {
+    useLogStore.setState({
+      isAnonymized: true,
+      anonymizationDictionary: { forward: { '@alice:example.org': '@user0:domain0.org' }, reverse: {} },
+    });
+    renderDialog();
+    expect(screen.getByRole('button', { name: 'Save anonymisation dictionary' })).toBeInTheDocument();
+    // Reset so this doesn't leak
+    useLogStore.setState({ isAnonymized: false, anonymizationDictionary: null });
+  });
+
+  it('does not show the Save dictionary button when isAnonymized=false', () => {
+    useLogStore.setState({ isAnonymized: false, anonymizationDictionary: null });
+    renderDialog();
+    expect(screen.queryByRole('button', { name: 'Save anonymisation dictionary' })).not.toBeInTheDocument();
+  });
+
+  it('shows the Save dictionary button and triggers a download when clicked', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    useLogStore.setState({
+      isAnonymized: true,
+      anonymizationDictionary: {
+        forward: { '@alice:example.org': '@user0:domain0.org' },
+        reverse: { '@user0:domain0.org': '@alice:example.org' },
+      },
+    });
+
+    renderDialog({ context: { ...BASE_CONTEXT, isAnonymized: true } });
+
+    const dictButton = screen.getByRole('button', { name: 'Save anonymisation dictionary' });
+    expect(dictButton).toBeInTheDocument();
+    fireEvent.click(dictButton);
+
+    // One createObjectURL call for the dictionary file
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+
+    clickSpy.mockRestore();
+    useLogStore.setState({ isAnonymized: false, anonymizationDictionary: null });
   });
 });
