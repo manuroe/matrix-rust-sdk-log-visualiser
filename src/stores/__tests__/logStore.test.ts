@@ -2,7 +2,7 @@
  * Unit tests for logStore.ts
  * Tests Zustand store actions and state management.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useLogStore } from '../logStore';
 import {
   createSyncRequest,
@@ -805,8 +805,9 @@ describe('logStore', () => {
 
     it('anonymizeLogs anonymizes HTTP request URIs containing Matrix room IDs', () => {
       useLogStore.getState().loadLogParserResult({
-        requests: [],
-        connectionIds: [],
+        // Include a SyncRequest so the allRequests.map() callback (line 434) is invoked
+        requests: [createSyncRequest({ requestId: 'SYNC-1', connId: 'room-list' })],
+        connectionIds: ['room-list'],
         rawLogLines: rawLines,
         httpRequests: [
           createHttpRequest({ requestId: 'HTTP-1', uri: '/_matrix/client/v3/rooms/!room1:example.org/messages' }),
@@ -855,11 +856,13 @@ describe('logStore', () => {
     it('unanonymizeLogs with externalDict restores HTTP request URIs', () => {
       const originalUri = '/_matrix/client/v3/rooms/!room1:example.org/messages';
       useLogStore.getState().loadLogParserResult({
-        requests: [],
-        connectionIds: [],
+        // Include SyncRequest + sentry event so the unanonymize external-dict path
+        // invokes allRequests.map() (line 572) and sentryEvents.map() (line 574).
+        requests: [createSyncRequest({ requestId: 'SYNC-1', connId: 'room-list' })],
+        connectionIds: ['room-list'],
         rawLogLines: rawLines,
         httpRequests: [createHttpRequest({ requestId: 'HTTP-1', uri: originalUri })],
-        sentryEvents: [],
+        sentryEvents: [{ platform: 'ios', lineNumber: 0, message: 'crash at !room1:example.org' }],
       });
       useLogStore.getState().anonymizeLogs();
       const dict = useLogStore.getState().anonymizationDictionary!;
@@ -868,6 +871,116 @@ describe('logStore', () => {
       (useLogStore as any).setState({ originalLogLines: null, originalAllRequests: null, originalAllHttpRequests: null, originalSentryEvents: null });
       useLogStore.getState().unanonymizeLogs(dict);
       expect(useLogStore.getState().allHttpRequests[0].uri).toBe(originalUri);
+    });
+
+    // -------------------------------------------------------------------------
+    // cancelAnonymization
+    // -------------------------------------------------------------------------
+
+    it('cancelAnonymization resets isAnonymizing when no async operation is in flight', () => {
+      // Force isAnonymizing=true via setState (simulates a stuck state)
+      useLogStore.setState({ isAnonymizing: true, anonymizingProgress: 0.5 });
+      useLogStore.getState().cancelAnonymization();
+      expect(useLogStore.getState().isAnonymizing).toBe(false);
+      expect(useLogStore.getState().anonymizingProgress).toBe(0);
+    });
+
+    // -------------------------------------------------------------------------
+    // Async anonymization path (rawLogLines.length > 500)
+    // -------------------------------------------------------------------------
+
+    /** Build 501 lines so the async chunked path is taken. */
+    function makeLargeLines(count = 501) {
+      return Array.from({ length: count }, (_, i) =>
+        createParsedLogLine({
+          lineNumber: i,
+          rawText: `2024-01-15T10:00:00.000000Z INFO @alice:matrix.org line ${i}`,
+          message: `2024-01-15T10:00:00.000000Z INFO @alice:matrix.org line ${i}`,
+          strippedMessage: `@alice:matrix.org line ${i}`,
+        }),
+      );
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('anonymizeLogs sets isAnonymizing=true immediately for large logs', () => {
+      vi.useFakeTimers();
+      useLogStore.getState().loadLogParserResult({
+        requests: [],
+        connectionIds: [],
+        rawLogLines: makeLargeLines(),
+        httpRequests: [],
+        sentryEvents: [],
+      });
+      useLogStore.getState().anonymizeLogs();
+      // State is set synchronously before the async body runs
+      expect(useLogStore.getState().isAnonymizing).toBe(true);
+      expect(useLogStore.getState().isAnonymized).toBe(false);
+    });
+
+    it('anonymizeLogs processes large logs and completes asynchronously', async () => {
+      vi.useFakeTimers();
+      const manyLines = makeLargeLines();
+      useLogStore.getState().loadLogParserResult({
+        // Include non-empty arrays so the async completion path's .map() callbacks
+        // at each of allRequests (line 506), allHttpRequests (507), and
+        // sentryEvents (508) are all invoked.
+        requests: [createSyncRequest({ requestId: 'SYNC-1', connId: 'room-list' })],
+        connectionIds: ['room-list'],
+        rawLogLines: manyLines,
+        httpRequests: [
+          createHttpRequest({ requestId: 'HTTP-1', uri: '/_matrix/rooms/@alice:matrix.org/messages' }),
+        ],
+        sentryEvents: [{ platform: 'ios', lineNumber: 0, message: 'Error for @alice:matrix.org' }],
+      });
+      useLogStore.getState().anonymizeLogs();
+      expect(useLogStore.getState().isAnonymizing).toBe(true);
+
+      // Flush all scheduled timers / rAF callbacks until the async body finishes
+      await vi.runAllTimersAsync();
+
+      const state = useLogStore.getState();
+      expect(state.isAnonymizing).toBe(false);
+      expect(state.isAnonymized).toBe(true);
+      expect(state.rawLogLines[0].rawText).not.toContain('@alice:matrix.org');
+      expect(state.originalLogLines).toHaveLength(manyLines.length);
+      // Verify async path also anonymized derived data
+      expect(state.allHttpRequests[0].uri).not.toContain('@alice:matrix.org');
+      expect(state.sentryEvents[0].message).not.toContain('@alice:matrix.org');
+    });
+
+    it('cancelAnonymization aborts an in-progress async anonymization', async () => {
+      vi.useFakeTimers();
+      useLogStore.getState().loadLogParserResult({
+        requests: [],
+        connectionIds: [],
+        rawLogLines: makeLargeLines(),
+        httpRequests: [],
+        sentryEvents: [],
+      });
+      useLogStore.getState().anonymizeLogs();
+      expect(useLogStore.getState().isAnonymizing).toBe(true);
+
+      // Cancel before the async body has processed any chunk
+      useLogStore.getState().cancelAnonymization();
+      expect(useLogStore.getState().isAnonymizing).toBe(false);
+
+      // Let remaining scheduled callbacks drain — the token is cancelled so
+      // the body returns early and the log is NOT anonymized
+      await vi.runAllTimersAsync();
+
+      expect(useLogStore.getState().isAnonymized).toBe(false);
+    });
+
+    it('anonymizeLogs is a no-op when isAnonymizing is already true', () => {
+      vi.useFakeTimers();
+      useLogStore.setState({ isAnonymizing: true });
+      const before = useLogStore.getState().anonymizingProgress;
+      useLogStore.getState().anonymizeLogs();
+      // Should not reset progress or start another loop
+      expect(useLogStore.getState().anonymizingProgress).toBe(before);
     });
   });
 });

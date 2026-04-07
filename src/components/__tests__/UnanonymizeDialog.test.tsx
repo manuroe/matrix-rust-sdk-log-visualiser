@@ -157,12 +157,64 @@ describe('UnanonymizeDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('Tab cycles focus within the panel', () => {
+  it('Tab cycles focus within the panel (Shift+Tab path)', () => {
     renderDialog();
     const dialog = screen.getByRole('dialog', { name: 'Unanonymise logs' });
-    // Just verify no error is thrown when Tab is pressed
-    fireEvent.keyDown(dialog, { key: 'Tab' });
+    // Use the same selector as the component so we get the true first focusable element
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    // Focus the first element so Shift+Tab triggers the wrap-to-last branch
+    focusable[0].focus();
     fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+  });
+
+  it('Tab key wraps forward from last focusable element back to first', () => {
+    renderDialog();
+    const dialog = screen.getByRole('dialog', { name: 'Unanonymise logs' });
+    // Use the same selector as the component so we get the true last focusable element
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    // Focus the last element so Tab triggers the wrap-to-first branch
+    focusable[focusable.length - 1].focus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+  });
+
+  it('Shift+Tab does not wrap when focus is not on the first element', () => {
+    renderDialog();
+    const dialog = screen.getByRole('dialog', { name: 'Unanonymise logs' });
+    // Focus the second button (not the first); Shift+Tab should not wrap
+    const buttons = screen.getAllByRole('button');
+    buttons[1].focus();
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    // Focus stays on the second button (no wrap)
+    expect(document.activeElement).toBe(buttons[1]);
+  });
+
+  it('Tab does not wrap when focus is not on the last element', () => {
+    renderDialog();
+    const dialog = screen.getByRole('dialog', { name: 'Unanonymise logs' });
+    // Focus the first button; Tab should not wrap
+    const buttons = screen.getAllByRole('button');
+    buttons[0].focus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    // Focus stays on the first button (no wrap to beginning)
+    expect(document.activeElement).toBe(buttons[0]);
+  });
+
+  it('clicking "Choose dictionary file…" triggers the file input', () => {
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    renderDialog();
+    fireEvent.click(screen.getByRole('button', { name: /choose dictionary file/i }));
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    clickSpy.mockRestore();
   });
 
   it('calls unanonymizeLogs and onClose when Apply is clicked after loading a valid dict', async () => {
