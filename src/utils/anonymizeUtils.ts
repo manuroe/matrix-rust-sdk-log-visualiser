@@ -430,11 +430,26 @@ export function detectAnonymizedLog(rawContent: string): boolean {
 /**
  * Strip the anonymization marker from `rawContent` so the remainder can be
  * parsed normally. Returns the content unchanged if the marker is absent.
+ *
+ * Mirrors `detectAnonymizedLog`: skips leading blank lines and removes the
+ * marker line wherever it appears as the first non-empty line, regardless of
+ * line-ending style.
  */
 export function stripAnonymizedMarker(rawContent: string): string {
-  const lf = ANONYMIZED_LOG_MARKER + '\n';
-  if (rawContent.startsWith(lf)) return rawContent.slice(lf.length);
-  const crlf = ANONYMIZED_LOG_MARKER + '\r\n';
-  if (rawContent.startsWith(crlf)) return rawContent.slice(crlf.length);
+  let lineStart = 0;
+  while (lineStart <= rawContent.length) {
+    let lineEnd = rawContent.indexOf('\n', lineStart);
+    if (lineEnd === -1) lineEnd = rawContent.length;
+    const line = rawContent.slice(lineStart, lineEnd).replace(/\r$/, '');
+    if (line.trim().length > 0) {
+      if (line.trim() === ANONYMIZED_LOG_MARKER) {
+        const nextLineStart = lineEnd < rawContent.length ? lineEnd + 1 : lineEnd;
+        return rawContent.slice(0, lineStart) + rawContent.slice(nextLineStart);
+      }
+      return rawContent;
+    }
+    if (lineEnd === rawContent.length) break;
+    lineStart = lineEnd + 1;
+  }
   return rawContent;
 }

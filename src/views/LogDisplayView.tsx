@@ -747,6 +747,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                   }
                 }}
                 aria-label={isAnonymizing ? 'Anonymising…' : isAnonymized ? 'Unanonymise logs' : 'Anonymise logs'}
+                aria-pressed={isAnonymized}
                 title={isAnonymizing ? 'Anonymising…' : isAnonymized ? 'Unanonymise logs' : 'Anonymise logs'}
                 disabled={isAnonymizing}
               >

@@ -388,6 +388,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   clearData: () => {
+    // Cancel any in-flight async anonymisation so it cannot write stale results
+    // back to the store after the data has been cleared.
+    if (currentCancelToken) {
+      currentCancelToken.cancelled = true;
+      currentCancelToken = null;
+    }
     set({
       allRequests: [],
       filteredRequests: [],
@@ -629,6 +635,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
 
   loadLogParserResult: (result) => {
+    // Cancel any in-flight async anonymisation so it cannot overwrite the
+    // newly-loaded log data after this function returns.
+    if (currentCancelToken) {
+      currentCancelToken.cancelled = true;
+      currentCancelToken = null;
+    }
     try {
       const lineNumberIndex = buildLineNumberIndex(result.rawLogLines);
       const detectedPlatform = detectPlatform(result.rawLogLines);

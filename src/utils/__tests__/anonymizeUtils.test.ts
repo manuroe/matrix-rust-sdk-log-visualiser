@@ -317,6 +317,12 @@ describe('stripAnonymizedMarker', () => {
     expect(stripAnonymizedMarker(`${ANONYMIZED_LOG_MARKER}\r\n${rest}`)).toBe(rest);
   });
 
+  it('removes marker when preceded by blank lines, preserving blanks before it', () => {
+    const rest = '2024-01-15T10:00:00Z INFO hello\n';
+    const content = `\n  \n${ANONYMIZED_LOG_MARKER}\n${rest}`;
+    expect(stripAnonymizedMarker(content)).toBe(`\n  \n${rest}`);
+  });
+
   it('leaves content unchanged when marker is absent', () => {
     const content = '2024-01-15T10:00:00Z INFO normal log';
     expect(stripAnonymizedMarker(content)).toBe(content);
