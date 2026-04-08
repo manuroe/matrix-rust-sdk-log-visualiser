@@ -56,6 +56,8 @@ describe('LogExportDialog', () => {
   const originalRevokeObjectURL = URL.revokeObjectURL;
 
   beforeEach(() => {
+    // Reset store state so dictionary-export tests don't leak isAnonymized into siblings.
+    useLogStore.getState().clearData();
     // Mock clipboard.writeText
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -81,6 +83,8 @@ describe('LogExportDialog', () => {
     global.URL.createObjectURL = (originalCreateObjectURL ?? vi.fn()) as typeof URL.createObjectURL;
     global.URL.revokeObjectURL = originalRevokeObjectURL ?? vi.fn();
     vi.restoreAllMocks();
+    // Ensure any store state set by dictionary tests is cleaned up.
+    useLogStore.getState().clearData();
   });
 
   // -------------------------------------------------------------------------
@@ -306,8 +310,6 @@ describe('LogExportDialog', () => {
     });
     renderDialog();
     expect(screen.getByRole('button', { name: 'Save anonymisation dictionary' })).toBeInTheDocument();
-    // Reset so this doesn't leak
-    useLogStore.setState({ isAnonymized: false, anonymizationDictionary: null });
   });
 
   it('does not show the Save dictionary button when isAnonymized=false', () => {
@@ -336,6 +338,5 @@ describe('LogExportDialog', () => {
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
 
     clickSpy.mockRestore();
-    useLogStore.setState({ isAnonymized: false, anonymizationDictionary: null });
   });
 });

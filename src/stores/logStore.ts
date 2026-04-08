@@ -33,7 +33,7 @@ import type { HttpRequest, SyncRequest, ParsedLogLine, SentryEvent, LogParserRes
 import { wrapError, type AppError } from '../utils/errorHandling';
 import { DEFAULT_MS_PER_PIXEL } from '../utils/timelineUtils';
 import { filterSyncRequests, filterHttpRequests } from '../utils/requestFilters';
-import { buildAnonymizationDictionary, anonymizeLogLine, buildCompiledAnonymizer, buildCompiledUnanonymizer } from '../utils/anonymizeUtils';
+import { buildAnonymizationDictionary, buildCompiledAnonymizer, buildCompiledUnanonymizer } from '../utils/anonymizeUtils';
 
 /**
  * Mutable token shared between `anonymizeLogs` and `cancelAnonymization` so
@@ -433,7 +433,13 @@ export const useLogStore = create<LogStore>((set, get) => ({
     if (rawLogLines.length <= SYNC_THRESHOLD) {
       const dict = buildAnonymizationDictionary(rawLogLines);
       const apply = buildCompiledAnonymizer(dict);
-      const anonymizedLines = rawLogLines.map((l) => anonymizeLogLine(l, dict));
+      const anonymizedLines = rawLogLines.map((l) => ({
+        ...l,
+        rawText: apply(l.rawText),
+        message: apply(l.message),
+        strippedMessage: apply(l.strippedMessage),
+        continuationLines: l.continuationLines?.map(apply),
+      }));
       const newIndex = buildLineNumberIndex(anonymizedLines);
       const { allRequests, allHttpRequests, sentryEvents } = get();
       // Apply anonymizer to derived data shown on other screens (/http_requests, /summary, etc.)
