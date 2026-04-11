@@ -5,6 +5,7 @@ import { parseSizeString } from './sizeUtils';
 import { ParsingError } from './errorHandling';
 import { INCOMPLETE_STATUS_KEY } from './statusCodeUtils';
 import { ISO_TIMESTAMP_RE, stripLogPrefix } from './logMessageUtils';
+import { detectAnonymizedLog, stripAnonymizedMarker } from './anonymizeUtils';
 
 /**
  * Mutable builder record used during log parsing before all fields have been
@@ -589,12 +590,15 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
 }
 
 export function parseLogFile(logContent: string): LogParserResult {
+  const isAnonymized = detectAnonymizedLog(logContent);
+  const contentToParse = isAnonymized ? stripAnonymizedMarker(logContent) : logContent;
+
   // First parse all HTTP requests
-  const { httpRequests, rawLogLines, sentryEvents } = parseAllHttpRequests(logContent);
+  const { httpRequests, rawLogLines, sentryEvents } = parseAllHttpRequests(contentToParse);
 
   // Filter for sync-specific requests and add connId
   const syncRequests: SyncRequest[] = [];
-  const lines = logContent.split('\n');
+  const lines = contentToParse.split('\n');
 
   // Build a map of request_id to sync metadata by scanning lines again
   const syncMetadataMap = new Map<string, { connId?: string; timeout?: number }>();
@@ -653,5 +657,6 @@ export function parseLogFile(logContent: string): LogParserResult {
     connectionIds,
     rawLogLines,
     sentryEvents,
+    isAnonymized,
   };
 }

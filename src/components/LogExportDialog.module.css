@@ -135,6 +135,7 @@
 .actionRow {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
 }
 
@@ -174,4 +175,30 @@
     min-width: 56px;
     text-align: center;
     flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------------
+   Progress bar — shared with AnonymizingProgressModal
+   ------------------------------------------------------------------------- */
+
+.progressBar {
+    height: 8px;
+    background: var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin: 20px 0 12px;
+}
+
+.progressFill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: var(--radius-md);
+    transition: width 200ms ease-out;
+}
+
+.progressSubtext {
+    font-size: var(--font-size-md);
+    color: var(--text-muted);
+    text-align: center;
+    margin: 0 0 20px;
 }
