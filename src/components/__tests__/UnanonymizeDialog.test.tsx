@@ -265,4 +265,38 @@ describe('UnanonymizeDialog', () => {
     expect(useLogStore.getState().isAnonymized).toBe(false);
     expect(useLogStore.getState().rawLogLines[0].rawText).toContain('@alice:example.org');
   });
+
+  it('stays open and shows an error when the dictionary does not match the log', async () => {
+    const anonymizedLine = createParsedLogLine({
+      lineNumber: 0,
+      rawText: '2024-01-15T10:00:00.000000Z INFO @user0:domain0.org joined',
+      message: '2024-01-15T10:00:00.000000Z INFO @user0:domain0.org joined',
+      strippedMessage: '@user0:domain0.org joined',
+    });
+    useLogStore.getState().loadLogParserResult({
+      requests: [],
+      connectionIds: [],
+      rawLogLines: [anonymizedLine],
+      httpRequests: [],
+      sentryEvents: [],
+      isAnonymized: true,
+    });
+
+    renderDialog();
+
+    // Provide a dictionary for a *different* log — reverse keys don't match this log
+    const forward = { '@alice:example.org': '@user99:domain99.org' };
+    const reverse = { '@user99:domain99.org': '@alice:example.org' };
+    await loadFile(makeDictJson(forward, reverse));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /apply/i })).not.toBeDisabled());
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(useLogStore.getState().isAnonymized).toBe(true);
+    expect(screen.getByText(/does not match/i)).toBeInTheDocument();
+  });
 });

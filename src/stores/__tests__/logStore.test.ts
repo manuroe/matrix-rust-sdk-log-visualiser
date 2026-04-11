@@ -780,6 +780,32 @@ describe('logStore', () => {
       expect(useLogStore.getState().isAnonymized).toBe(true);
     });
 
+    it('unanonymizeLogs returns false and leaves isAnonymized=true when external dict does not match', () => {
+      loadLines();
+      useLogStore.getState().anonymizeLogs();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (useLogStore as any).setState({ originalLogLines: null });
+      // Dict whose reverse keys don't appear in the current log
+      const wrongDict = {
+        forward: { '@wrong:example.org': '@user99:domain99.org' },
+        reverse: { '@user99:domain99.org': '@wrong:example.org' },
+      };
+      const result = useLogStore.getState().unanonymizeLogs(wrongDict);
+      expect(result).toBe(false);
+      expect(useLogStore.getState().isAnonymized).toBe(true);
+    });
+
+    it('unanonymizeLogs returns true when external dict matches', () => {
+      loadLines();
+      useLogStore.getState().anonymizeLogs();
+      const dict = useLogStore.getState().anonymizationDictionary!;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (useLogStore as any).setState({ originalLogLines: null });
+      const result = useLogStore.getState().unanonymizeLogs(dict);
+      expect(result).toBe(true);
+      expect(useLogStore.getState().isAnonymized).toBe(false);
+    });
+
     it('clearData resets anonymization state', () => {
       loadLines();
       useLogStore.getState().anonymizeLogs();

@@ -128,8 +128,12 @@ export function UnanonymizeDialog({ onClose }: UnanonymizeDialogProps) {
 
   const handleApply = () => {
     if (!parsedDict) return;
-    unanonymizeLogs(parsedDict);
-    onClose();
+    const success = unanonymizeLogs(parsedDict);
+    if (success) {
+      onClose();
+    } else {
+      setError('The dictionary does not match this log. Please check that you are using the correct file.');
+    }
   };
 
   return createPortal(

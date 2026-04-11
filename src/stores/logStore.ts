@@ -167,7 +167,7 @@ interface LogStore {
    * already-anonymized file, `externalDict` (uploaded by the user) is used
    * to reverse-map each line.
    */
-  unanonymizeLogs: (externalDict?: AnonymizationDictionary) => void;
+  unanonymizeLogs: (externalDict?: AnonymizationDictionary) => boolean;
 
   // Log viewer actions
   openLogViewer: (rowKey: number) => void;
@@ -536,11 +536,11 @@ export const useLogStore = create<LogStore>((set, get) => ({
         });
         get().filterRequests();
         get().filterHttpRequests();
-      } catch {
+      } catch (error) {
         // Any unexpected error (e.g. regex too complex for V8) must reset
         // isAnonymizing so the UI does not get permanently stuck.
         currentCancelToken = null;
-        set({ isAnonymizing: false, anonymizingProgress: 0 });
+        set({ isAnonymizing: false, anonymizingProgress: 0, error: wrapError(error, 'Failed to anonymize logs') });
       }
     })();
   },
@@ -559,7 +559,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       allRequests, allHttpRequests, sentryEvents,
       originalAllRequests, originalAllHttpRequests, originalSentryEvents,
     } = get();
-    if (!isAnonymized) return;
+    if (!isAnonymized) return false;
     let restoredLines: ParsedLogLine[];
     let restoredAllRequests: SyncRequest[];
     let restoredAllHttpRequests: HttpRequest[];
@@ -573,7 +573,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
     } else {
       // Log was loaded already-anonymized; use the provided (or stored) dict.
       const dict = externalDict ?? anonymizationDictionary;
-      if (!dict) return;
+      if (!dict) return false;
       const restore = buildCompiledUnanonymizer(dict);
       restoredLines = rawLogLines.map((l) => ({
         ...l,
@@ -582,6 +582,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
         strippedMessage: restore(l.strippedMessage),
         continuationLines: l.continuationLines?.map(restore),
       }));
+      // Detect a dictionary mismatch: if no line text changed at all, the
+      // provided dictionary does not match this log — bail out without
+      // committing any state changes so isAnonymized stays true.
+      if (!restoredLines.some((l, i) => l.rawText !== rawLogLines[i].rawText)) {
+        return false;
+      }
       restoredAllRequests = allRequests.map((r) => ({ ...r, uri: restore(r.uri) }));
       restoredAllHttpRequests = allHttpRequests.map((r) => ({ ...r, uri: restore(r.uri) }));
       restoredSentryEvents = sentryEvents.map((e) => ({ ...e, message: restore(e.message) }));
@@ -602,6 +608,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
     });
     get().filterRequests();
     get().filterHttpRequests();
+    return true;
   },
 
   clearUIState: () => {
