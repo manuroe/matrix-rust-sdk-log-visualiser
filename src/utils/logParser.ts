@@ -600,7 +600,7 @@ export function parseLogFile(logContent: string): LogParserResult {
   // would otherwise fail the timestamp-density validation and throw a
   // ParsingError.
   if (isLogcatFormat(contentToParse)) {
-    return parseLogcatContent(contentToParse);
+    return { ...parseLogcatContent(contentToParse), isAnonymized };
   }
 
   // First parse all HTTP requests

@@ -105,7 +105,7 @@ describe('inferLogcatYear', () => {
   it('rolls back one year when the log month > current month (year boundary)', () => {
     // Log from December, viewing in January 2026 → log must be from 2025
     expect(inferLogcatYear(12, new Date('2026-01-03'))).toBe('2025');
-    // Log from November, viewing in April 2026 → same year
+    // Log from November, viewing in April 2026 → log must be from 2025
     expect(inferLogcatYear(11, new Date('2026-04-14'))).toBe('2025');
   });
 });
@@ -156,11 +156,20 @@ describe('parseLogcatContent', () => {
     expect(result.rawLogLines).toHaveLength(8);
   });
 
-  it('assigns consecutive lineNumbers starting from 1', () => {
+  it('assigns physical line numbers (1-based) matching position in the file', () => {
+    // SAMPLE_LOGCAT has no blank lines so physical and logical positions match.
     const result = parseLogcatContent(SAMPLE_LOGCAT);
     result.rawLogLines.forEach((line, idx) => {
       expect(line.lineNumber).toBe(idx + 1);
     });
+  });
+
+  it('physical line numbers skip blank lines and reflect true file position', () => {
+    // Insert a blank line between two data lines; the second should get lineNumber 3.
+    const withBlank = `${LOGCAT_LINE_E}\n\n${LOGCAT_LINE_W}`;
+    const result = parseLogcatContent(withBlank);
+    expect(result.rawLogLines[0].lineNumber).toBe(1);
+    expect(result.rawLogLines[1].lineNumber).toBe(3); // blank line at index 1 → skip to 3
   });
 
   it('sets the correct level for data lines (headers are UNKNOWN)', () => {

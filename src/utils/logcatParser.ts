@@ -71,21 +71,27 @@ export function logcatLevelToLogLevel(char: string): LogLevel {
  * // false
  */
 export function isLogcatFormat(content: string): boolean {
-  const lines = content.split('\n');
   let checked = 0;
   let matched = 0;
+  let start = 0;
 
-  for (const line of lines) {
+  while (start <= content.length) {
+    const end = content.indexOf('\n', start);
+    const line = end === -1 ? content.slice(start) : content.slice(start, end);
     const trimmed = line.trim();
-    if (!trimmed) continue;
 
-    if (LOGCAT_LINE_RE.test(trimmed)) {
-      matched++;
-      if (matched >= 2) return true;
+    if (trimmed) {
+      if (LOGCAT_LINE_RE.test(trimmed)) {
+        matched++;
+        if (matched >= 2) return true;
+      }
+
+      checked++;
+      if (checked >= 50) break;
     }
 
-    checked++;
-    if (checked >= 50) break;
+    if (end === -1) break;
+    start = end + 1;
   }
 
   return false;
@@ -138,7 +144,6 @@ export function inferLogcatYear(month: number, referenceDate: Date = new Date())
 export function parseLogcatContent(content: string): LogParserResult {
   const lines = content.split('\n');
   const rawLogLines: ParsedLogLine[] = [];
-  let lineNumber = 0;
 
   // Tracks the last-seen timestamp so unmatched lines (e.g. section headers)
   // can inherit it and remain in the correct time-order position.
@@ -150,17 +155,20 @@ export function parseLogcatContent(content: string): LogParserResult {
   // only called once per distinct month value across the whole file.
   const yearCache = new Map<number, string>();
 
-  for (const line of lines) {
-    if (!line.trim()) continue;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!trimmed) continue;
 
-    const match = line.match(LOGCAT_LINE_RE);
+    // Match against the trimmed line for consistency with isLogcatFormat(),
+    // while preserving the original line as rawText.
+    const match = trimmed.match(LOGCAT_LINE_RE);
     if (!match) {
       // Unrecognised lines (e.g. "--------- beginning of crash" section headers)
       // are emitted as UNKNOWN entries so they are visible in the /logs view.
       // They inherit the last-seen timestamp to stay in time-order position.
-      lineNumber++;
       rawLogLines.push({
-        lineNumber,
+        lineNumber: i + 1,
         rawText: line,
         isoTimestamp: lastIsoTimestamp,
         timestampUs: lastTimestampUs,
@@ -172,7 +180,6 @@ export function parseLogcatContent(content: string): LogParserResult {
       continue;
     }
 
-    lineNumber++;
     const [, monthDay, time, levelChar, tag, msg] = match;
 
     // Infer the year, caching per month to avoid repeated Date construction.
@@ -186,7 +193,7 @@ export function parseLogcatContent(content: string): LogParserResult {
     // Build an ISO 8601 timestamp. Logcat milliseconds are padded to 3 digits;
     // we append three trailing zeros to produce the 6-digit microsecond precision
     // expected by isoToMicros() without synthesising fake precision.
-    const isoTimestamp = `${year}-${monthDay.replace('-', '-')}T${time}000Z` as ISODateTimeString;
+    const isoTimestamp = `${year}-${monthDay}T${time}000Z` as ISODateTimeString;
     const timestampUs = isoToMicros(isoTimestamp);
 
     // displayTime: just the time portion from the logcat line (HH:MM:SS.mmm),
@@ -202,7 +209,7 @@ export function parseLogcatContent(content: string): LogParserResult {
     const strippedMessage = `${tag}: ${msg}`;
 
     rawLogLines.push({
-      lineNumber,
+      lineNumber: i + 1,
       rawText: line,
       isoTimestamp,
       timestampUs,
