@@ -214,6 +214,7 @@ export function ArchiveView() {
   const navigate = useNavigate();
   const { archiveName, archiveEntries, archiveSummaries, setArchiveSummary, visitedEntries, markVisited } = useArchiveStore();
   const loadLogParserResult = useLogStore((state) => state.loadLogParserResult);
+  const setLogFileName = useLogStore((state) => state.setLogFileName);
 
   /** Set to true on unmount to stop the background summary loop. */
   const cancelRef = useRef(false);
@@ -431,13 +432,14 @@ export function ArchiveView() {
         const text = decodeTextBytes(bytes);
         const result = parseLogFile(text);
         loadLogParserResult(result);
+        setLogFileName(entryName.includes('/') ? entryName.slice(entryName.lastIndexOf('/') + 1) : entryName);
         markVisited(entryName);
         void navigate(kind === 'dated-log' ? '/summary' : '/logs');
       } catch (err) {
         console.error('Failed to open archive entry:', err);
       }
     },
-    [archiveEntries, loadLogParserResult, markVisited, navigate]
+    [archiveEntries, loadLogParserResult, setLogFileName, markVisited, navigate]
   );
 
   const handleOpenRaw = useCallback(

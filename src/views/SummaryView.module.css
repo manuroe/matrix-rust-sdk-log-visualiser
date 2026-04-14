@@ -3,6 +3,13 @@
     composes: section from '../components/Card.module.css';
 }
 
+.fileName {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    margin: 0;
+    align-self: center;
+}
+
 .summarySection h2 {
     font-size: var(--font-size-base);
     font-weight: 500;

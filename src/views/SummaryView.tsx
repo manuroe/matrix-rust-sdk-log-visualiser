@@ -37,6 +37,7 @@ export function SummaryView() {
     endTime,
     detectedPlatform,
     lineNumberIndex,
+    logFileName,
   } = useLogStore();
   const { setTimeFilter } = useURLParams();
 
@@ -225,6 +226,7 @@ export function SummaryView() {
         <div className="header-compact">
           <BurgerMenu />
           <h1 className="header-title">{summaryTitle}</h1>
+          {logFileName && <p className={styles.fileName}>{logFileName}</p>}
         </div>
         <div className="content">
           <p>No logs loaded. Please upload a log file to see the summary.</p>
@@ -239,6 +241,7 @@ export function SummaryView() {
         <div className="header-left">
           <BurgerMenu />
           <h1 className="header-title">{summaryTitle}</h1>
+          {logFileName && <p className={styles.fileName}>{logFileName}</p>}
         </div>
         
         <div className="header-right">
