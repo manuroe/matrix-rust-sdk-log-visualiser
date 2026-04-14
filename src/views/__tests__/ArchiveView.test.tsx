@@ -34,14 +34,11 @@ vi.mock('fflate', () => ({
 
 vi.mock('../../utils/logParser', () => ({
   parseLogFile: vi.fn(() => ({
-    allRequests: [],
-    allHttpRequests: [],
+    requests: [],
+    httpRequests: [],
     connectionIds: [],
     rawLogLines: [],
-    startTime: null,
-    endTime: null,
-    filteredRequests: [],
-    filteredHttpRequests: [],
+    sentryEvents: [],
   })),
 }));
 

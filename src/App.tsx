@@ -104,7 +104,9 @@ function AppContent() {
   return (
     <KeyboardShortcutProvider>
       <Routes>
-        <Route path="/" element={<LandingPage />} />          <Route path="/archive" element={<ArchiveView />} />        <Route path="/summary" element={<SummaryView />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/archive" element={<ArchiveView />} />
+        <Route path="/summary" element={<SummaryView />} />
         <Route path="/logs" element={<LogsView />} />
         <Route path="/http_requests" element={<HttpRequestsView />} />
         <Route path="/http_requests/sync" element={<SyncView />} />

@@ -27,11 +27,12 @@ import { isAnalyzableEntry, computeArchiveSummary, type ArchiveSummary } from '.
 import { decodeTextBytes } from '../utils/fileValidator';
 import { parseLogFile } from '../utils/logParser';
 import { formatBytes } from '../utils/sizeUtils';
+import { isNumericStatus } from '../utils/statusCodeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
 import tableStyles from '../components/Table.module.css';
 import styles from './ArchiveView.module.css';
 
-const NUMERIC_CODE_RE = /^\d+$/;
+const NUMERIC_CODE_RE = { test: isNumericStatus };
 
 /**
  * Strips the leading directory component from a tar entry path.
@@ -281,6 +282,12 @@ export function ArchiveView() {
     const colonIdx = userId.indexOf(':', 1);
     if (colonIdx < 0) return;
     const homeserver = userId.slice(colonIdx + 1);
+
+    // Guard against crafted archives reaching unexpected hosts: only request
+    // profiles for homeservers that look like real internet domain names.
+    // Rejects localhost, raw IPv4/IPv6 addresses, and single-label hostnames.
+    const HOMESERVER_RE = /^[a-zA-Z][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}(?::\d{1,5})?$/;
+    if (!HOMESERVER_RE.test(homeserver)) return;
 
     let cancelled = false;
     const fetchProfile = async () => {

@@ -99,8 +99,13 @@ export function parseTar(data: Uint8Array): readonly TarEntry[] {
   let pendingLongName: string | null = null;
 
   while (offset + BLOCK_SIZE <= data.length) {
-    // Two consecutive zero blocks = end of archive
+    // Two consecutive all-zero 512-byte blocks mark the end of a tar archive.
+    // A single zero block is treated conservatively as end-of-archive to avoid
+    // spinning over padding in truncated or concatenated archives.
     if (isZeroBlock(data, offset)) {
+      if (offset + 2 * BLOCK_SIZE <= data.length && isZeroBlock(data, offset + BLOCK_SIZE)) {
+        break;
+      }
       break;
     }
 
@@ -124,7 +129,13 @@ export function parseTar(data: Uint8Array): readonly TarEntry[] {
         name = prefix.length > 0 ? `${prefix}/${base}` : base;
       }
 
-      const entryData = data.slice(dataStart, dataStart + size);
+      // Bounds check: a corrupt or truncated archive may declare a size that
+      // extends past the end of the buffer. Stop parsing rather than yielding
+      // an incomplete entry.
+      if (dataStart + size > data.length) break;
+      // subarray() creates a zero-copy view into the same backing buffer —
+      // entries are held in memory by the store, so the buffer stays alive.
+      const entryData = data.subarray(dataStart, dataStart + size);
       entries.push({ name, data: entryData, size });
     } else {
       // Directories ('5'), symlinks ('2'), PAX headers ('x'/'g'), etc.
