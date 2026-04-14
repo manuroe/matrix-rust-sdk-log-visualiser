@@ -340,7 +340,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
     }
     newWindow.opener = null;
     newWindow.location.href = url.toString();
-  }, [displayItems, lineNumberIndex, filterQuery, startTime, endTime]);
+  }, [displayItems, lineNumberIndex, filterQuery, startTime, endTime, logFileName]);
 
   // Search determines highlighting within all currently rendered lines (including
   // lines expanded from collapsed groups via forcedRanges).

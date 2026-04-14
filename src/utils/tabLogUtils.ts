@@ -95,5 +95,7 @@ export function loadAndClearTabLog(uuid: string): { text: string; fileName: stri
   if (typeof entry.text !== 'string' || typeof entry.createdAt !== 'number') return null;
   if (Date.now() - entry.createdAt > MAX_AGE_MS) return null;
 
-  return { text: entry.text, fileName: entry.fileName ?? null };
+  const fileName = typeof entry.fileName === 'string' ? entry.fileName : null;
+
+  return { text: entry.text, fileName };
 }

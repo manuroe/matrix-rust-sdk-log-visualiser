@@ -45,6 +45,12 @@ function stripArchivePrefix(name: string): string {
   return slash >= 0 ? name.slice(slash + 1) : name;
 }
 
+/** Returns the final path segment of an archive entry name. */
+function basenameFromEntryName(name: string): string {
+  const slash = name.lastIndexOf('/');
+  return slash >= 0 ? name.slice(slash + 1) : name;
+}
+
 /**
  * Extracts the date-hour string from a rageshake log filename so that entries
  * can be sorted most-recent-first.
@@ -61,7 +67,7 @@ function stripArchivePrefix(name: string): string {
 function extractDateKey(name: string): string | null {
   // Strip any leading directory prefix before matching so that the archive's
   // top-level folder date (e.g. 2026-04-14_ID/) doesn't pollute all entries.
-  const basename = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name;
+  const basename = basenameFromEntryName(name);
   const m = basename.match(/(\d{4}-\d{2}-\d{2}(?:-\d{2})?)/);
   return m ? m[1] : null;
 }
@@ -76,7 +82,7 @@ function extractDateKey(name: string): string | null {
  *      `"details.json"`                → `"details"`
  */
 function extractCategory(name: string): string {
-  const basename = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name;
+  const basename = basenameFromEntryName(name);
   // Take everything before the first date-like segment or the first dot
   const m = basename.match(/^([^.]+)/);
   return m ? m[1] : basename;
@@ -235,7 +241,7 @@ export function ArchiveView() {
    */
   const parsedDetails = useMemo(() => {
     const entry = archiveEntries.find((e) => {
-      const basename = e.name.includes('/') ? e.name.slice(e.name.lastIndexOf('/') + 1) : e.name;
+      const basename = basenameFromEntryName(e.name);
       return basename === 'details.json';
     });
     if (!entry) return null;
@@ -432,7 +438,7 @@ export function ArchiveView() {
         const text = decodeTextBytes(bytes);
         const result = parseLogFile(text);
         loadLogParserResult(result);
-        setLogFileName(entryName.includes('/') ? entryName.slice(entryName.lastIndexOf('/') + 1) : entryName);
+        setLogFileName(basenameFromEntryName(entryName));
         markVisited(entryName);
         void navigate(kind === 'dated-log' ? '/summary' : '/logs');
       } catch (err) {

@@ -224,9 +224,11 @@ export function SummaryView() {
     return (
       <div className="app">
         <div className="header-compact">
-          <BurgerMenu />
-          <h1 className="header-title">{summaryTitle}</h1>
-          {logFileName && <p className={styles.fileName}>{logFileName}</p>}
+          <div className={`header-left ${styles.headerLeft}`}>
+            <BurgerMenu />
+            <h1 className="header-title">{summaryTitle}</h1>
+            {logFileName && <p className={styles.fileName}>{logFileName}</p>}
+          </div>
         </div>
         <div className="content">
           <p>No logs loaded. Please upload a log file to see the summary.</p>
@@ -238,7 +240,7 @@ export function SummaryView() {
   return (
     <div className="app">
       <div className="header-compact">
-        <div className="header-left">
+        <div className={`header-left ${styles.headerLeft}`}>
           <BurgerMenu />
           <h1 className="header-title">{summaryTitle}</h1>
           {logFileName && <p className={styles.fileName}>{logFileName}</p>}

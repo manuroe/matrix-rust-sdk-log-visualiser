@@ -187,6 +187,7 @@ describe('useExtensionFile', () => {
     expect(mockParseLogFile).toHaveBeenCalledWith('log text');
     // loadLogParserResult was called with the parsed result
     expect(mockLoadLogParserResult).toHaveBeenCalledWith({ logs: [], requests: [] });
+    expect(mockSetLogFileName).toHaveBeenCalledWith(TEST_FILE_NAME);
     // navigate was called to remove the params and go to /summary
     expect(mockNavigate).toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/summary' }),
