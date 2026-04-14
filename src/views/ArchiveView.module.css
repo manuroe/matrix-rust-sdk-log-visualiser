@@ -5,18 +5,6 @@
     margin: 0 auto;
 }
 
-.header {
-    margin-bottom: 20px;
-}
-
-.archiveName {
-    font-size: var(--font-size-2xl);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0 0 4px 0;
-    word-break: break-all;
-}
-
 .entryCount {
     font-size: var(--font-size-base);
     color: var(--text-muted);
@@ -190,12 +178,6 @@
 .fileLinkVisited:hover {
     color: var(--color-visited);
     opacity: 0.8;
-}
-
-.nonLogName {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    color: var(--text-muted);
 }
 
 /* Count color classes */

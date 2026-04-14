@@ -10,9 +10,11 @@
  * `setTimeout(0)` yield between files keeps the main thread responsive during
  * large archives.
  *
- * Entries are sorted most-recent-first by the date embedded in their filename
+ * Entries are sorted primarily by filename category (alphabetically), then
+ * most-recent-first by the date embedded in the filename within each category
  * (e.g. `logs.2026-04-12-09.log.gz`). Files without a recognisable date
- * (e.g. `details.json`, `logcat.log.gz`) appear after the dated entries.
+ * (e.g. `details.json`, `logcat.log.gz`) appear after the dated entries in
+ * their category.
  *
  * The archive store is left intact after the user navigates to `/summary`, so
  * pressing Back returns here with all summaries already computed.
@@ -410,8 +412,14 @@ export function ArchiveView() {
           blob = new Blob([entry.data as Uint8Array<ArrayBuffer>], { type: getMimeType(entryName) });
         }
         const url = URL.createObjectURL(blob);
-        window.location.href = url;
-        // Revoke after the browser has had time to read the URL
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+          // Popup blocked — revoke immediately since navigation won't happen
+          URL.revokeObjectURL(url);
+          return;
+        }
+        // Revoke after the browser has had time to read the URL; since the
+        // current page stays loaded, this timer will always fire reliably.
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         return;
       }
@@ -442,7 +450,11 @@ export function ArchiveView() {
         const text = decodeTextBytes(bytes);
         const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
-        window.location.href = url;
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+          URL.revokeObjectURL(url);
+          return;
+        }
         setTimeout(() => URL.revokeObjectURL(url), 3000);
       } catch (err) {
         console.error('Failed to open raw archive entry:', err);
