@@ -3,7 +3,7 @@
  * the browser extension.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { gunzipSync } from 'fflate';
 import { BurgerMenu } from '../components/BurgerMenu';
@@ -145,7 +145,6 @@ export function ListingView() {
   const [detailsUrl, setDetailsUrl] = useState<string | null>(null);
   const [parsedDetails, setParsedDetails] = useState<ListingDetails | null>(null);
   const [matrixProfile, setMatrixProfile] = useState<MatrixProfile | null>(null);
-  const cancelRef = useRef(false);
 
   useEffect(() => {
     if (!listingUrlParam && listingEntries.length === 0) {
@@ -277,13 +276,13 @@ export function ListingView() {
     const chromeGlobal = typeof chrome !== 'undefined' ? chrome : undefined;
     if (!chromeGlobal?.runtime?.sendMessage) return;
 
-    cancelRef.current = false;
+    let cancelled = false;
     const analyzableEntries = sortedEntries.filter((entry) => isAnalyzableEntry(entry.name));
     let nextIndex = 0;
     let activeCount = 0;
 
     const runNext = (): void => {
-      while (!cancelRef.current && activeCount < 3 && nextIndex < analyzableEntries.length) {
+      while (!cancelled && activeCount < 3 && nextIndex < analyzableEntries.length) {
         const entry = analyzableEntries[nextIndex++];
         if (listingSummaries.has(entry.name)) {
           continue;
@@ -296,7 +295,7 @@ export function ListingView() {
               url: entry.url,
             })) as SummarizeResponse | undefined;
 
-            if (cancelRef.current) return;
+            if (cancelled) return;
 
             if (response?.ok && response.summary) {
               setListingSummary(entry.name, response.summary);
@@ -304,12 +303,12 @@ export function ListingView() {
               setListingSummary(entry.name, zeroSummary());
             }
           } catch {
-            if (!cancelRef.current) {
+            if (!cancelled) {
               setListingSummary(entry.name, zeroSummary());
             }
           } finally {
             activeCount--;
-            if (!cancelRef.current) {
+            if (!cancelled) {
               setTimeout(runNext, 0);
             }
           }
@@ -320,7 +319,7 @@ export function ListingView() {
     runNext();
 
     return () => {
-      cancelRef.current = true;
+      cancelled = true;
     };
     // listingSummaries is intentionally excluded so the effect does not restart for each row update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -361,19 +360,29 @@ export function ListingView() {
       if (!entry) return;
 
       void (async () => {
-        const bytes = await fetchExtensionFileBytes(entry.url, entry.name);
-        if (!bytes) return;
+        let objectUrl: string | null = null;
+        try {
+          const bytes = await fetchExtensionFileBytes(entry.url, entry.name);
+          if (!bytes) return;
 
-        const decoded = isValidGzipHeader(bytes) ? gunzipSync(bytes) : bytes;
-        const text = decodeTextBytes(decoded);
-        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const opened = window.open(url, '_blank', 'noopener,noreferrer');
-        if (!opened) {
-          URL.revokeObjectURL(url);
-          return;
+          const decoded = isValidGzipHeader(bytes) ? gunzipSync(bytes) : bytes;
+          const text = decodeTextBytes(decoded);
+          const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+          objectUrl = URL.createObjectURL(blob);
+          const opened = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+          if (!opened) {
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+            return;
+          }
+          // Revoke after a short delay — long enough for the tab to fetch the blob URL.
+          setTimeout(() => {
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+          }, 3000);
+        } catch {
+          // gunzipSync or decoding failed; revoke the object URL if it was created.
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
         }
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
       })();
     },
     [listingEntries]

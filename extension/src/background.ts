@@ -207,8 +207,13 @@ function isExtensionPageSender(sender: chrome.runtime.MessageSender): boolean {
 }
 
 /**
- * Validate that `rawUrl` is a same-origin HTTPS log URL relative to the
- * sender origin, and return a normalised absolute URL string.
+ * Validate that `rawUrl` is a same-origin HTTPS log URL and return a
+ * normalised absolute URL string.
+ *
+ * Relative URLs are resolved against the full sender tab URL (e.g.
+ * `https://rageshakes.example.com/api/listing/2024/abc`), so a relative href
+ * like `console.log.gz` correctly resolves to the same listing subdirectory
+ * instead of the origin root.
  *
  * Rejects non-https protocols, cross-origin requests, paths outside
  * `/api/listing/`, and paths that do not end with `.log` or `.log.gz`.
@@ -219,7 +224,7 @@ function isExtensionPageSender(sender: chrome.runtime.MessageSender): boolean {
  * @example
  * // Given: sender.tab.url === 'https://rageshakes.example.com/api/listing/2024/abc'
  * validateAndNormalizeUrl('console.log.gz', sender);
- * // => 'https://rageshakes.example.com/api/listing/console.log.gz'
+ * // => 'https://rageshakes.example.com/api/listing/2024/console.log.gz'
  */
 function validateAndNormalizeUrl(
   rawUrl: string,
@@ -228,10 +233,15 @@ function validateAndNormalizeUrl(
   const senderOrigin = getSenderOrigin(sender);
   if (!senderOrigin) throw new Error('Unable to determine sender origin');
 
+  // Resolve relative URLs against the full sender tab URL (not just the origin)
+  // so that a relative href like 'console.log.gz' on a listing page at
+  // '/api/listing/2024/abc' resolves to '/api/listing/2024/console.log.gz'
+  // rather than '/console.log.gz' (which would fail the /api/listing/ check).
+  const base = sender.tab?.url ?? senderOrigin;
+
   let url: URL;
   try {
-    // Allow relative URLs by resolving against the sender origin.
-    url = new URL(rawUrl, senderOrigin);
+    url = new URL(rawUrl, base);
   } catch {
     throw new Error('Invalid URL');
   }

@@ -47,6 +47,9 @@ export async function fetchExtensionFileBytes(url: string, fileName: string): Pr
 /**
  * Loads a log entry from a remote listing page into `logStore` and returns the target route.
  *
+ * Sets `logStore.logFileName` so the viewer header displays the correct filename.
+ * This is done here (rather than in each caller) so all callers behave consistently.
+ *
  * @example
  * const route = await loadFromExtensionUrl(url, 'console.2026-04-14-09.log.gz');
  * console.log(route); // '/summary'
@@ -67,6 +70,8 @@ export async function loadFromExtensionUrl(
   const text = decodeTextBytes(decoded);
   const result = parseLogFile(text);
   if (options.isCancelled?.()) return null;
-  useLogStore.getState().loadLogParserResult(result);
+  const store = useLogStore.getState();
+  store.loadLogParserResult(result);
+  store.setLogFileName(fileName);
   return kind === 'dated-log' ? '/summary' : '/logs';
 }

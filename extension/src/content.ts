@@ -6,12 +6,12 @@
  * `/listing` route, which mirrors the `/archive` view in the main web app —
  * same table, same details panel, same file-navigation flow.
  *
- * The redirect uses `window.location.replace` so that pressing the browser's
- * Back button returns to the _native_ rageshake listing rather than the viewer,
- * preventing an infinite redirect loop. A `back_forward` navigation-type guard
- * also suppresses the redirect when the user arrives on this page via Back or
- * Forward, which gives the native page a chance to render before the extension
- * kicks in again.
+ * The redirect uses `window.location.assign` so that pressing the browser's
+ * Back button returns to the native rageshake listing page (the listing stays
+ * in history). A `back_forward` navigation-type guard suppresses the redirect
+ * when the user arrives on this page via Back or Forward, preventing an
+ * infinite redirect loop: the native listing renders, and the extension does
+ * not kick in again.
  */
 
 // Guard: skip the redirect when the user navigated here via Back/Forward.
@@ -24,5 +24,5 @@ if (navType !== 'back_forward') {
     chrome.runtime.getURL('viewer.html') +
     '#/listing?listingUrl=' +
     encodeURIComponent(listingUrl);
-  window.location.replace(viewerUrl);
+  window.location.assign(viewerUrl);
 }
