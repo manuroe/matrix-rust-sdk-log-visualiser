@@ -42,7 +42,7 @@ Read the stat output to understand which file types changed.
 - `navigator.clipboard`, fetch, and storage calls have `try/catch`.
 - `navigate()` (react-router) is never `await`ed.
 - `URL.revokeObjectURL` is deferred to `setTimeout(..., 0)`, not called synchronously after `a.click()`.
-- `localStorage.getItem` / `setItem` / `removeItem` in `useEffect` or startup paths are wrapped in `try/catch` (throws `SecurityError` in private-browsing mode).
+- `localStorage.getItem` / `setItem` / `removeItem` in `useEffect` or startup paths are wrapped in `try/catch` (can throw a `DOMException`, e.g. `SecurityError` / `QuotaExceededError`, when storage access is blocked or quota is zero).
 - New file-processing paths apply the same validation gates (file-size limit, type guard) as existing paths.
 
 **P9 — ARIA Role / Keyboard Interaction Gaps**
