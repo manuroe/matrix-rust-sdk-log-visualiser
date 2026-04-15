@@ -382,7 +382,7 @@ Consult this file during the self-review pass before creating any PR.
 - Does a `useMemo` computation use a variable and omit it from its deps?
 - Check for `// eslint-disable-next-line react-hooks/exhaustive-deps` suppressions that may be hiding this.
 
-**Canonical fix**: Add the omitted variable to the dependency array. For stable callbacks that must not re-create on every render, read the value through a `useRef` kept in sync, or call `useStore.getState()` at invocation time instead of closing over a selector result.
+**Canonical fix**: Add the omitted variable to the dependency array. For stable callbacks that must not re-create on every render, read the value through a `useRef` kept in sync, or call `<storeHook>.getState()` at invocation time instead of closing over a selector result.
 
 **Past examples**:
 - PR #76: `handleOpenInNewTab` closed over `logFileName` from `useLogStore` but `logFileName` was omitted from the `useCallback` dep array — the callback always used the initial (empty) filename.
