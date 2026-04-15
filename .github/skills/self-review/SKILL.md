@@ -31,6 +31,8 @@ Read the stat output to understand which file types changed.
 - Every JSDoc `@param` / `@returns` / field description matches the current implementation.
 - Test `it(...)` / `describe(...)` descriptions accurately reflect what is being asserted.
 - After a rename, search for the old name in comments (for example, `git grep -n '<old_identifier>'`).
+- CSS block comments (e.g. "No absolute positioning") remain accurate under all variant rules in the same file.
+- JSDoc `@returns` precision: qualitative terms like "snapped to nearest" or column names like "URI column" match the actual implementation semantics.
 
 **P5 — Wrong Variable / Wrong Denominator**
 - In any percentage/ratio calculation: is the denominator the concept it claims to measure?
@@ -41,6 +43,8 @@ Read the stat output to understand which file types changed.
 - `navigator.clipboard`, fetch, and storage calls have `try/catch`.
 - `navigate()` (react-router) is never `await`ed.
 - `URL.revokeObjectURL` is deferred to `setTimeout(..., 0)`, not called synchronously after `a.click()`.
+- `localStorage.getItem` / `setItem` / `removeItem` in `useEffect` or startup paths are wrapped in `try/catch` (throws `SecurityError` in private-browsing mode).
+- New file-processing paths apply the same validation gates (file-size limit, type guard) as existing paths.
 
 **P9 — ARIA Role / Keyboard Interaction Gaps**
 - No element carries `role="menu"` / `role="menuitem"` without full arrow-key + Escape keyboard handling.
@@ -51,10 +55,13 @@ Read the stat output to understand which file types changed.
 - No `.find()` / `.filter()` inside an outer loop over requests or log lines (pre-build a Map).
 - No Map or index rebuilt on every call that could be computed once.
 - Binary search used where available; linear scan only for small inputs.
+- `Math.max(...array)` / `Math.min(...array)` on large arrays → use `for` loop or `.reduce()`; spreads exceeding ~65k elements throw.
+- New `Uint8Array` copies via `.buffer.slice()` → prefer `.subarray()` (zero-copy) or pass `Uint8Array` directly to `Blob`.
 
 **P11 — State Update / Close-Handler Edge Cases**
 - Close callbacks use functional state updates (`prev => prev === thisItem ? null : prev`).
 - No `onClose` unconditionally sets state to `null` that could clobber a concurrent open.
+- A `useEffect` that re-fetches on a reactive key change (e.g. `userId`) clears the prior result at effect start to prevent stale data showing during the new request.
 
 **P12 — Type Mutability**
 - All new domain type properties (in `src/types/`) are `readonly`.
@@ -69,6 +76,17 @@ Read the stat output to understand which file types changed.
 - HTTP status code regexes use `\d{3}` (exactly 3), not `\d{3,}`.
 - Timestamp-strip regexes accept the same variation as `extractISOTimestamp` in `logParser.ts` (with/without fractional seconds, with/without `Z`).
 - Truthy checks (`if (x.field)`) not used where `0` or `''` are valid non-missing values.
+- Format detection and format parser operate on the same string form (trimmed vs raw); detecting on trimmed but parsing raw causes all-UNKNOWN output.
+- Regex character classes for enum-like token types enumerate all members (e.g. logcat priorities: `V D I W E F A` — not missing `A`).
+
+**P17 — useCallback / useMemo Stale Dependency Array**
+- Every `useCallback` and `useMemo` dep array includes all closed-over state, props, and store-selector results.
+- Check for `// eslint-disable-next-line react-hooks/exhaustive-deps` suppressions that could be hiding a stale dep.
+- For stable callbacks that intentionally omit deps, ensure the omitted value is read via `useRef` or `useStore.getState()` at call time.
+
+**P18 — Keyboard Event `code` vs `key` for Character Shortcuts**
+- `e.code === 'KeyX'` for character-intention shortcuts (wrap, print, save) → replace with `e.key.toLowerCase() === 'x'`.
+- `e.code` is correct only for layout-independent physical keys (`'Escape'`, `'Enter'`, `'Space'`, arrow keys, etc.).
 
 ### 3. For each changed CSS file — apply these patterns
 
@@ -91,12 +109,16 @@ Read the stat output to understand which file types changed.
 - Log-line fixtures set `isoTimestamp`, `displayTime`, and `message` to values matching real parser output (full first physical line with timestamp+level prefix).
 - Filter tests that say a request "should appear" actually include the filter keyword in the fixture's `rawText`.
 - Test comments accurately describe the fixture structure (line counts, field values).
+- Virtualizer mocks (`getVirtualItems`) include `end` (= `start + size`) matching the real TanStack virtualizer shape.
+- When a utility gains a new side-effect call (e.g. `setLogFileName`), the happy-path test adds a matching assertion.
+- Inline test literals typed as domain interfaces include all required fields; tsc excludes test files so gaps compile silently.
 
 **P7 — Test Isolation / Mock Leakage**
 - Any `beforeEach` that overwrites a global (`navigator.clipboard`, `URL.createObjectURL`, etc.) has a matching `afterEach` that restores the original (captured in a `let` before overwriting — `vi.restoreAllMocks()` does NOT restore property assignments).
 - Fake timer tests flush pending timers before switching back to real timers.
 - Zustand store state is reset between tests.
 - Interactive element tests use `userEvent.hover` before `userEvent.click` when a trigger is only visible on hover.
+- `HTMLElement.prototype` property restores in `afterEach` use `Object.getOwnPropertyDescriptor` + `Object.defineProperty`, not assignment to a fixed value.
 
 **P16 — Test Spec Coherence**
 - For UI tests that act as specification, the title describes a user-observable scenario. For integration tests, the title describes the public contract at that boundary.
