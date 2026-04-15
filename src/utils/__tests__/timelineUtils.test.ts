@@ -122,10 +122,10 @@ describe('timelineUtils', () => {
       expect(computeAutoScale(data, 800)).toBeNull();
     });
 
-    it('snaps to nearest discrete step — 5000ms span / 800px → raw ≈ 6.25 → step 5', () => {
-      // raw = 5000 / 800 = 6.25; nearest steps: |6.25-5|=1.25 vs |6.25-10|=3.75 → 5
+    it('snaps up to the smallest step >= raw — 5000ms span / 800px → raw ≈ 6.25 → step 10', () => {
+      // raw = 5000 / 800 = 6.25; ceiling: step 5 (5 < 6.25) is too zoomed-in → step 10
       const data = makeEntries([[0, 5000]]);
-      expect(computeAutoScale(data, 800)).toBe(5);
+      expect(computeAutoScale(data, 800)).toBe(10);
     });
 
     it('snaps to step 10 when raw is close to 10', () => {
@@ -150,7 +150,7 @@ describe('timelineUtils', () => {
     });
 
     it('clamps to the largest step for very long spans', () => {
-      // raw = 1_000_000 / 800 = 1250 → nearest to 1000
+      // raw = 1_000_000 / 800 = 1250 → exceeds all steps → clamped to 1000
       const data = makeEntries([[0, 1_000_000]]);
       expect(computeAutoScale(data, 800)).toBe(1000);
     });
@@ -158,11 +158,12 @@ describe('timelineUtils', () => {
     describe('collapse-idle aware (collapseIdlePeriods = true, the default)', () => {
       // Two clusters separated by a 10 s idle gap (> IDLE_GAP_THRESHOLD_MS = 5 000 ms).
       // The gap band consumes 28 px; request bars must fit the remaining budget.
-      //   Request A: [0, 500]   → 500 ms active
-      //   Gap:       500–10 500 → 10 000 ms gap → collapsed to 28 px
-      //   Request B: [10_500, 11_000] → 500 ms active
-      //   totalActiveMs = 1 000, activePixelBudget = 800 - 28 = 772
-      //   raw = 1000 / 772 ≈ 1.29 → nearest step = 5
+      //   Request A: [0, 500]   → active window [0, 500]
+      //   Gap:       500–10 500 → 10 000 ms → collapsed gap
+      //   Request B: [10_500, 11_000] → active window [10_500, 11_000]
+      //   spanMs = 11 000, collapsedGapMs = 10 000, activeMs = 1 000
+      //   activePixelBudget = 800 - 28 = 772
+      //   raw = 1 000 / 772 ≈ 1.29 → ceiling step = 5
       const gapData = makeEntries([[0, 500], [10_500, 11_000]]);
 
       it('subtracts collapsed gap bands from the pixel budget', () => {
@@ -170,21 +171,21 @@ describe('timelineUtils', () => {
       });
 
       it('produces a different (smaller) scale than the linear path for gapped data', () => {
-        // Linear path: span = 11 000 ms / 800 px → raw ≈ 13.75 → step 10
+        // Linear path: spanMs = 11 000 / 800 px → raw ≈ 13.75 → ceiling step = 25
         const linearScale = computeAutoScale(gapData, 800, 25, false);
+        // Compressed path: activeMs = 1 000, budget = 772 px → raw ≈ 1.29 → ceiling step = 5
         const compressedScale = computeAutoScale(gapData, 800, 25, true);
-        // Compressed scale must be ≤ linear scale (more zoomed-in because gaps are hidden)
-        expect(linearScale).toBe(10);
+        // Compressed scale must be < linear scale (gaps hidden → more zoomed-in fits)
+        expect(linearScale).toBe(25);
         expect(compressedScale).toBe(5);
         expect(compressedScale!).toBeLessThan(linearScale!);
       });
 
       it('ignores gaps shorter than IDLE_GAP_THRESHOLD_MS', () => {
-        // Gap of 2 000 ms < 5 000 ms threshold — treated as active, not collapsed
-        // span-like view: totalActiveMs = 200 + 200 + gap(2000 as active) = 2400 ms / 800 px → raw = 3 → step 5
+        // Gap of 2 000 ms < 5 000 ms threshold — rendered proportionally, not collapsed.
+        // spanMs = 2 400 (last endTime − minStart), collapsedGapMs = 0, activeMs = 2 400.
+        // raw = 2 400 / 800 = 3 → ceiling step = 5
         const smallGapData = makeEntries([[0, 200], [2_200, 2_400]]);
-        // merged: [{0, 200}, {2200, 2400}], gap = 2000 < threshold, so numCollapsedGaps = 0
-        // totalActiveMs = 200 + 200 = 400; activePixelBudget = 800; raw = 400/800 = 0.5 → step 5
         expect(computeAutoScale(smallGapData, 800, 25, true)).toBe(5);
       });
     });

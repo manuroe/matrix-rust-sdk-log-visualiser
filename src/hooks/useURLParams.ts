@@ -71,9 +71,11 @@ export function useURLParams() {
 
   // Set timeline scale
   const setScale = useCallback((newScale: number) => {
+    // Always write scale to the URL — even the default value — so that an
+    // explicit user selection (including 10ms/px) is distinguishable from
+    // "no scale set" and prevents the auto-scale effect from overriding it.
     updateParams({
-      // Omit from URL if default
-      scale: newScale === DEFAULT_MS_PER_PIXEL ? null : newScale.toString(),
+      scale: newScale.toString(),
     });
   }, [updateParams]);
 

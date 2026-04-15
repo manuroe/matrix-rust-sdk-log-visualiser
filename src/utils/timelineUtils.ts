@@ -64,19 +64,17 @@ export function computeAutoScale(
   const slice = timeData.slice(0, requestCount);
   if (slice.length === 0) return null;
 
-  /** Snap a raw ms/px value to the nearest discrete step. */
+  /** Snap a raw ms/px value to the smallest discrete step that is >= rawMsPerPixel.
+   * This guarantees the first N requests always fit within the container — picking
+   * a smaller step would require more pixels than the budget allows.
+   * If rawMsPerPixel exceeds every step, the largest step (most zoomed-out) is returned.
+   */
   function snapToStep(rawMsPerPixel: number): number {
     const steps = TIMELINE_SCALE_OPTIONS.map((o) => o.value);
-    let nearest = steps[0];
-    let minDist = Math.abs(rawMsPerPixel - nearest);
     for (const step of steps) {
-      const dist = Math.abs(rawMsPerPixel - step);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = step;
-      }
+      if (step >= rawMsPerPixel) return step;
     }
-    return nearest;
+    return steps[steps.length - 1]; // clamp to most zoomed-out step
   }
 
   const minStart = Math.min(...slice.map((t) => t.startTime));
@@ -96,18 +94,27 @@ export function computeAutoScale(
       }
     }
 
-    let totalActiveMs = 0;
+    let collapsedGapMs = 0;
     let numCollapsedGaps = 0;
     let cursor = 0;
     for (const active of merged) {
-      if (active.startMs - cursor > IDLE_GAP_THRESHOLD_MS) {
+      const gapDuration = active.startMs - cursor;
+      if (gapDuration > IDLE_GAP_THRESHOLD_MS) {
         numCollapsedGaps++;
+        // Only the collapsed gap's ms are removed from the pixel budget; the
+        // fixed COLLAPSED_GAP_PX band is subtracted from the container below.
+        collapsedGapMs += gapDuration;
       }
-      totalActiveMs += active.endMs - active.startMs;
       cursor = active.endMs;
     }
 
-    if (totalActiveMs <= 0) return null;
+    // spanMs includes every millisecond that will be rendered proportionally
+    // (active bars + short sub-threshold gaps). Subtracting collapsed-gap
+    // durations gives the ms that must fit within the non-gap pixel budget.
+    const spanMs = merged.length > 0 ? merged[merged.length - 1].endMs : 0;
+    const activeMs = spanMs - collapsedGapMs;
+
+    if (activeMs <= 0) return null;
 
     const activePixelBudget = containerWidth - numCollapsedGaps * COLLAPSED_GAP_PX;
     if (activePixelBudget <= 0) {
@@ -115,7 +122,7 @@ export function computeAutoScale(
       return TIMELINE_SCALE_OPTIONS[TIMELINE_SCALE_OPTIONS.length - 1].value;
     }
 
-    return snapToStep(totalActiveMs / activePixelBudget);
+    return snapToStep(activeMs / activePixelBudget);
   }
 
   // Linear path: fit the full span proportionally.

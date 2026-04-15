@@ -179,7 +179,7 @@ describe('useURLParams', () => {
       expect(result.current.scale).toBe(50);
     });
 
-    it('setScale with default value removes param', () => {
+    it('setScale with default value still writes param to URL', () => {
       const { result } = renderHook(() => useURLParams(), {
         wrapper: createWrapper(['/?scale=50']),
       });
@@ -188,8 +188,10 @@ describe('useURLParams', () => {
         result.current.setScale(10); // DEFAULT_MS_PER_PIXEL
       });
 
-      // Scale should return default but param should be removed
+      // Scale should be written to URL even when it equals the default,
+      // so hasExplicitScale stays true and auto-scale does not override it.
       expect(result.current.scale).toBe(10);
+      expect(result.current.hasExplicitScale).toBe(true);
     });
 
     it('setStatusFilter updates status param', () => {
