@@ -5,6 +5,7 @@ import {
   calculateTimelineWidth,
   getWaterfallPosition,
   getWaterfallBarWidth,
+  computeAutoScale,
 } from '../timelineUtils';
 
 describe('timelineUtils', () => {
@@ -100,6 +101,92 @@ describe('timelineUtils', () => {
       // calculatedWidth = (1/1_000_000)*100 = 0.0001
       // dynamicMin = max(1, 1/10) = max(1, 0.1) = 1
       expect(w).toBe(1);
+    });
+  });
+
+  describe('computeAutoScale', () => {
+    const makeEntries = (pairs: [number, number][]) =>
+      pairs.map(([startTime, endTime]) => ({ startTime, endTime }));
+
+    it('returns null for empty timeData', () => {
+      expect(computeAutoScale([], 800)).toBeNull();
+    });
+
+    it('returns null when containerWidth is zero', () => {
+      const data = makeEntries([[0, 5000]]);
+      expect(computeAutoScale(data, 0)).toBeNull();
+    });
+
+    it('returns null when span is zero (all requests at same instant)', () => {
+      const data = makeEntries([[1000, 1000]]);
+      expect(computeAutoScale(data, 800)).toBeNull();
+    });
+
+    it('snaps to nearest discrete step — 5000ms span / 800px → raw ≈ 6.25 → step 5', () => {
+      // raw = 5000 / 800 = 6.25; nearest steps: |6.25-5|=1.25 vs |6.25-10|=3.75 → 5
+      const data = makeEntries([[0, 5000]]);
+      expect(computeAutoScale(data, 800)).toBe(5);
+    });
+
+    it('snaps to step 10 when raw is close to 10', () => {
+      // raw = 8000 / 800 = 10 → exactly step 10
+      const data = makeEntries([[0, 8000]]);
+      expect(computeAutoScale(data, 800)).toBe(10);
+    });
+
+    it('only considers the first requestCount (default 25) entries', () => {
+      // First 25 entries span 5000ms; remaining entries span much more
+      const first25 = Array.from({ length: 25 }, (_, i) => [i * 10, i * 10 + 100] as [number, number]);
+      const rest = [[0, 500_000]] as [number, number][];
+      const data = makeEntries([...first25, ...rest]);
+      // span of first 25 = (24*10+100) - 0 = 340ms in 800px → raw ≈ 0.425 → snaps to 5
+      expect(computeAutoScale(data, 800)).toBe(5);
+    });
+
+    it('respects a custom requestCount', () => {
+      // Only first 1 entry: span = 500ms in 800px → raw ≈ 0.625 → snaps to 5
+      const data = makeEntries([[0, 500], [0, 200_000]]);
+      expect(computeAutoScale(data, 800, 1)).toBe(5);
+    });
+
+    it('clamps to the largest step for very long spans', () => {
+      // raw = 1_000_000 / 800 = 1250 → nearest to 1000
+      const data = makeEntries([[0, 1_000_000]]);
+      expect(computeAutoScale(data, 800)).toBe(1000);
+    });
+
+    describe('collapse-idle aware (collapseIdlePeriods = true, the default)', () => {
+      // Two clusters separated by a 10 s idle gap (> IDLE_GAP_THRESHOLD_MS = 5 000 ms).
+      // The gap band consumes 28 px; request bars must fit the remaining budget.
+      //   Request A: [0, 500]   → 500 ms active
+      //   Gap:       500–10 500 → 10 000 ms gap → collapsed to 28 px
+      //   Request B: [10_500, 11_000] → 500 ms active
+      //   totalActiveMs = 1 000, activePixelBudget = 800 - 28 = 772
+      //   raw = 1000 / 772 ≈ 1.29 → nearest step = 5
+      const gapData = makeEntries([[0, 500], [10_500, 11_000]]);
+
+      it('subtracts collapsed gap bands from the pixel budget', () => {
+        expect(computeAutoScale(gapData, 800)).toBe(5);
+      });
+
+      it('produces a different (smaller) scale than the linear path for gapped data', () => {
+        // Linear path: span = 11 000 ms / 800 px → raw ≈ 13.75 → step 10
+        const linearScale = computeAutoScale(gapData, 800, 25, false);
+        const compressedScale = computeAutoScale(gapData, 800, 25, true);
+        // Compressed scale must be ≤ linear scale (more zoomed-in because gaps are hidden)
+        expect(linearScale).toBe(10);
+        expect(compressedScale).toBe(5);
+        expect(compressedScale!).toBeLessThan(linearScale!);
+      });
+
+      it('ignores gaps shorter than IDLE_GAP_THRESHOLD_MS', () => {
+        // Gap of 2 000 ms < 5 000 ms threshold — treated as active, not collapsed
+        // span-like view: totalActiveMs = 200 + 200 + gap(2000 as active) = 2400 ms / 800 px → raw = 3 → step 5
+        const smallGapData = makeEntries([[0, 200], [2_200, 2_400]]);
+        // merged: [{0, 200}, {2200, 2400}], gap = 2000 < threshold, so numCollapsedGaps = 0
+        // totalActiveMs = 200 + 200 = 400; activePixelBudget = 800; raw = 400/800 = 0.5 → step 5
+        expect(computeAutoScale(smallGapData, 800, 25, true)).toBe(5);
+      });
     });
   });
 });

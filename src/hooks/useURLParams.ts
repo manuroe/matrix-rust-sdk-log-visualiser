@@ -111,6 +111,8 @@ export function useURLParams() {
     start,
     end,
     scale,
+    /** True when the URL contains an explicit `scale` param (i.e. the user set it). */
+    hasExplicitScale: scaleParam !== null,
     status,
     filter,
     requestId,

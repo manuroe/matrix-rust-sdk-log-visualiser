@@ -15,7 +15,7 @@ import type { SearchInputHandle } from './SearchInput';
 import { useKeyboardShortcutContextOptional } from './KeyboardShortcutContext';
 import { metaKey, optionKey } from '../utils/shortcuts';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { calculateTimelineWidth } from '../utils/timelineUtils';
+import { calculateTimelineWidth, computeAutoScale } from '../utils/timelineUtils';
 import { buildCompressedTimeline, buildLinearTimeline, formatGapDuration, LABEL_PADDING_PX } from '../utils/waterfallGapUtils';
 import { LogDisplayView } from '../views/LogDisplayView';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
@@ -149,11 +149,13 @@ export function RequestTable({
     logFilter,
   } = useLogStore();
   const navigate = useNavigate();
-  const { setLogFilter } = useURLParams();
+  const { setLogFilter, setScale, hasExplicitScale } = useURLParams();
 
   const waterfallContainerRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  /** Tracks whether auto-scale has fired for this mount. Resets on unmount so navigating back refits. */
+  const autoScaleApplied = useRef(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [showSyncRequests, setShowSyncRequests] = useState(true);
   /** When true (default), idle gaps longer than the threshold are collapsed to narrow stripe bands. */
@@ -356,6 +358,18 @@ export function RequestTable({
       observer.disconnect();
     };
   }, []);
+
+  // Automatically pick a scale so the first 25 requests fit the container, but only
+  // when there is no explicit ?scale= URL param (i.e. the user has not set it manually).
+  useEffect(() => {
+    if (containerWidth === 0) return;
+    if (hasExplicitScale) return;
+    if (autoScaleApplied.current) return;
+    const scale = computeAutoScale(timeData, containerWidth, 25, collapseIdlePeriods);
+    if (scale === null) return;
+    setScale(scale);
+    autoScaleApplied.current = true;
+  }, [containerWidth, timeData, hasExplicitScale, setScale, collapseIdlePeriods]);
 
   /** Handle click on request ID - toggle expansion or open log viewer */
   const handleRequestClick = useCallback((rowKey: number, requestId: string, req?: HttpRequest) => {
