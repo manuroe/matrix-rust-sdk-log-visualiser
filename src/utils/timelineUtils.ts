@@ -45,8 +45,8 @@ export const TIMELINE_SCALE_OPTIONS = [
  * @returns Snapped ms-per-pixel value, or `null` if a scale cannot be computed.
  *
  * @example
- * // 25 requests spanning 5 000 ms in an 800 px container → raw ≈ 6.25 → snapped to 5
- * computeAutoScale(timeData, 800); // → 5
+ * // 25 requests spanning 5 000 ms in an 800 px container → raw ≈ 6.25 → snapped to 10
+ * computeAutoScale(timeData, 800); // → 10
  *
  * @example
  * // Two clusters separated by a 10 s gap; collapse-idle on, 800 px container
