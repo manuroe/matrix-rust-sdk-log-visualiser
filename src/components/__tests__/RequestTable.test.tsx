@@ -57,6 +57,10 @@ vi.mock('../BurgerMenu', () => ({
   BurgerMenu: () => <div data-testid="burger-menu" />,
 }));
 
+// Mutable flag controlling hasExplicitScale returned by the useURLParams mock.
+// Tests that need hasExplicitScale:true write to this before rendering.
+let _hasExplicitScale = false;
+
 // Mock useURLParams to directly update store (simulating App.tsx URL→Store sync)
 vi.mock('../../hooks/useURLParams', () => ({
   useURLParams: () => ({
@@ -71,6 +75,7 @@ vi.mock('../../hooks/useURLParams', () => ({
       useLogStore.getState().setTimelineScale(scale);
     },
     setRequestId: () => {},
+    hasExplicitScale: _hasExplicitScale,
   }),
 }));
 
@@ -1134,5 +1139,99 @@ describe('RequestTable — multi-attempt segment rendering', () => {
       (el) => el.textContent === expectedLabel
     );
     expect(durationSpans.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('RequestTable — auto-scale effect', () => {
+  // Two short-duration requests with a sub-threshold gap (< 5 s).
+  // totalActiveMs = 100+100 = 200 ms; containerWidth = 800 px.
+  // raw = 200/800 = 0.25 → snaps to step 5 (different from default 10).
+  const BASE_TS = 1_700_000_000_000_000;
+  function setupRequests() {
+    const requests = [
+      createHttpRequest({ requestId: 'AS-1', sendLineNumber: 0, responseLineNumber: 1, requestDurationMs: 100 }),
+      createHttpRequest({ requestId: 'AS-2', sendLineNumber: 2, responseLineNumber: 3, requestDurationMs: 100 }),
+    ];
+    const rawLines = [
+      createParsedLogLine({ lineNumber: 0, timestampUs: BASE_TS }),
+      createParsedLogLine({ lineNumber: 1, timestampUs: BASE_TS + 100_000 }),
+      createParsedLogLine({ lineNumber: 2, timestampUs: BASE_TS + 1_000_000 }),
+      createParsedLogLine({ lineNumber: 3, timestampUs: BASE_TS + 1_100_000 }),
+    ];
+    useLogStore.getState().setHttpRequests(requests, rawLines);
+    return requests;
+  }
+
+  beforeEach(() => {
+    _hasExplicitScale = false;
+    useLogStore.getState().clearData();
+    // Mock clientWidth so the resize effect sets containerWidth to 800 immediately.
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 800,
+    });
+  });
+
+  afterEach(() => {
+    _hasExplicitScale = false;
+    // Restore clientWidth to the jsdom default (0)
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 0,
+    });
+  });
+
+  it('applies auto-scale when containerWidth > 0 and no explicit scale', () => {
+    const requests = setupRequests();
+    renderWithRouter(
+      <RequestTable {...createProps({ filteredRequests: requests, totalCount: 2, msPerPixel: 10 })} />
+    );
+    // Scale should have been set to 5 (snapped from raw ≈ 0.25)
+    expect(useLogStore.getState().timelineScale).toBe(5);
+  });
+
+  it('skips auto-scale when hasExplicitScale is true', () => {
+    const requests = setupRequests();
+    _hasExplicitScale = true;
+    useLogStore.getState().setTimelineScale(10); // pre-set the store value
+    renderWithRouter(
+      <RequestTable {...createProps({ filteredRequests: requests, totalCount: 2, msPerPixel: 10 })} />
+    );
+    expect(useLogStore.getState().timelineScale).toBe(10); // unchanged
+  });
+
+  it('skips auto-scale when computeAutoScale returns null (no timestamps)', () => {
+    // Requests present but rawLines not loaded → lineNumberIndex is empty → timestamps = 0 → filtered out
+    const requests = [
+      createHttpRequest({ requestId: 'NO-TS', sendLineNumber: 0, responseLineNumber: 1 }),
+    ];
+    useLogStore.getState().setTimelineScale(10);
+    renderWithRouter(
+      <RequestTable {...createProps({ filteredRequests: requests, totalCount: 1, msPerPixel: 10 })} />
+    );
+    expect(useLogStore.getState().timelineScale).toBe(10); // unchanged
+  });
+
+  it('applies auto-scale only once per mount (autoScaleApplied guard)', () => {
+    const requests = setupRequests();
+    const { rerender } = renderWithRouter(
+      <RequestTable {...createProps({ filteredRequests: requests, totalCount: 2, msPerPixel: 10 })} />
+    );
+    expect(useLogStore.getState().timelineScale).toBe(5); // auto-scale fired
+
+    // Update scale in store to simulate user adjusting it
+    act(() => { useLogStore.getState().setTimelineScale(50); });
+
+    // Rerender with different requests — timeData dep changes, effect re-runs, but guard blocks
+    const moreRequests = [
+      createHttpRequest({ requestId: 'AS-3', sendLineNumber: 0, responseLineNumber: 1, requestDurationMs: 100 }),
+    ];
+    rerender(
+      <MemoryRouter initialEntries={['/http_requests']}>
+        <RequestTable {...createProps({ filteredRequests: moreRequests, totalCount: 1, msPerPixel: 50 })} />
+      </MemoryRouter>
+    );
+    // Scale should still be 50 (guard prevented re-fire)
+    expect(useLogStore.getState().timelineScale).toBe(50);
   });
 });

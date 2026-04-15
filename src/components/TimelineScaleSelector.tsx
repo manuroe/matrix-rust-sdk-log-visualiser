@@ -1,19 +1,8 @@
 import { useRef, useState, useCallback } from 'react';
 import { useURLParams } from '../hooks/useURLParams';
 import { useClickOutside } from '../hooks/useClickOutside';
+import { TIMELINE_SCALE_OPTIONS } from '../utils/timelineUtils';
 import styles from './TimelineScaleSelector.module.css';
-
-// Available timeline scale options (ms per pixel)
-const TIMELINE_SCALE_OPTIONS = [
-  { value: 5, label: '1px = 5ms' },
-  { value: 10, label: '1px = 10ms' },
-  { value: 25, label: '1px = 25ms' },
-  { value: 50, label: '1px = 50ms' },
-  { value: 100, label: '1px = 100ms' },
-  { value: 250, label: '1px = 250ms' },
-  { value: 500, label: '1px = 500ms' },
-  { value: 1000, label: '1px = 1000ms' },
-];
 
 interface TimelineScaleSelectorProps {
   /** Current ms per pixel value */

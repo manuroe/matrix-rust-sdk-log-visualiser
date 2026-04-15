@@ -5,6 +5,7 @@ import {
   calculateTimelineWidth,
   getWaterfallPosition,
   getWaterfallBarWidth,
+  computeAutoScale,
 } from '../timelineUtils';
 
 describe('timelineUtils', () => {
@@ -100,6 +101,93 @@ describe('timelineUtils', () => {
       // calculatedWidth = (1/1_000_000)*100 = 0.0001
       // dynamicMin = max(1, 1/10) = max(1, 0.1) = 1
       expect(w).toBe(1);
+    });
+  });
+
+  describe('computeAutoScale', () => {
+    const makeEntries = (pairs: [number, number][]) =>
+      pairs.map(([startTime, endTime]) => ({ startTime, endTime }));
+
+    it('returns null for empty timeData', () => {
+      expect(computeAutoScale([], 800)).toBeNull();
+    });
+
+    it('returns null when containerWidth is zero', () => {
+      const data = makeEntries([[0, 5000]]);
+      expect(computeAutoScale(data, 0)).toBeNull();
+    });
+
+    it('returns null when span is zero (all requests at same instant)', () => {
+      const data = makeEntries([[1000, 1000]]);
+      expect(computeAutoScale(data, 800)).toBeNull();
+    });
+
+    it('snaps up to the smallest step >= raw — 5000ms span / 800px → raw ≈ 6.25 → step 10', () => {
+      // raw = 5000 / 800 = 6.25; ceiling: step 5 (5 < 6.25) is too zoomed-in → step 10
+      const data = makeEntries([[0, 5000]]);
+      expect(computeAutoScale(data, 800)).toBe(10);
+    });
+
+    it('snaps to step 10 when raw is close to 10', () => {
+      // raw = 8000 / 800 = 10 → exactly step 10
+      const data = makeEntries([[0, 8000]]);
+      expect(computeAutoScale(data, 800)).toBe(10);
+    });
+
+    it('only considers the first requestCount (default 25) entries', () => {
+      // First 25 entries span 5000ms; remaining entries span much more
+      const first25 = Array.from({ length: 25 }, (_, i) => [i * 10, i * 10 + 100] as [number, number]);
+      const rest = [[0, 500_000]] as [number, number][];
+      const data = makeEntries([...first25, ...rest]);
+      // span of first 25 = (24*10+100) - 0 = 340ms in 800px → raw ≈ 0.425 → snaps to 5
+      expect(computeAutoScale(data, 800)).toBe(5);
+    });
+
+    it('respects a custom requestCount', () => {
+      // Only first 1 entry: span = 500ms in 800px → raw ≈ 0.625 → snaps to 5
+      const data = makeEntries([[0, 500], [0, 200_000]]);
+      expect(computeAutoScale(data, 800, 1)).toBe(5);
+    });
+
+    it('clamps to the largest step for very long spans', () => {
+      // raw = 1_000_000 / 800 = 1250 → exceeds all steps → clamped to 1000
+      const data = makeEntries([[0, 1_000_000]]);
+      expect(computeAutoScale(data, 800)).toBe(1000);
+    });
+
+    describe('collapse-idle aware (collapseIdlePeriods = true, the default)', () => {
+      // Two clusters separated by a 10 s idle gap (> IDLE_GAP_THRESHOLD_MS = 5 000 ms).
+      // The gap band consumes 28 px; request bars must fit the remaining budget.
+      //   Request A: [0, 500]   → active window [0, 500]
+      //   Gap:       500–10 500 → 10 000 ms → collapsed gap
+      //   Request B: [10_500, 11_000] → active window [10_500, 11_000]
+      //   spanMs = 11 000, collapsedGapMs = 10 000, activeMs = 1 000
+      //   activePixelBudget = 800 - 28 = 772
+      //   raw = 1 000 / 772 ≈ 1.29 → ceiling step = 5
+      const gapData = makeEntries([[0, 500], [10_500, 11_000]]);
+
+      it('subtracts collapsed gap bands from the pixel budget', () => {
+        expect(computeAutoScale(gapData, 800)).toBe(5);
+      });
+
+      it('produces a different (smaller) scale than the linear path for gapped data', () => {
+        // Linear path: spanMs = 11 000 / 800 px → raw ≈ 13.75 → ceiling step = 25
+        const linearScale = computeAutoScale(gapData, 800, 25, false);
+        // Compressed path: activeMs = 1 000, budget = 772 px → raw ≈ 1.29 → ceiling step = 5
+        const compressedScale = computeAutoScale(gapData, 800, 25, true);
+        // Compressed scale must be < linear scale (gaps hidden → more zoomed-in fits)
+        expect(linearScale).toBe(25);
+        expect(compressedScale).toBe(5);
+        expect(compressedScale!).toBeLessThan(linearScale!);
+      });
+
+      it('ignores gaps shorter than IDLE_GAP_THRESHOLD_MS', () => {
+        // Gap of 2 000 ms < 5 000 ms threshold — rendered proportionally, not collapsed.
+        // spanMs = 2 400 (last endTime − minStart), collapsedGapMs = 0, activeMs = 2 400.
+        // raw = 2 400 / 800 = 3 → ceiling step = 5
+        const smallGapData = makeEntries([[0, 200], [2_200, 2_400]]);
+        expect(computeAutoScale(smallGapData, 800, 25, true)).toBe(5);
+      });
     });
   });
 });
